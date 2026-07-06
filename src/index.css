@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #299775;
+  --color-primary-dark: #1d7a5f;
+  --color-primary-light: #d1f0e6;
+  --color-accent: #DEB660;
+  --color-accent-dark: #c49a40;
+  --color-accent-light: #fdf3dc;
+  --color-dark: #1F2937;
+  --color-bg: #F9FAFB;
+  --color-status-pending: #f59e0b;
+  --color-status-approved: #3b82f6;
+  --color-status-done: #299775;
+  --color-status-rejected: #ef4444;
+
+  --font-family-sans: 'Inter', sans-serif;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F9FAFB;
+    color: #1F2937;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    line-height: 1.3;
+  }
+}
+
+@layer utilities {
+  .text-primary { color: #299775; }
+  .text-accent { color: #DEB660; }
+  .bg-primary { background-color: #299775; }
+  .bg-primary-dark { background-color: #1d7a5f; }
+  .bg-primary-light { background-color: #d1f0e6; }
+  .bg-accent { background-color: #DEB660; }
+  .bg-accent-light { background-color: #fdf3dc; }
+  .border-primary { border-color: #299775; }
+  .border-accent { border-color: #DEB660; }
+  .ring-primary { --tw-ring-color: #299775; }
+
+  .shadow-card {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .shadow-card-hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, #299775 0%, #1d7a5f 100%);
+  }
+
+  .gradient-accent {
+    background: linear-gradient(135deg, #DEB660 0%, #c49a40 100%);
+  }
+
+  /* Custom scrollbar */
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
+
+/* Transitions */
+.transition-base {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Toast animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.toast-exit {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Pulse */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
