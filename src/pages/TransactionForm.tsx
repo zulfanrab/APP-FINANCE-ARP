@@ -1,17 +1,18 @@
 // ============================================================
 // ARKA Finance — Transaction Form (Input Transaksi)
-// Includes: OCR scan, file upload, Rupiah auto-format
+// Includes: OCR scan, multi-file cloud upload, Rupiah auto-format
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Save, Upload, X, Camera, Loader2, Image, FileText,
-  ScanLine, AlertCircle, ArrowLeft
+  Save, Upload, X, Camera, Loader2, FileText,
+  ScanLine, AlertCircle, ArrowLeft, CheckCircle2
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { addTransaction } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
+import { uploadAttachmentFile } from '../services/storageService';
 import { type Project, type Attachment } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
 import { useApp } from '../context/AppContext';
@@ -49,6 +50,7 @@ export function TransactionForm() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState('');
@@ -73,20 +75,40 @@ export function TransactionForm() {
     setForm(f => ({ ...f, [key]: value }));
   };
 
-  // File upload handler
+  // Multi-file upload handler
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const selectedProject = projects.find(p => p.id === form.proyekId);
+    const uploadContext = {
+      tanggal: form.tanggal,
+      proyekNama: selectedProject?.nama,
+      tag: form.tag,
+    };
+
+    setUploadingFiles(true);
+    let successCount = 0;
+
     for (const file of files) {
-      if (file.size > 5 * 1024 * 1024) {
-        addToast('error', `File ${file.name} terlalu besar (maks 5MB)`);
+      if (file.size > 50 * 1024 * 1024) {
+        addToast('error', `File ${file.name} terlalu besar (maksimal 50MB)`);
         continue;
       }
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = ev => resolve(ev.target?.result as string);
-        reader.readAsDataURL(file);
-      });
-      setAttachments(prev => [...prev, { nama: file.name, tipe: file.type, dataUrl }]);
+
+      try {
+        const att = await uploadAttachmentFile(file, uploadContext);
+        setAttachments(prev => [...prev, att]);
+        successCount++;
+      } catch (err) {
+        console.error('File upload error:', err);
+        addToast('error', `Gagal mengunggah ${file.name}`);
+      }
+    }
+
+    setUploadingFiles(false);
+    if (successCount > 0) {
+      addToast('success', `${successCount} file lampiran berhasil ditambahkan!`);
     }
     e.target.value = '';
   };
@@ -114,7 +136,6 @@ export function TransactionForm() {
       const text = result.data.text;
       setOcrResult(text);
 
-      // Try to extract amount from OCR text
       const nominalMatch = text.match(/(?:total|jumlah|rp\.?|idr)\s*[:\s]*([0-9.,]+)/i)
         ?? text.match(/([0-9]{3,}[.,][0-9]{2,})/);
 
@@ -127,7 +148,6 @@ export function TransactionForm() {
         }
       }
 
-      // Try to extract description
       const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && l.length < 60);
       if (lines.length > 0 && !form.deskripsi) {
         setField('deskripsi', lines[0]);
@@ -355,38 +375,68 @@ export function TransactionForm() {
           <input ref={ocrInputRef} type="file" accept="image/*" className="hidden" onChange={handleOcrScan} />
         </Card>
 
-        {/* Lampiran */}
+        {/* Multi-File Cloud Lampiran */}
         <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-accent-light flex items-center justify-center">
-              <Upload size={18} className="text-accent-dark" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-accent-light flex items-center justify-center">
+                <Upload size={18} className="text-accent-dark" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-800">Lampiran & Dokumen</h2>
+                <p className="text-xs text-gray-500">Mendukung multi-file (gambar, PDF, DOC) s.d 50MB/file</p>
+              </div>
             </div>
-            <h2 className="text-base font-semibold text-gray-800">Lampiran</h2>
+            {attachments.length > 0 && (
+              <span className="text-xs font-semibold px-2.5 py-1 bg-green-100 text-green-700 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={12} /> {attachments.length} file
+              </span>
+            )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center justify-center gap-3 py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-accent hover:text-accent-dark hover:bg-accent-light transition-all mb-3"
-          >
-            <Upload size={20} />
-            <span className="text-sm font-medium">Upload Lampiran (bisa lebih dari 1 file)</span>
-          </button>
-          <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" onChange={handleFileChange} />
+          {uploadingFiles ? (
+            <div className="bg-primary-light rounded-xl p-4 flex items-center gap-3 mb-3">
+              <Loader2 size={18} className="animate-spin text-primary" />
+              <span className="text-sm text-primary font-medium">Mengunggah file lampiran ke Cloud...</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-accent hover:text-accent-dark hover:bg-accent-light transition-all mb-3"
+            >
+              <Upload size={20} />
+              <span className="text-sm font-medium">Pilih & Upload Lampiran (Multi-file)</span>
+            </button>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
           {attachments.length > 0 && (
             <div className="space-y-2">
               {attachments.map((att, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
                   {att.tipe.startsWith('image') ? (
                     <img src={att.dataUrl} alt={att.nama} className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText size={18} className="text-gray-500" />
+                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-xs">
+                      <FileText size={18} />
                     </div>
                   )}
-                  <p className="text-sm text-gray-700 flex-1 truncate">{att.nama}</p>
-                  <button type="button" onClick={() => removeAttachment(idx)} className="text-gray-400 hover:text-red-500 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{att.nama}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {att.dataUrl.startsWith('http') ? '🌐 Cloud Storage Link' : '📄 File Siap Upload'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => removeAttachment(idx)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
                     <X size={16} />
                   </button>
                 </div>
@@ -398,7 +448,7 @@ export function TransactionForm() {
         {/* Submit */}
         <div className="flex gap-3">
           <Button type="button" variant="secondary" className="flex-1" onClick={() => navigate(-1)}>Batal</Button>
-          <Button type="submit" loading={loading} icon={<Save size={16} />} className="flex-1">
+          <Button type="submit" loading={loading || uploadingFiles} icon={<Save size={16} />} className="flex-1">
             Simpan Transaksi
           </Button>
         </div>
