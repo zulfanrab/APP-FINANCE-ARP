@@ -209,17 +209,17 @@ export function TransactionForm() {
         {/* Basic Info Card */}
         <Card>
           <h2 className="text-base font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">Informasi Utama</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-full overflow-hidden">
             {/* Jenis */}
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 min-w-0">
               <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Jenis Transaksi</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 max-w-full">
                 {(['masuk', 'keluar'] as const).map(j => (
                   <button
                     key={j}
                     type="button"
                     onClick={() => setField('jenis', j)}
-                    className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all active:scale-95
+                    className={`py-2.5 px-3 rounded-xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 truncate
                       ${form.jenis === j
                         ? j === 'masuk' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-red-500 bg-red-50 text-red-700 shadow-sm'
                         : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-white'
@@ -232,26 +232,26 @@ export function TransactionForm() {
             </div>
 
             {/* Tanggal */}
-            <div>
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal</label>
               <input
                 type="date"
                 value={form.tanggal}
                 onChange={e => setField('tanggal', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                className="w-full max-w-full box-border border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white appearance-none min-w-0 overflow-hidden"
                 required
               />
             </div>
 
             {/* Nominal */}
-            <div>
+            <div className="min-w-0">
               <label className="block text-xs font-semibold text-gray-700 mb-1">Nominal (Rp) *</label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={form.nominalStr}
                 onChange={e => setField('nominalStr', formatRupiahInput(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-base font-extrabold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                className="w-full max-w-full box-border border border-gray-200 rounded-xl px-3 py-2.5 text-base font-extrabold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary bg-white min-w-0"
                 placeholder="0"
                 required
               />

@@ -2,13 +2,15 @@
 // ARKA Finance — Mobile App Header Bar (Native Look with Safe Area)
 // ============================================================
 
-import React from 'react';
-import { LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { LogOut, BookOpen } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
+import { UserGuideModal } from '../ui/UserGuideModal';
 
 export function MobileHeader() {
   const { role, logout } = useAuth();
+  const [guideOpen, setGuideOpen] = useState(false);
 
   return (
     <header className="md:hidden sticky top-0 z-40 bg-[#0F172A]/98 backdrop-blur-xl text-white border-b border-white/10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between shadow-lg">
@@ -28,9 +30,18 @@ export function MobileHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => setGuideOpen(true)}
+          className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-emerald-300 hover:text-emerald-200 transition-all active:scale-95"
+          title="Buku Panduan Penggunaan"
+        >
+          <BookOpen size={16} />
+        </button>
+
         <span className="px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-semibold text-emerald-300 border border-emerald-500/20 capitalize">
           {role === 'owner' ? '👑 Owner' : '💼 Admin'}
         </span>
+
         <button
           onClick={logout}
           className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-red-500/30 transition-all active:scale-95"
@@ -38,6 +49,8 @@ export function MobileHeader() {
         >
           <LogOut size={16} />
         </button>
+
+        <UserGuideModal isOpen={guideOpen} onClose={() => setGuideOpen(false)} />
       </div>
     </header>
   );

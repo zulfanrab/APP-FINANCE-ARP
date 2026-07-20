@@ -19,7 +19,7 @@ import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
 import { uploadAttachmentFile } from '../services/storageService';
 import { type Transaction, type DashboardSummary, type MonthlyChartData, type Project, type Attachment } from '../types';
-import { Card, Button, StatusBadge, DashboardSkeleton, EmptyState, formatRupiah, formatDate, AttachmentViewer } from '../components/ui';
+import { Card, Button, StatusBadge, LoadingSpinner, EmptyState, formatRupiah, formatDate, AttachmentViewer } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 
@@ -248,7 +248,7 @@ export function OwnerDashboard() {
     }
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <LoadingSpinner size={32} />;
 
   const getDaysPending = (dateStr: string): number => {
     const txDate = new Date(dateStr).getTime();

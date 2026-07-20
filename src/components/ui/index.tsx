@@ -168,5 +168,4 @@ export function formatDate(dateStr: string): string {
 }
 
 export { AttachmentViewer } from './AttachmentViewer';
-export { CardSkeleton, TableRowSkeleton, DashboardSkeleton } from './Skeleton';
 
