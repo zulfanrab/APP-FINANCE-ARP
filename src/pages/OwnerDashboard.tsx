@@ -1,25 +1,25 @@
 // ============================================================
 // ARKA Finance — Owner Dashboard
+// Includes Owner Quick Transaction / Prive Entry (Instant Approval)
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, Clock, CheckCircle,
-  XCircle, Upload, X, ChevronRight, AlertTriangle
+  XCircle, Upload, X, ChevronRight, AlertTriangle, PlusCircle, Paperclip, ExternalLink, Sparkles
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
 } from 'recharts';
 import {
-  getTransactions, updateTransactionStatus, uploadBuktiTransfer, filterTransactions
+  getTransactions, updateTransactionStatus, uploadBuktiTransfer, addTransaction
 } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
 import { uploadAttachmentFile } from '../services/storageService';
-import { type Transaction, type DashboardSummary, type MonthlyChartData } from '../types';
+import { type Transaction, type DashboardSummary, type MonthlyChartData, type Project, type Attachment } from '../types';
 import { Card, Button, StatusBadge, LoadingSpinner, EmptyState, formatRupiah, formatDate, AttachmentViewer } from '../components/ui';
-
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 
@@ -38,6 +38,16 @@ function SummaryCard({ label, value, icon, color, sub }: {
       </div>
     </Card>
   );
+}
+
+function formatRupiahInput(value: string): string {
+  const num = value.replace(/\D/g, '');
+  if (!num) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(num));
+}
+
+function parseRupiahInput(value: string): number {
+  return Number(value.replace(/\./g, '').replace(',', ''));
 }
 
 const RUPIAH_TOOLTIP = ({ active, payload, label }: any) => {
@@ -63,6 +73,7 @@ export function OwnerDashboard() {
   const [chartData, setChartData] = useState<MonthlyChartData[]>([]);
   const [pendingApproval, setPendingApproval] = useState<Transaction[]>([]);
   const [pendingTransfer, setPendingTransfer] = useState<Transaction[]>([]);
+  const [projectsList, setProjectsList] = useState<Project[]>([]);
 
   // Reject modal state
   const [rejectModal, setRejectModal] = useState<{ open: boolean; txId: string }>({ open: false, txId: '' });
@@ -74,35 +85,58 @@ export function OwnerDashboard() {
   const [transferFileName, setTransferFileName] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
 
+  // Owner Quick Entry Modal
+  const [quickModalOpen, setQuickModalOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({
+    mode: 'prive' as 'prive' | 'operasional' | 'setoran',
+    nominalStr: '',
+    deskripsi: '',
+    proyekId: '',
+  });
+  const [quickFileLoading, setQuickFileLoading] = useState(false);
+  const [quickAttachments, setQuickAttachments] = useState<Attachment[]>([]);
+  const [quickSaving, setQuickSaving] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [txns, projects] = await Promise.all([getTransactions(), getProjects()]);
-      const activeProjects = projects.filter(p => p.status === 'aktif').length;
-      setSummary(getDashboardSummary(txns, activeProjects));
-      setChartData(getMonthlyChartData(txns, 6));
+      const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
+      setProjectsList(prjs);
+      const activePrjCount = prjs.filter(p => p.status === 'aktif').length;
+      setSummary(getDashboardSummary(txns, activePrjCount));
+      setChartData(getMonthlyChartData(txns));
       setPendingApproval(txns.filter(t => t.status === 'menunggu_approval'));
       setPendingTransfer(txns.filter(t => t.status === 'disetujui'));
+    } catch {
+      addToast('error', 'Gagal memuat data dashboard');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => { loadData(); }, [loadData, refreshKey]);
 
-  const handleApprove = async (id: string) => {
-    await updateTransactionStatus(id, 'disetujui');
-    addToast('success', 'Transaksi berhasil disetujui');
-    loadData();
+  const handleApprove = async (txId: string) => {
+    try {
+      await updateTransactionStatus(txId, 'disetujui');
+      addToast('success', 'Transaksi disetujui');
+      loadData();
+    } catch {
+      addToast('error', 'Gagal memproses persetujuan');
+    }
   };
 
   const handleReject = async () => {
-    if (!rejectNote.trim()) { addToast('error', 'Harap isi alasan penolakan'); return; }
-    await updateTransactionStatus(rejectModal.txId, 'ditolak', rejectNote.trim());
-    addToast('success', 'Transaksi ditolak');
-    setRejectModal({ open: false, txId: '' });
-    setRejectNote('');
-    loadData();
+    if (!rejectNote.trim()) { addToast('error', 'Masukkan alasan penolakan'); return; }
+    try {
+      await updateTransactionStatus(rejectModal.txId, 'ditolak', rejectNote.trim());
+      addToast('success', 'Transaksi ditolak');
+      setRejectModal({ open: false, txId: '' });
+      setRejectNote('');
+      loadData();
+    } catch {
+      addToast('error', 'Gagal menolak transaksi');
+    }
   };
 
   const handleTransferFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,14 +172,101 @@ export function OwnerDashboard() {
     }
   };
 
+  // Quick Attachment Upload for Owner
+  const handleQuickFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setQuickFileLoading(true);
+    try {
+      const att = await uploadAttachmentFile(file, {
+        tanggal: new Date().toISOString().split('T')[0],
+        tag: quickForm.mode === 'prive' ? 'pribadi' : 'operasional',
+      });
+      setQuickAttachments(prev => [...prev, att]);
+      addToast('success', 'Lampiran berhasil diunggah ke Google Drive');
+    } catch {
+      addToast('error', 'Gagal mengunggah lampiran');
+    } finally {
+      setQuickFileLoading(false);
+    }
+  };
+
+  // Owner Quick Save Transaction (Instant Finish, No Approval Needed)
+  const handleQuickSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nominal = parseRupiahInput(quickForm.nominalStr);
+    if (!nominal || nominal <= 0) {
+      addToast('error', 'Masukkan nominal yang valid');
+      return;
+    }
+    if (!quickForm.deskripsi.trim()) {
+      addToast('error', 'Masukkan keterangan singkat');
+      return;
+    }
+
+    setQuickSaving(true);
+    try {
+      let jenis: 'masuk' | 'keluar' = 'keluar';
+      let kategori = 'Prive Owner';
+      let tag: 'operasional' | 'pribadi' = 'pribadi';
+
+      if (quickForm.mode === 'prive') {
+        jenis = 'keluar';
+        kategori = 'Prive Owner';
+        tag = 'pribadi';
+      } else if (quickForm.mode === 'operasional') {
+        jenis = 'keluar';
+        kategori = 'Operasional Direct Owner';
+        tag = 'operasional';
+      } else if (quickForm.mode === 'setoran') {
+        jenis = 'masuk';
+        kategori = 'Setoran Modal Owner';
+        tag = 'operasional';
+      }
+
+      await addTransaction({
+        tanggal: new Date().toISOString().split('T')[0],
+        jenis,
+        deskripsi: quickForm.deskripsi.trim(),
+        nominal,
+        kategori,
+        tag,
+        proyekId: quickForm.proyekId || undefined,
+        lampiran: quickAttachments,
+        status: 'selesai', // Directly finished, no approval needed!
+      });
+
+      addToast('success', 'Transaksi Owner berhasil dicatat & langsung aktif!');
+      setQuickModalOpen(false);
+      setQuickForm({ mode: 'prive', nominalStr: '', deskripsi: '', proyekId: '' });
+      setQuickAttachments([]);
+      loadData();
+    } catch {
+      addToast('error', 'Gagal mencatat transaksi');
+    } finally {
+      setQuickSaving(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner size={32} />;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard Owner</h1>
-        <p className="text-gray-500 text-sm mt-1">Ringkasan keuangan PT Aksara Riksa Perdana</p>
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-card">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard Owner</h1>
+          <p className="text-gray-500 text-xs mt-0.5">Ringkasan real-time & kontrol keuangan PT Aksara Riksa Perdana</p>
+        </div>
+
+        <Button
+          variant="primary"
+          icon={<Sparkles size={16} />}
+          onClick={() => setQuickModalOpen(true)}
+          className="shadow-lg shadow-emerald-500/20"
+        >
+          ⚡ + Catat Transaksi / Prive
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -202,73 +323,91 @@ export function OwnerDashboard() {
           </ResponsiveContainer>
         </Card>
 
-        {/* Pending Summary */}
-        <Card className="flex flex-col gap-4">
-          <h2 className="text-base font-semibold text-gray-800">Status Transaksi</h2>
-          <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              <span className="text-sm text-gray-700">Menunggu Approval</span>
+        {/* Quick Stats */}
+        <Card className="flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800 mb-4">Status Transaksi</h2>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
+                <div className="flex items-center gap-2 text-amber-700">
+                  <Clock size={16} />
+                  <span className="text-sm font-medium">Perlu Persetujuan</span>
+                </div>
+                <span className="text-lg font-bold text-amber-800">{pendingApproval.length}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <Wallet size={16} />
+                  <span className="text-sm font-medium">Perlu Transfer</span>
+                </div>
+                <span className="text-lg font-bold text-blue-800">{pendingTransfer.length}</span>
+              </div>
             </div>
-            <span className="font-bold text-amber-600">{pendingApproval.length}</span>
           </div>
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
-            <div className="flex items-center gap-2">
-              <Upload size={16} className="text-blue-500" />
-              <span className="text-sm text-gray-700">Menunggu Transfer</span>
-            </div>
-            <span className="font-bold text-blue-600">{pendingTransfer.length}</span>
+          <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400">
+            Catatan: Transaksi yang belum disetujui tidak mempengaruhi saldo sisa kas.
           </div>
         </Card>
       </div>
 
-      {/* Pending Approval */}
+      {/* Pending Approval Section */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <Clock size={18} className="text-amber-500" />
-          <h2 className="text-base font-semibold text-gray-800">Menunggu Approval ({pendingApproval.length})</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Clock size={18} className="text-amber-500" />
+            <h2 className="text-base font-semibold text-gray-800">Menunggu Persetujuan ({pendingApproval.length})</h2>
+          </div>
+          {pendingApproval.length > 0 && (
+            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium">
+              Membutuhkan tindakan Anda
+            </span>
+          )}
         </div>
+
         {pendingApproval.length === 0 ? (
-          <EmptyState icon={<CheckCircle size={28} />} title="Tidak ada transaksi yang menunggu" />
+          <EmptyState
+            icon={<CheckCircle size={28} />}
+            title="Tidak Ada Transaksi Gantung"
+            description="Semua pengajuan transaksi dari Admin sudah diproses"
+          />
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-100">
             {pendingApproval.map(tx => (
-              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
+              <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tx.jenis === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {tx.jenis === 'masuk' ? '+ Masuk' : '- Keluar'}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tx.jenis === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {tx.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
                     </span>
-                    {tx.tag && (
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full capitalize">{tx.tag === 'pribadi' ? 'Pribadi Owner' : 'Operasional'}</span>
-                    )}
+                    <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
                   </div>
-                  <p className="font-medium text-gray-800 truncate">{tx.deskripsi}</p>
-                  <p className="text-sm text-gray-500">{formatDate(tx.tanggal)} · {tx.kategori}</p>
+                  <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
                   {tx.lampiran && tx.lampiran.length > 0 && (
                     <AttachmentViewer attachments={tx.lampiran} />
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className={`font-bold text-lg ${tx.jenis === 'masuk' ? 'text-green-600' : 'text-red-600'}`}>
-                    {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                  </p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<CheckCircle size={14} />}
-                    onClick={() => handleApprove(tx.id)}
-                  >
-                    Setujui
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    icon={<XCircle size={14} />}
-                    onClick={() => setRejectModal({ open: true, txId: tx.id })}
-                  >
-                    Tolak
-                  </Button>
+
+                <div className="flex items-center justify-between sm:justify-end gap-4">
+                  <div className="text-right">
+                    <p className={`font-bold text-base ${tx.jenis === 'masuk' ? 'text-green-600' : 'text-red-600'}`}>
+                      {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setRejectModal({ open: true, txId: tx.id })}
+                      className="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <XCircle size={14} /> Tolak
+                    </button>
+                    <button
+                      onClick={() => handleApprove(tx.id)}
+                      className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                    >
+                      <CheckCircle size={14} /> Setujui
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -276,41 +415,45 @@ export function OwnerDashboard() {
         )}
       </Card>
 
-      {/* Pending Transfer */}
+      {/* Pending Transfer Section */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <Upload size={18} className="text-blue-500" />
-          <h2 className="text-base font-semibold text-gray-800">Disetujui — Menunggu Transfer ({pendingTransfer.length})</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Wallet size={18} className="text-blue-500" />
+            <h2 className="text-base font-semibold text-gray-800">Menunggu Transfer Selesai ({pendingTransfer.length})</h2>
+          </div>
         </div>
+
         {pendingTransfer.length === 0 ? (
-          <EmptyState icon={<CheckCircle size={28} />} title="Tidak ada transaksi menunggu transfer" />
+          <EmptyState
+            icon={<CheckCircle size={28} />}
+            title="Semua Transfer Selesai"
+            description="Tidak ada transaksi disetujui yang belum ditransfer"
+          />
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-100">
             {pendingTransfer.map(tx => (
-              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-blue-100 rounded-xl bg-blue-50/30">
+              <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-800 truncate">{tx.deskripsi}</p>
-                  <p className="text-sm text-gray-500">{formatDate(tx.tanggal)} · {tx.kategori}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <StatusBadge status={tx.status} />
+                    <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
+                  </div>
+                  <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
                   {tx.lampiran && tx.lampiran.length > 0 && (
                     <AttachmentViewer attachments={tx.lampiran} />
                   )}
-                  {tx.buktiTransfer && (
-                    <div className="mt-2">
-                      <p className="text-xs font-semibold text-emerald-700 mb-1">Bukti Transfer:</p>
-                      <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
-                    </div>
-                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className="font-bold text-lg text-red-600">-{formatRupiah(tx.nominal)}</p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Upload size={14} />}
+
+                <div className="flex items-center justify-between sm:justify-end gap-4">
+                  <p className="font-bold text-base text-red-600">-{formatRupiah(tx.nominal)}</p>
+                  <button
                     onClick={() => setTransferModal({ open: true, txId: tx.id })}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
                   >
-                    Tandai Sudah Transfer
-                  </Button>
+                    <Upload size={14} /> Tandai Sudah Transfer
+                  </button>
                 </div>
               </div>
             ))}
@@ -321,12 +464,9 @@ export function OwnerDashboard() {
       {/* Reject Modal */}
       <Modal isOpen={rejectModal.open} onClose={() => setRejectModal({ open: false, txId: '' })} title="Tolak Transaksi">
         <div className="space-y-4">
-          <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl">
-            <AlertTriangle size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-red-700">Harap berikan alasan penolakan yang jelas agar Admin Keuangan dapat menindaklanjuti.</p>
-          </div>
+          <p className="text-sm text-gray-600">Berikan alasan penolakan untuk transaksi ini agar Admin dapat mengetahuinya.</p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Alasan Penolakan</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Alasan Penolakan *</label>
             <textarea
               value={rejectNote}
               onChange={e => setRejectNote(e.target.value)}
@@ -344,9 +484,9 @@ export function OwnerDashboard() {
       </Modal>
 
       {/* Transfer Proof Modal */}
-      <Modal isOpen={transferModal.open} onClose={() => { setTransferModal({ open: false, txId: '' }); setTransferFile(null); setTransferFileName(''); }} title="Upload Bukti Transfer">
+      <Modal isOpen={transferModal.open} onClose={() => { setTransferModal({ open: false, txId: '' }); setTransferFile(null); setTransferFileName(''); }} title="Upload Bukti Transfer (Opsional)">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">Upload foto atau screenshot bukti transfer untuk menyelesaikan transaksi ini.</p>
+          <p className="text-sm text-gray-600">Upload foto atau screenshot bukti transfer untuk menyelesaikan transaksi ini (Opsional).</p>
           <label className="block">
             <div className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors
               ${transferFile ? 'border-primary bg-primary-light' : 'border-gray-200 hover:border-primary hover:bg-gray-50'}`}>
@@ -354,16 +494,131 @@ export function OwnerDashboard() {
               <p className="text-sm text-gray-600">{transferFileName || 'Klik untuk pilih file'}</p>
               <p className="text-xs text-gray-400 mt-1">JPG, PNG, PDF (maks 5MB)</p>
             </div>
-            <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleTransferFileChange} />
+            <input type="file" accept="image/*,application/pdf" onChange={handleTransferFileChange} className="hidden" />
           </label>
-          {transferFile && transferFile.startsWith('data:image') && (
-            <img src={transferFile} alt="preview" className="w-full rounded-xl max-h-48 object-contain bg-gray-50 border" />
-          )}
+
           <div className="flex gap-3 justify-end">
             <Button variant="secondary" onClick={() => { setTransferModal({ open: false, txId: '' }); setTransferFile(null); setTransferFileName(''); }}>Batal</Button>
-            <Button loading={transferLoading} icon={<CheckCircle size={16} />} onClick={handleUploadTransfer}>Tandai Selesai</Button>
+            <Button variant="primary" icon={<CheckCircle size={16} />} loading={transferLoading} onClick={handleUploadTransfer}>
+              Konfirmasi Sudah Transfer
+            </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Owner Quick Entry Modal (Instant Finished Transaction) */}
+      <Modal isOpen={quickModalOpen} onClose={() => setQuickModalOpen(false)} title="⚡ Catat Transaksi Instan / Prive (Owner)">
+        <form onSubmit={handleQuickSave} className="space-y-4">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 leading-relaxed">
+            💡 <strong>Transaksi Owner Instan:</strong> Pencatatan oleh Pak Fatwa otomatis berstatus <strong>Selesai</strong> dan langsung aktif di kas tanpa memerlukan approval.
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Peruntukan Transaksi</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setQuickForm(f => ({ ...f, mode: 'prive' }))}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                  quickForm.mode === 'prive'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                🛍️ Prive Pribadi
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickForm(f => ({ ...f, mode: 'operasional' }))}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                  quickForm.mode === 'operasional'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-md'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                🏢 Belanja Direct
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickForm(f => ({ ...f, mode: 'setoran' }))}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                  quickForm.mode === 'setoran'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                💰 Setor Modal
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Nominal (Rp) *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={quickForm.nominalStr}
+              onChange={e => setQuickForm(f => ({ ...f, nominalStr: formatRupiahInput(e.target.value) }))}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-base font-extrabold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="0"
+              required
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Keterangan Singkat *</label>
+            <input
+              type="text"
+              value={quickForm.deskripsi}
+              onChange={e => setQuickForm(f => ({ ...f, deskripsi: e.target.value }))}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder={quickForm.mode === 'prive' ? 'Tarik tunai keperluan pribadi' : 'Keterangan belanja...'}
+              required
+            />
+          </div>
+
+          {projectsList.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek (Opsional)</label>
+              <select
+                value={quickForm.proyekId}
+                onChange={e => setQuickForm(f => ({ ...f, proyekId: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+              >
+                <option value="">-- Tanpa Proyek --</option>
+                {projectsList.map(p => (
+                  <option key={p.id} value={p.id}>{p.nama} ({p.klien})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Lampiran Struk / Nota (Opsional)</label>
+            <div className="flex items-center gap-2">
+              <label className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 cursor-pointer flex items-center gap-1.5 transition-colors">
+                <Paperclip size={14} />
+                <span>{quickFileLoading ? 'Mengunggah...' : 'Pilih Foto Struk'}</span>
+                <input type="file" accept="image/*,application/pdf" onChange={handleQuickFileUpload} className="hidden" disabled={quickFileLoading} />
+              </label>
+            </div>
+            {quickAttachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {quickAttachments.map((att, idx) => (
+                  <span key={idx} className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium">
+                    <CheckCircle size={12} /> {att.nama}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 justify-end pt-3">
+            <Button type="button" variant="secondary" onClick={() => setQuickModalOpen(false)}>Batal</Button>
+            <Button type="submit" variant="primary" loading={quickSaving}>Simpan & Aktifkan</Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

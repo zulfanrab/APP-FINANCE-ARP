@@ -89,12 +89,12 @@ export async function getTransactionsByProject(proyekId: string): Promise<Transa
 }
 
 export async function addTransaction(
-  data: Omit<Transaction, 'id' | 'status' | 'dibuatPada' | 'diupdatePada'>
+  data: Omit<Transaction, 'id' | 'status' | 'dibuatPada' | 'diupdatePada'> & { status?: TransactionStatus }
 ): Promise<Transaction> {
   const newTransaction: Transaction = {
     ...data,
     id: generateId(),
-    status: 'menunggu_approval',
+    status: data.status ?? 'menunggu_approval',
     dibuatPada: now(),
     diupdatePada: now(),
   };

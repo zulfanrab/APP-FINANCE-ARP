@@ -2,7 +2,7 @@
 // ARKA Finance — Project Service (LocalStorage + Supabase Sync)
 // ============================================================
 
-import { type Project } from '../types';
+import { type Project, type Transaction } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
@@ -42,6 +42,61 @@ function mapProjectToRow(p: Project): any {
     dibuat_pada: p.dibuatPada,
     diupdate_pada: p.diupdatePada,
   };
+}
+
+export async function syncProjectBudgetTransaction(project: Project): Promise<void> {
+  if (!project.anggaran || project.anggaran <= 0) return;
+
+  const newTx: Transaction = {
+    id: `txn_modal_${project.id}`,
+    tanggal: project.tanggalMulai || new Date().toISOString().split('T')[0],
+    jenis: 'keluar',
+    deskripsi: `Suntikan Modal Proyek: ${project.nama}`,
+    nominal: project.anggaran,
+    kategori: 'Biaya Proyek',
+    tag: 'operasional',
+    proyekId: project.id,
+    lampiran: [],
+    status: 'selesai',
+    dibuatPada: now(),
+    diupdatePada: now(),
+  };
+
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const idx = transactions.findIndex(t => t.id === newTx.id || (t.proyekId === project.id && t.deskripsi.startsWith('Suntikan Modal Proyek:')));
+
+  if (idx !== -1) {
+    transactions[idx] = {
+      ...transactions[idx],
+      nominal: project.anggaran,
+      deskripsi: `Suntikan Modal Proyek: ${project.nama}`,
+      diupdatePada: now(),
+    };
+  } else {
+    transactions.push(newTx);
+  }
+  setItem(KEYS.TRANSACTIONS, transactions);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('transactions').upsert({
+        id: newTx.id,
+        tanggal: newTx.tanggal,
+        jenis: newTx.jenis,
+        deskripsi: newTx.deskripsi,
+        nominal: project.anggaran,
+        kategori: newTx.kategori,
+        tag: newTx.tag,
+        proyek_id: newTx.proyekId,
+        lampiran: [],
+        status: newTx.status,
+        dibuat_pada: newTx.dibuatPada,
+        diupdate_pada: newTx.diupdatePada,
+      });
+    } catch (err) {
+      console.warn('Supabase sync modal transaction error:', err);
+    }
+  }
 }
 
 export async function getProjects(): Promise<Project[]> {
@@ -101,6 +156,10 @@ export async function addProject(
     }
   }
 
+  if (newProject.anggaran && newProject.anggaran > 0) {
+    await syncProjectBudgetTransaction(newProject);
+  }
+
   return newProject;
 }
 
@@ -127,6 +186,10 @@ export async function updateProject(
     } catch (err) {
       console.warn('Supabase update project error:', err);
     }
+  }
+
+  if (updated.anggaran && updated.anggaran > 0) {
+    await syncProjectBudgetTransaction(updated);
   }
 
   return updated;

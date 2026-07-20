@@ -21,6 +21,12 @@ import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
+function formatRupiahInput(value: string): string {
+  const num = value.replace(/\D/g, '');
+  if (!num) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(num));
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -51,11 +57,11 @@ export function ProjectDetail() {
       if (prj) {
         setEditNama(prj.nama);
         setEditKlien(prj.klien);
-        setEditBudgetStr(prj.anggaran ? prj.anggaran.toLocaleString('id-ID') : '0');
+        setEditBudgetStr(prj.anggaran ? new Intl.NumberFormat('id-ID').format(prj.anggaran) : '0');
       }
     } catch {
       addToast('error', 'Gagal memuat data proyek');
-    } font: {
+    } finally {
       setLoading(false);
     }
   }, [id, addToast]);
@@ -400,7 +406,7 @@ export function ProjectDetail() {
               type="text"
               inputMode="numeric"
               value={editBudgetStr}
-              onChange={e => setEditBudgetStr(e.target.value)}
+              onChange={e => setEditBudgetStr(formatRupiahInput(e.target.value))}
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold text-emerald-700"
             />
           </div>
