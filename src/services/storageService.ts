@@ -1,9 +1,8 @@
 // ============================================================
-// ARKA Finance — Storage Service (Google Drive & Cloud Upload)
+// ARKA Finance — Storage Service (Pure Google Drive Integration)
 // ============================================================
 
-import { supabase, isSupabaseConfigured } from './supabase';
-import { uploadToGoogleDrive, isGoogleDriveConfigured } from './googleDriveService';
+import { uploadToGoogleDrive } from './googleDriveService';
 import { type Attachment } from '../types';
 
 export interface UploadContext {
@@ -38,60 +37,11 @@ export function buildFolderPath(fileName: string, context: UploadContext): strin
 }
 
 /**
- * Priority 1: Google Drive (if configured)
- * Priority 2: Supabase Storage (if configured)
- * Priority 3: Base64 DataUrl
+ * Uploads attachment file strictly to Google Drive.
  */
 export async function uploadAttachmentFile(
   file: File,
   context: UploadContext
 ): Promise<Attachment> {
-  // 1. Try Google Drive Direct Upload
-  if (isGoogleDriveConfigured) {
-    const gdriveResult = await uploadToGoogleDrive(file, context);
-    if (gdriveResult) {
-      return gdriveResult;
-    }
-  }
-
-  // 2. Try Supabase Storage Upload
-  const filePath = buildFolderPath(file.name, context);
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.storage
-        .from('attachments')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (!error && data) {
-        const { data: publicUrlData } = supabase.storage
-          .from('attachments')
-          .getPublicUrl(data.path);
-
-        return {
-          nama: file.name,
-          tipe: file.type,
-          dataUrl: publicUrlData.publicUrl,
-        };
-      }
-    } catch (err) {
-      console.warn('Supabase storage upload failed:', err);
-    }
-  }
-
-  // 3. Fallback: Base64 DataUrl
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = ev => resolve(ev.target?.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-  return {
-    nama: file.name,
-    tipe: file.type,
-    dataUrl,
-  };
+  return await uploadToGoogleDrive(file, context);
 }
