@@ -12,12 +12,9 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
 
 interface NavItem {
   to: string;
@@ -44,7 +41,6 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const { role, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
 
   const filtered = navItems.filter(
@@ -103,18 +99,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom: collapse toggle + theme + logout */}
+      {/* Bottom: collapse toggle + logout */}
       <div className="px-2 py-3 border-t border-white/10 space-y-1">
-        <button
-          onClick={toggleTheme}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
-            text-amber-300 hover:bg-white/10 transition-all duration-200
-            ${collapsed ? 'justify-center' : ''}`}
-          title={isDark ? 'Mode Terang' : 'Mode Gelap'}
-        >
-          {isDark ? <Sun size={20} /> : <Moon size={20} />}
-          {!collapsed && <span className="text-sm font-medium">{isDark ? 'Mode Terang' : 'Mode Gelap'}</span>}
-        </button>
         <button
           onClick={logout}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
