@@ -1,5 +1,5 @@
 // ============================================================
-// ARKA Finance — Mobile App Header Bar (Native Look)
+// ARKA Finance — Mobile App Header Bar (Native Look with Safe Area)
 // ============================================================
 
 import React from 'react';
@@ -11,16 +11,17 @@ export function MobileHeader() {
   const { role, logout } = useAuth();
 
   return (
-    <header className="md:hidden sticky top-0 z-40 bg-[#0F172A]/95 backdrop-blur-md text-white border-b border-white/10 px-4 py-3 flex items-center justify-between shadow-md">
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-xl bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <img src={logo} alt="ARKA Logo" className="w-full h-full object-contain" />
+    <header className="md:hidden sticky top-0 z-40 bg-[#0F172A]/98 backdrop-blur-xl text-white border-b border-white/10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between shadow-lg">
+      <div className="flex items-center gap-3">
+        {/* Seamless Rounded Logo Container */}
+        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 p-1 flex items-center justify-center flex-shrink-0 shadow-inner overflow-hidden">
+          <img src={logo} alt="ARKA Logo" className="w-full h-full object-contain drop-shadow-sm" />
         </div>
         <div>
           <h1 className="font-bold text-base leading-tight tracking-tight flex items-center gap-1.5">
             ARKA Finance
           </h1>
-          <p className="text-[10px] text-emerald-400 font-medium leading-none">
+          <p className="text-[10px] text-emerald-400 font-medium leading-none mt-0.5">
             PT Aksara Riksa Perdana
           </p>
         </div>
