@@ -1,8 +1,9 @@
 // ============================================================
-// ARKA Finance — Modal Component (Premium Animated UI)
+// ARKA Finance — Modal Component (Portal-based Fullscreen Backdrop)
 // ============================================================
 
 import React, { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -42,20 +43,20 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-x-hidden overflow-y-auto">
+      {/* Fullscreen Backdrop */}
       <div
-        className="absolute inset-0 bg-slate-950/70 backdrop-blur-md animate-fade-in"
+        className="fixed inset-0 bg-slate-950/75 backdrop-blur-md animate-fade-in"
         onClick={onClose}
       />
-      {/* Modal Content */}
+      {/* Modal Card */}
       <div
-        className={`relative bg-white rounded-3xl border border-gray-100 shadow-2xl w-full ${sizeMap[size]} animate-scale-up overflow-hidden`}
+        className={`relative bg-white rounded-3xl border border-gray-100 shadow-2xl w-full ${sizeMap[size]} animate-scale-up overflow-hidden max-h-[90vh] flex flex-col z-10`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="text-base font-bold text-gray-800 tracking-tight">{title}</h3>
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/60 flex-shrink-0">
+          <h3 className="text-base font-bold text-gray-900 tracking-tight">{title}</h3>
           {showClose && (
             <button
               onClick={onClose}
@@ -65,9 +66,10 @@ export function Modal({
             </button>
           )}
         </div>
-        {/* Content */}
-        <div className="p-6">{children}</div>
+        {/* Content Body */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

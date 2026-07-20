@@ -256,16 +256,16 @@ export function OwnerDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-card">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard Owner</h1>
-          <p className="text-gray-500 text-xs mt-0.5">Ringkasan real-time & kontrol keuangan PT Aksara Riksa Perdana</p>
+          <p className="text-gray-500 text-xs mt-0.5">Ringkasan real-time &amp; kontrol keuangan PT Aksara Riksa Perdana</p>
         </div>
 
         <Button
           variant="primary"
-          icon={<Sparkles size={16} />}
+          icon={<PlusCircle size={15} />}
           onClick={() => setQuickModalOpen(true)}
-          className="shadow-lg shadow-emerald-500/20"
+          className="!bg-slate-900 hover:!bg-slate-800 text-white font-medium text-xs rounded-xl shadow-md border border-slate-800"
         >
-          ⚡ + Catat Transaksi / Prive
+          Input Transaksi / Prive
         </Button>
       </div>
 
@@ -507,47 +507,47 @@ export function OwnerDashboard() {
       </Modal>
 
       {/* Owner Quick Entry Modal (Instant Finished Transaction) */}
-      <Modal isOpen={quickModalOpen} onClose={() => setQuickModalOpen(false)} title="⚡ Catat Transaksi Instan / Prive (Owner)">
+      <Modal isOpen={quickModalOpen} onClose={() => setQuickModalOpen(false)} title="Catat Transaksi Owner / Prive">
         <form onSubmit={handleQuickSave} className="space-y-4">
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 leading-relaxed">
-            💡 <strong>Transaksi Owner Instan:</strong> Pencatatan oleh Pak Fatwa otomatis berstatus <strong>Selesai</strong> dan langsung aktif di kas tanpa memerlukan approval.
+          <div className="p-3 bg-slate-50 border border-gray-100 rounded-2xl text-xs text-gray-600 leading-relaxed font-medium">
+            Pencatatan oleh Owner otomatis berstatus <strong>Selesai</strong> dan langsung aktif di kas perusahaan.
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Peruntukan Transaksi</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wider">Peruntukan Transaksi</label>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setQuickForm(f => ({ ...f, mode: 'prive' }))}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
                   quickForm.mode === 'prive'
-                    ? 'bg-purple-600 text-white border-purple-600 shadow-md'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                🛍️ Prive Pribadi
+                Prive / Pribadi
               </button>
               <button
                 type="button"
                 onClick={() => setQuickForm(f => ({ ...f, mode: 'operasional' }))}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
                   quickForm.mode === 'operasional'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-md'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                🏢 Belanja Direct
+                Operasional Direct
               </button>
               <button
                 type="button"
                 onClick={() => setQuickForm(f => ({ ...f, mode: 'setoran' }))}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
                   quickForm.mode === 'setoran'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                💰 Setor Modal
+                Setoran Modal
               </button>
             </div>
           </div>
