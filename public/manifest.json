@@ -1,0 +1,24 @@
+{
+  "name": "ARKA Finance",
+  "short_name": "ARKA Finance",
+  "description": "Sistem Manajemen Keuangan Internal PT Aksara Riksa Perdana",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F172A",
+  "theme_color": "#299775",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
