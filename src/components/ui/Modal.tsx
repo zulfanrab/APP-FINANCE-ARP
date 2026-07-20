@@ -1,5 +1,5 @@
 // ============================================================
-// ARKA Finance — Modal Component
+// ARKA Finance — Modal Component (Premium Animated UI)
 // ============================================================
 
 import React, { useEffect, type ReactNode } from 'react';
@@ -46,20 +46,20 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/70 backdrop-blur-md animate-fade-in"
         onClick={onClose}
       />
-      {/* Modal */}
+      {/* Modal Content */}
       <div
-        className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizeMap[size]} animate-fade-in`}
+        className={`relative bg-white rounded-3xl border border-gray-100 shadow-2xl w-full ${sizeMap[size]} animate-scale-up overflow-hidden`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <h3 className="text-base font-bold text-gray-800 tracking-tight">{title}</h3>
           {showClose && (
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all active:scale-95"
             >
               <X size={18} />
             </button>
