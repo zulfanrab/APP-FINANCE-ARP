@@ -84,14 +84,14 @@ export function ProjectDetail() {
     );
   }
 
-  // Financial Calculations
+  // Financial Calculations (Excluding initial capital injection from internal operational expenses)
   const anggaranModal = project.anggaran || 0;
   const pemasukanKlien = transactions
     .filter(t => t.jenis === 'masuk' && t.status !== 'ditolak')
     .reduce((sum, t) => sum + t.nominal, 0);
 
   const pengeluaranTotal = transactions
-    .filter(t => t.jenis === 'keluar' && t.status !== 'ditolak')
+    .filter(t => t.jenis === 'keluar' && t.status !== 'ditolak' && !t.deskripsi.startsWith('Suntikan Modal Proyek:'))
     .reduce((sum, t) => sum + t.nominal, 0);
 
   const sisaAnggaranModal = anggaranModal - pengeluaranTotal;
@@ -99,6 +99,7 @@ export function ProjectDetail() {
   const usagePercentage = anggaranModal > 0 ? Math.min(Math.round((pengeluaranTotal / anggaranModal) * 100), 100) : 0;
 
   const filteredTx = transactions.filter(t => {
+    if (t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
     if (filterType === 'masuk') return t.jenis === 'masuk';
     if (filterType === 'keluar') return t.jenis === 'keluar';
     return true;

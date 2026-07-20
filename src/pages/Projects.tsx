@@ -60,7 +60,7 @@ export function Projects() {
       const withStats = await Promise.all(
         raw.map(async p => {
           const txns = await getTransactionsByProject(p.id);
-          const approved = txns.filter(t => t.status === 'disetujui' || t.status === 'selesai');
+          const approved = txns.filter(t => (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:'));
           const totalPemasukan = approved.filter(t => t.jenis === 'masuk').reduce((s, t) => s + t.nominal, 0);
           const totalPengeluaran = approved.filter(t => t.jenis === 'keluar').reduce((s, t) => s + t.nominal, 0);
           return { ...p, totalPemasukan, totalPengeluaran, profit: totalPemasukan - totalPengeluaran };
