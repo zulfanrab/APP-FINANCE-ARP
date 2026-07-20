@@ -1,8 +1,9 @@
 // ============================================================
-// ARKA Finance — Storage Service (Supabase Storage & Cloud Sync)
+// ARKA Finance — Storage Service (Google Drive & Cloud Upload)
 // ============================================================
 
 import { supabase, isSupabaseConfigured } from './supabase';
+import { uploadToGoogleDrive, isGoogleDriveConfigured } from './googleDriveService';
 import { type Attachment } from '../types';
 
 export interface UploadContext {
@@ -37,15 +38,24 @@ export function buildFolderPath(fileName: string, context: UploadContext): strin
 }
 
 /**
- * Uploads a file to Supabase Storage bucket 'attachments' (if configured),
- * or falls back to Base64 dataUrl if offline/unconfigured.
+ * Priority 1: Google Drive (if configured)
+ * Priority 2: Supabase Storage (if configured)
+ * Priority 3: Base64 DataUrl
  */
 export async function uploadAttachmentFile(
   file: File,
   context: UploadContext
 ): Promise<Attachment> {
-  const filePath = buildFolderPath(file.name, context);
+  // 1. Try Google Drive Direct Upload
+  if (isGoogleDriveConfigured) {
+    const gdriveResult = await uploadToGoogleDrive(file, context);
+    if (gdriveResult) {
+      return gdriveResult;
+    }
+  }
 
+  // 2. Try Supabase Storage Upload
+  const filePath = buildFolderPath(file.name, context);
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase.storage
@@ -65,15 +75,13 @@ export async function uploadAttachmentFile(
           tipe: file.type,
           dataUrl: publicUrlData.publicUrl,
         };
-      } else {
-        console.warn('Supabase storage upload returned error, trying fallback:', error?.message);
       }
     } catch (err) {
       console.warn('Supabase storage upload failed:', err);
     }
   }
 
-  // Fallback: Convert to Base64 DataUrl
+  // 3. Fallback: Base64 DataUrl
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = ev => resolve(ev.target?.result as string);
