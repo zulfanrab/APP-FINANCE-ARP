@@ -36,7 +36,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
 
   return (
     <div
-      className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg max-w-sm w-full
+      className={`pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-xl max-w-sm w-full
         ${bgMap[toast.type]} ${visible ? 'toast-enter' : 'toast-exit'}`}
     >
       {icons[toast.type]}
@@ -55,7 +55,7 @@ export function ToastContainer() {
   const { toasts, removeToast } = useApp();
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+    <div className="fixed top-[calc(4.5rem+env(safe-area-inset-top))] right-4 left-4 sm:left-auto sm:right-4 z-[10000] flex flex-col items-end gap-2 pointer-events-none">
       {toasts.map(toast => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}

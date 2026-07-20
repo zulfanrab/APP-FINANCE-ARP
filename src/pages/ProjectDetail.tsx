@@ -301,8 +301,8 @@ export function ProjectDetail() {
             <p className="text-xs text-gray-500 mt-0.5">Semua pengeluaran & pemasukan terkait proyek ini</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full">
               <button
                 onClick={() => setFilterType('semua')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'semua' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
@@ -329,6 +329,7 @@ export function ProjectDetail() {
                 size="sm"
                 icon={<PlusCircle size={15} />}
                 onClick={() => navigate('/transaksi/baru')}
+                className="w-full sm:w-auto justify-center"
               >
                 + Input Pengeluaran
               </Button>

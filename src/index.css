@@ -25,6 +25,22 @@
     box-sizing: border-box;
   }
 
+  html, body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   body {
     font-family: 'Inter', sans-serif;
     background-color: #F8FAFC;
