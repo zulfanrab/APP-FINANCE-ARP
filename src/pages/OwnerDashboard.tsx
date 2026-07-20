@@ -3,11 +3,13 @@
 // Includes Owner Quick Transaction / Prive Entry (Instant Approval)
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, Clock, CheckCircle,
-  XCircle, Upload, X, ChevronRight, AlertTriangle, PlusCircle, Paperclip, ExternalLink, Sparkles
+  XCircle, Upload, X, ChevronRight, AlertTriangle, PlusCircle, Paperclip, ExternalLink, Sparkles,
+  Mic, MicOff, Loader2
 } from 'lucide-react';
+import { parseVoiceSentenceWithAI } from '../services/aiVoiceService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
@@ -189,6 +191,69 @@ export function OwnerDashboard() {
     } finally {
       setQuickFileLoading(false);
     }
+  };
+
+  // Voice Recognition for Pak Fatwa
+  const [isListening, setIsListening] = useState(false);
+  const [voiceText, setVoiceText] = useState('');
+  const [voiceParsing, setVoiceParsing] = useState(false);
+
+  const handleVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      addToast('error', 'Browser tidak mendukung Speech Recognition. Gunakan Chrome / Safari.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'id-ID';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    setIsListening(true);
+    setVoiceText('');
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setVoiceText(transcript);
+      setIsListening(false);
+      setVoiceParsing(true);
+
+      try {
+        const result = await parseVoiceSentenceWithAI(transcript);
+        if (result.nominal > 0) {
+          setQuickForm(f => ({
+            ...f,
+            nominalStr: formatRupiahInput(result.nominal.toString()),
+            deskripsi: result.deskripsi,
+            mode: result.jenisQuick,
+          }));
+          addToast('success', `✨ AI Suara: ${result.deskripsi} (${formatRupiah(result.nominal)})`);
+        } else {
+          setQuickForm(f => ({ ...f, deskripsi: transcript }));
+          addToast('info', `Suara terdeteksi: "${transcript}". Silakan masukkan nominal.`);
+        }
+      } catch {
+        addToast('error', 'Gagal memproses suara dengan AI.');
+      } finally {
+        setVoiceParsing(false);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      addToast('error', 'Gagal merekam suara. Pastikan izin mikrofon aktif.');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   // Owner Quick Save Transaction (Instant Finish, No Approval Needed)
@@ -542,9 +607,58 @@ export function OwnerDashboard() {
         </div>
       </Modal>
 
-      {/* Owner Quick Entry Modal (Instant Finished Transaction) */}
+      {/* Owner Quick Entry Modal (Instant Finished Transaction with AI Voice Input) */}
       <Modal isOpen={quickModalOpen} onClose={() => setQuickModalOpen(false)} title="Catat Transaksi Owner / Prive">
         <form onSubmit={handleQuickSave} className="space-y-4">
+          {/* AI Voice Input Banner */}
+          <div className="p-3.5 bg-slate-900 text-white rounded-2xl space-y-2 border border-emerald-500/40 shadow-md">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0">
+                  <Mic size={18} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white">Input Pakai Suara (AI Voice)</p>
+                  <p className="text-[10px] text-emerald-400">Pak Fatwa cukup sebutkan nominal & kebutuhan</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleVoiceInput}
+                disabled={isListening || voiceParsing}
+                className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-md flex-shrink-0 ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : voiceParsing
+                    ? 'bg-purple-600 text-white animate-bounce'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                }`}
+              >
+                {isListening ? (
+                  <><MicOff size={15} /> Mendengarkan...</>
+                ) : voiceParsing ? (
+                  <><Loader2 size={15} className="animate-spin" /> Memproses AI...</>
+                ) : (
+                  <><Sparkles size={15} /> 🎙️ Mulai Bicara</>
+                )}
+              </button>
+            </div>
+
+            {isListening && (
+              <div className="p-2 bg-red-500/20 border border-red-500/40 rounded-xl text-center animate-pulse">
+                <p className="text-xs font-extrabold text-red-300">🔴 Mendengarkan Suara Pak Fatwa...</p>
+                <p className="text-[10px] text-red-200 mt-0.5">Ucapkan contoh: "Beli bensin dan tol 150 ribu operasional" atau "Tarik prive 5 juta"</p>
+              </div>
+            )}
+
+            {voiceText && !isListening && (
+              <div className="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300">
+                <strong>Suara Terdeteksi:</strong> "{voiceText}"
+              </div>
+            )}
+          </div>
+
           <div className="p-3 bg-slate-50 border border-gray-100 rounded-2xl text-xs text-gray-600 leading-relaxed font-medium">
             Pencatatan oleh Owner otomatis berstatus <strong>Selesai</strong> dan langsung aktif di kas perusahaan.
           </div>
