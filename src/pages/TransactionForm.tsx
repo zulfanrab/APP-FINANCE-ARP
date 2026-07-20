@@ -1,36 +1,23 @@
 // ============================================================
 // ARKA Finance — Transaction Form (Input Transaksi)
-// Includes: OCR scan, multi-file cloud upload, Rupiah auto-format
+// Includes: OCR scan, multi-file cloud upload, Rupiah auto-format & Custom Category Manager
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Save, Upload, X, Camera, Loader2, FileText,
-  ScanLine, AlertCircle, ArrowLeft, CheckCircle2
+  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { addTransaction } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
+import { getCategories, addCategory, deleteCategory } from '../services/categoryService';
 import { uploadAttachmentFile } from '../services/storageService';
 import { type Project, type Attachment } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
+import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
-
-const CATEGORIES = [
-  'Gaji & Honorarium',
-  'Operasional Kantor',
-  'Marketing & Promosi',
-  'Transportasi',
-  'Utilitas (Listrik/Air/Internet)',
-  'Peralatan & Aset',
-  'Pajak & Administrasi',
-  'Konsumsi & Entertaintment',
-  'Biaya Proyek',
-  'Pemasukan Proyek',
-  'Pemasukan Lainnya',
-  'Pengeluaran Lainnya',
-];
 
 function formatRupiahInput(value: string): string {
   const num = value.replace(/\D/g, '');
@@ -49,8 +36,15 @@ export function TransactionForm() {
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Category Manager Modal
+  const [catModalOpen, setCatModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+
+  // OCR
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState('');
@@ -64,111 +58,112 @@ export function TransactionForm() {
     kategori: '',
     tag: 'operasional' as 'operasional' | 'pribadi',
     proyekId: '',
+    lampiran: [] as Attachment[],
   });
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   useEffect(() => {
-    getProjects().then(p => setProjects(p.filter(pr => pr.status === 'aktif')));
+    getProjects().then(setProjects);
+    loadCategoryList();
   }, []);
 
-  const setField = (key: string, value: string) => {
-    setForm(f => ({ ...f, [key]: value }));
-  };
-
-  // Multi-file upload handler
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-
-    const selectedProject = projects.find(p => p.id === form.proyekId);
-    const uploadContext = {
-      tanggal: form.tanggal,
-      proyekNama: selectedProject?.nama,
-      tag: form.tag,
-    };
-
-    setUploadingFiles(true);
-    let successCount = 0;
-
-    for (const file of files) {
-      if (file.size > 50 * 1024 * 1024) {
-        addToast('error', `File ${file.name} terlalu besar (maksimal 50MB)`);
-        continue;
-      }
-
-      try {
-        const att = await uploadAttachmentFile(file, uploadContext);
-        setAttachments(prev => [...prev, att]);
-        successCount++;
-      } catch (err) {
-        console.error('File upload error:', err);
-        addToast('error', `Gagal mengunggah ${file.name}`);
-      }
+  const loadCategoryList = async () => {
+    const list = await getCategories();
+    setCategories(list);
+    if (!form.kategori && list.length > 0) {
+      setForm(f => ({ ...f, kategori: list[0] }));
     }
-
-    setUploadingFiles(false);
-    if (successCount > 0) {
-      addToast('success', `${successCount} file lampiran berhasil ditambahkan!`);
-    }
-    e.target.value = '';
   };
 
-  const removeAttachment = (idx: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== idx));
+  const setField = (key: string, value: any) => setForm(f => ({ ...f, [key]: value }));
+
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    const updated = await addCategory(newCatName);
+    setCategories(updated);
+    setField('kategori', newCatName.trim());
+    setNewCatName('');
+    addToast('success', `Kategori "${newCatName.trim()}" ditambahkan`);
   };
 
-  // OCR handler
-  const handleOcrScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeleteCategory = async (catName: string) => {
+    const updated = await deleteCategory(catName);
+    setCategories(updated);
+    addToast('success', `Kategori "${catName}" dihapus`);
+  };
+
+  // OCR Receipt Scan
+  const handleOcrFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setOcrLoading(true);
     setOcrProgress(0);
     setOcrResult('');
+
     try {
       const result = await Tesseract.recognize(file, 'ind+eng', {
         logger: m => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
+          if (m.status === 'recognizing text') setOcrProgress(Math.round(m.progress * 100));
         },
       });
 
       const text = result.data.text;
       setOcrResult(text);
 
-      const nominalMatch = text.match(/(?:total|jumlah|rp\.?|idr)\s*[:\s]*([0-9.,]+)/i)
-        ?? text.match(/([0-9]{3,}[.,][0-9]{2,})/);
+      // Extract total numeric amount
+      const matches = text.match(/(?:total|jumlah|rp\.?|bayar|net)\s*[:=]?\s*([0-9.,]+)/i) ||
+                      text.match(/([0-9]{1,3}(?:\.[0-9]{3})+)/);
 
-      if (nominalMatch) {
-        const raw = nominalMatch[1].replace(/\./g, '').replace(',', '');
-        const amount = parseInt(raw, 10);
-        if (!isNaN(amount) && amount > 0) {
-          setField('nominalStr', new Intl.NumberFormat('id-ID').format(amount));
-          addToast('info', `Nominal Rp ${formatRupiah(amount)} terdeteksi dari struk. Silakan verifikasi.`);
-        }
+      if (matches && matches[1]) {
+        const cleanedStr = matches[1].replace(/\D/g, '');
+        if (cleanedStr) setField('nominalStr', formatRupiahInput(cleanedStr));
       }
 
-      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && l.length < 60);
-      if (lines.length > 0 && !form.deskripsi) {
-        setField('deskripsi', lines[0]);
-      }
-
-      addToast('success', 'Scan struk selesai! Periksa dan edit hasil sebelum menyimpan.');
+      // Auto-upload scanned image
+      const att = await uploadAttachmentFile(file, {
+        tanggal: form.tanggal,
+        tag: form.tag,
+      });
+      setForm(f => ({ ...f, lampiran: [...f.lampiran, att] }));
+      addToast('success', 'Resi berhasil di-scan & ter-upload ke Drive!');
     } catch {
-      addToast('error', 'Gagal memproses gambar. Coba dengan foto yang lebih jelas.');
+      addToast('error', 'Gagal membaca gambar resi');
     } finally {
       setOcrLoading(false);
-      e.target.value = '';
     }
+  };
+
+  // Manual File Upload
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadingFiles(true);
+    try {
+      for (const file of files) {
+        const att = await uploadAttachmentFile(file, {
+          tanggal: form.tanggal,
+          tag: form.tag,
+        });
+        setForm(f => ({ ...f, lampiran: [...f.lampiran, att] }));
+      }
+      addToast('success', `${files.length} berkas berhasil diunggah ke Google Drive`);
+    } catch {
+      addToast('error', 'Gagal mengunggah beberapa berkas');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const removeAttachment = (idx: number) => {
+    setForm(f => ({ ...f, lampiran: f.lampiran.filter((_, i) => i !== idx) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nominal = parseRupiahInput(form.nominalStr);
-    if (!form.deskripsi.trim()) { addToast('error', 'Deskripsi wajib diisi'); return; }
+
     if (!nominal || nominal <= 0) { addToast('error', 'Nominal harus lebih dari 0'); return; }
-    if (!form.kategori) { addToast('error', 'Kategori wajib dipilih'); return; }
-    if (form.jenis === 'keluar' && !form.tag) { addToast('error', 'Tag pengeluaran wajib dipilih'); return; }
+    if (!form.deskripsi.trim()) { addToast('error', 'Deskripsi wajib diisi'); return; }
+    if (!form.kategori) { addToast('error', 'Pilih kategori transaksi'); return; }
 
     setLoading(true);
     try {
@@ -180,10 +175,11 @@ export function TransactionForm() {
         kategori: form.kategori,
         tag: form.jenis === 'keluar' ? form.tag : undefined,
         proyekId: form.proyekId || undefined,
-        lampiran: attachments,
+        lampiran: form.lampiran,
       });
+
+      addToast('success', 'Transaksi berhasil disimpan!');
       triggerRefresh();
-      addToast('success', 'Transaksi berhasil disimpan dan menunggu approval Owner!');
       navigate('/dashboard');
     } catch {
       addToast('error', 'Gagal menyimpan transaksi');
@@ -193,36 +189,40 @@ export function TransactionForm() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-12">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-          <ArrowLeft size={18} className="text-gray-600" />
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="w-10 h-10 rounded-2xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
+        >
+          <ArrowLeft size={18} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Input Transaksi</h1>
-          <p className="text-sm text-gray-500">Semua transaksi akan menunggu approval Owner</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Input Transaksi Baru</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Catat pengeluaran/pemasukan dengan bukti lampiran Google Drive</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Basic Info */}
+        {/* Basic Info Card */}
         <Card>
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Informasi Transaksi</h2>
+          <h2 className="text-base font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">Informasi Utama</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Jenis */}
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Jenis Transaksi</label>
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Jenis Transaksi</label>
               <div className="grid grid-cols-2 gap-3">
                 {(['masuk', 'keluar'] as const).map(j => (
                   <button
                     key={j}
                     type="button"
                     onClick={() => setField('jenis', j)}
-                    className={`py-3 px-4 rounded-xl border-2 font-medium text-sm transition-all
+                    className={`py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all active:scale-95
                       ${form.jenis === j
-                        ? j === 'masuk' ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        ? j === 'masuk' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-red-500 bg-red-50 text-red-700 shadow-sm'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-white'
                       }`}
                   >
                     {j === 'masuk' ? '▲ Pemasukan' : '▼ Pengeluaran'}
@@ -233,226 +233,218 @@ export function TransactionForm() {
 
             {/* Tanggal */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal</label>
               <input
                 type="date"
                 value={form.tanggal}
                 onChange={e => setField('tanggal', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                 required
               />
             </div>
 
             {/* Nominal */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Nominal (Rp)</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Nominal (Rp) *</label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={form.nominalStr}
                 onChange={e => setField('nominalStr', formatRupiahInput(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-base font-extrabold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                 placeholder="0"
                 required
               />
-              {form.nominalStr && (
-                <p className="text-xs text-gray-400 mt-1">
-                  {formatRupiah(parseRupiahInput(form.nominalStr))}
-                </p>
-              )}
             </div>
 
             {/* Deskripsi */}
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Deskripsi</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Deskripsi / Keterangan *</label>
               <input
                 type="text"
                 value={form.deskripsi}
                 onChange={e => setField('deskripsi', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Deskripsi transaksi..."
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                placeholder="Misal: Pembelian semen 50 sak untuk proyek A..."
                 required
               />
             </div>
 
-            {/* Kategori */}
+            {/* Kategori Custom Select */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-gray-700">Kategori *</label>
+                <button
+                  type="button"
+                  onClick={() => setCatModalOpen(true)}
+                  className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
+                >
+                  <Tag size={12} /> + Kelola Kategori
+                </button>
+              </div>
               <select
                 value={form.kategori}
                 onChange={e => setField('kategori', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 required
               >
-                <option value="">Pilih kategori...</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="">-- Pilih Kategori --</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
             {/* Tag (only for keluar) */}
             {form.jenis === 'keluar' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tag Pengeluaran</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Peruntukan Pengeluaran</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['operasional', 'pribadi'] as const).map(t => (
                     <button
                       key={t}
                       type="button"
                       onClick={() => setField('tag', t)}
-                      className={`py-2 px-3 rounded-xl border-2 text-xs font-medium transition-all
+                      className={`py-2.5 px-3 rounded-xl border font-semibold text-xs transition-all active:scale-95
                         ${form.tag === t
-                          ? t === 'operasional' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-purple-500 bg-purple-50 text-purple-700'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                          ? t === 'operasional' ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-sm' : 'border-purple-600 bg-purple-50 text-purple-700 shadow-sm'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-white'
                         }`}
                     >
-                      {t === 'operasional' ? '🏢 Operasional' : '👤 Pribadi Owner'}
+                      {t === 'operasional' ? '🏢 Operasional' : '👤 Prive Owner'}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Proyek */}
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Proyek (Opsional)</label>
-              <select
-                value={form.proyekId}
-                onChange={e => setField('proyekId', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
-              >
-                <option value="">Tidak terkait proyek</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.nama} — {p.klien}</option>
-                ))}
-              </select>
-            </div>
+            {/* Proyek Link */}
+            {projects.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek (Opsional)</label>
+                <select
+                  value={form.proyekId}
+                  onChange={e => setField('proyekId', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                >
+                  <option value="">-- Tanpa Proyek --</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.nama} ({p.klien})</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </Card>
 
-        {/* OCR Scan */}
+        {/* OCR Scan & Attachment Card */}
         <Card>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-primary-light flex items-center justify-center">
-              <ScanLine size={18} className="text-primary" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-gray-800">Scan dari Foto Struk</h2>
-              <p className="text-xs text-gray-500">OCR akan mencoba mengisi Nominal & Deskripsi otomatis</p>
-            </div>
-          </div>
-
-          {ocrLoading ? (
-            <div className="bg-blue-50 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <Loader2 size={18} className="animate-spin text-blue-500" />
-                <p className="text-sm text-blue-700 font-medium">Memproses gambar struk... {ocrProgress}%</p>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-2">
-                <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${ocrProgress}%` }} />
-              </div>
-            </div>
-          ) : (
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+            <h2 className="text-base font-bold text-gray-900">Lampiran Struk (Google Drive)</h2>
             <button
               type="button"
               onClick={() => ocrInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-primary hover:text-primary hover:bg-primary-light transition-all"
+              className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
             >
-              <Camera size={20} />
-              <span className="text-sm font-medium">Pilih Foto Struk untuk Discan</span>
+              <ScanLine size={15} /> Scan Struk (AI OCR)
             </button>
-          )}
-
-          {ocrResult && !ocrLoading && (
-            <div className="mt-3 p-3 bg-gray-50 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle size={14} className="text-amber-500" />
-                <p className="text-xs font-medium text-gray-600">Teks terdeteksi (periksa & edit manual):</p>
-              </div>
-              <p className="text-xs text-gray-500 font-mono whitespace-pre-line line-clamp-3">{ocrResult}</p>
-            </div>
-          )}
-
-          <input ref={ocrInputRef} type="file" accept="image/*" className="hidden" onChange={handleOcrScan} />
-        </Card>
-
-        {/* Multi-File Cloud Lampiran */}
-        <Card>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-accent-light flex items-center justify-center">
-                <Upload size={18} className="text-accent-dark" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-gray-800">Lampiran & Dokumen</h2>
-                <p className="text-xs text-gray-500">Mendukung multi-file (gambar, PDF, DOC) s.d 50MB/file</p>
-              </div>
-            </div>
-            {attachments.length > 0 && (
-              <span className="text-xs font-semibold px-2.5 py-1 bg-green-100 text-green-700 rounded-full flex items-center gap-1">
-                <CheckCircle2 size={12} /> {attachments.length} file
-              </span>
-            )}
+            <input type="file" ref={ocrInputRef} accept="image/*" onChange={handleOcrFile} className="hidden" />
           </div>
 
-          {uploadingFiles ? (
-            <div className="bg-primary-light rounded-xl p-4 flex items-center gap-3 mb-3">
-              <Loader2 size={18} className="animate-spin text-primary" />
-              <span className="text-sm text-primary font-medium">Mengunggah file lampiran ke Cloud...</span>
+          {ocrLoading && (
+            <div className="p-4 bg-purple-50 rounded-2xl mb-4 text-center space-y-2">
+              <Loader2 size={24} className="mx-auto animate-spin text-purple-600" />
+              <p className="text-xs font-bold text-purple-800">Membaca Teks Struk via OCR... ({ocrProgress}%)</p>
             </div>
-          ) : (
-            <button
-              type="button"
+          )}
+
+          {/* Upload Dropzone */}
+          <div className="space-y-3">
+            <div
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-accent hover:text-accent-dark hover:bg-accent-light transition-all mb-3"
+              className="border-2 border-dashed border-gray-200 hover:border-emerald-500 bg-gray-50/50 hover:bg-emerald-50/30 rounded-2xl p-6 text-center cursor-pointer transition-all duration-200"
             >
-              <Upload size={20} />
-              <span className="text-sm font-medium">Pilih & Upload Lampiran (Multi-file)</span>
-            </button>
-          )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-
-          {attachments.length > 0 && (
-            <div className="space-y-2">
-              {attachments.map((att, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                  {att.tipe.startsWith('image') ? (
-                    <img src={att.dataUrl} alt={att.nama} className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
-                  ) : (
-                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-xs">
-                      <FileText size={18} />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{att.nama}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {att.dataUrl.startsWith('http') ? '🌐 Cloud Storage Link' : '📄 File Siap Upload'}
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => removeAttachment(idx)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
+              <Upload size={28} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm font-semibold text-gray-700">Pilih Foto Struk / Nota PDF</p>
+              <p className="text-xs text-gray-400 mt-1">Otomatis ter-upload & tersimpan aman di Google Drive Anda</p>
             </div>
-          )}
+            <input type="file" ref={fileInputRef} multiple accept="image/*,application/pdf" onChange={handleFileUpload} className="hidden" />
+
+            {/* Attachment Items List */}
+            {uploadingFiles && (
+              <div className="flex items-center justify-center p-3 text-xs text-emerald-700 font-semibold bg-emerald-50 rounded-xl gap-2">
+                <Loader2 size={16} className="animate-spin" /> Uploading ke Google Drive...
+              </div>
+            )}
+
+            {form.lampiran.length > 0 && (
+              <div className="space-y-2 pt-2">
+                {form.lampiran.map((att, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
+                    <div className="flex items-center gap-2 truncate min-w-0">
+                      <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                      <span className="font-semibold text-gray-800 truncate">{att.nama}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(idx)}
+                      className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Submit */}
-        <div className="flex gap-3">
-          <Button type="button" variant="secondary" className="flex-1" onClick={() => navigate(-1)}>Batal</Button>
-          <Button type="submit" loading={loading || uploadingFiles} icon={<Save size={16} />} className="flex-1">
+        <div className="flex gap-3 justify-end pt-2">
+          <Button type="button" variant="secondary" onClick={() => navigate('/dashboard')}>
+            Batal
+          </Button>
+          <Button type="submit" variant="primary" loading={loading} icon={<Save size={16} />}>
             Simpan Transaksi
           </Button>
         </div>
       </form>
+
+      {/* Category Manager Modal */}
+      <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)} title="Kelola Kategori Custom">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              placeholder="Nama kategori baru..."
+              className="flex-1 border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={handleAddCategory}>
+              Tambah
+            </Button>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto space-y-1.5 pt-2">
+            {categories.map(cat => (
+              <div key={cat} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-medium text-gray-800">
+                <span>{cat}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCategory(cat)}
+                  className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                  title="Hapus Kategori"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button variant="secondary" size="sm" onClick={() => setCatModalOpen(false)}>Selesai</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

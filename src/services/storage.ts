@@ -5,6 +5,7 @@
 const KEYS = {
   TRANSACTIONS: 'arka_transactions',
   PROJECTS: 'arka_projects',
+  CATEGORIES: 'arka_categories',
   PIN_HASH: 'arka_pin_hash',
   SESSION: 'arka_session',
 } as const;

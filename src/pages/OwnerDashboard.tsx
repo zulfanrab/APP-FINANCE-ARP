@@ -250,6 +250,14 @@ export function OwnerDashboard() {
 
   if (loading) return <LoadingSpinner size={32} />;
 
+  const getDaysPending = (dateStr: string): number => {
+    const txDate = new Date(dateStr).getTime();
+    const now = new Date().getTime();
+    return Math.max(0, Math.floor((now - txDate) / (1000 * 60 * 60 * 24)));
+  };
+
+  const overdueApprovalList = pendingApproval.filter(tx => getDaysPending(tx.tanggal) >= 2);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header Bar */}
@@ -268,6 +276,24 @@ export function OwnerDashboard() {
           Input Transaksi / Prive
         </Button>
       </div>
+
+      {/* Overdue Approval Alert Banner */}
+      {overdueApprovalList.length > 0 && (
+        <div className="p-4 bg-amber-500/10 border-2 border-amber-500/40 rounded-3xl flex items-center justify-between gap-3 text-amber-900 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold flex-shrink-0">
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-amber-900 flex items-center gap-2">
+                <span>Perhatian Pak Fatwa: Terdapat {overdueApprovalList.length} Transaksi Menunggu Persetujuan &gt;2 Hari</span>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" />
+              </h3>
+              <p className="text-xs text-amber-800/80 mt-0.5">Mohon tinjau pengajuan transaksi Admin di bawah untuk memperlancar arus kas.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       {summary && (
@@ -375,11 +401,16 @@ export function OwnerDashboard() {
             {pendingApproval.map(tx => (
               <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tx.jenis === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                       {tx.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
                     </span>
                     <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
+                    {getDaysPending(tx.tanggal) >= 2 && (
+                      <span className="px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-700 text-[10px] font-extrabold flex items-center gap-1 animate-pulse">
+                        <AlertTriangle size={11} /> Pending {getDaysPending(tx.tanggal)} Hari
+                      </span>
+                    )}
                   </div>
                   <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
