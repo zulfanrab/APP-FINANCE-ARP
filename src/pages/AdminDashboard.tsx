@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, FolderOpen,
-  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2
+  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getTransactions, filterTransactions, deleteTransaction } from '../services/transactionService';
@@ -240,75 +240,134 @@ export function AdminDashboard() {
         {/* Table */}
         <div className="overflow-x-auto">
           {filtered.length === 0 ? (
-            <EmptyState icon={<Filter size={28} />} title="Tidak ada transaksi" description="Coba ubah filter atau tambahkan transaksi baru" />
+            <EmptyState
+              icon={<FileText size={28} />}
+              title="Tidak ada transaksi"
+              description="Belum ada transaksi yang sesuai dengan filter Anda"
+            />
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                    <button onClick={() => handleSort('tanggal')} className="flex items-center gap-1 hover:text-gray-700">
-                      Tanggal <SortIcon field="tanggal" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">
-                    <button onClick={() => handleSort('deskripsi')} className="flex items-center gap-1 hover:text-gray-700">
-                      Deskripsi <SortIcon field="deskripsi" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Kategori</th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Tag</th>
-                  <th className="text-right px-4 py-3 text-gray-500 font-medium">
-                    <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
-                      Nominal <SortIcon field="nominal" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
-                  <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
+            <>
+              {/* Mobile Card List View (Zero Horizontal Scroll!) */}
+              <div className="md:hidden space-y-3 pt-1">
                 {filtered.map(tx => (
-                  <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800 max-w-xs truncate">{tx.deskripsi}</p>
-                      {tx.lampiran && tx.lampiran.length > 0 && (
-                        <AttachmentViewer attachments={tx.lampiran} />
-                      )}
-                      {tx.buktiTransfer && (
-                        <div className="mt-1">
-                          <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{tx.kategori}</td>
-                    <td className="px-4 py-3">
-                      {tx.tag ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                          ${tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                          {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi Owner'}
+                  <div key={tx.id} className="p-4 bg-gray-50/90 border border-gray-200/80 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
+                        <span className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-bold">
+                          {tx.kategori}
                         </span>
-                      ) : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`font-semibold ${tx.jenis === 'masuk' ? 'text-green-600' : 'text-red-600'}`}>
+                        {tx.tag && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi'}
+                          </span>
+                        )}
+                      </div>
+                      <StatusBadge status={tx.status} />
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3 pt-1">
+                      <p className="text-sm font-bold text-gray-900 leading-snug break-words flex-1">
+                        {tx.deskripsi}
+                      </p>
+                      <p className={`font-extrabold text-base flex-shrink-0 ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                         {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                    <td className="px-4 py-3 text-center">
+                      </p>
+                    </div>
+
+                    {tx.lampiran && tx.lampiran.length > 0 && (
+                      <div className="pt-2 border-t border-gray-200/60">
+                        <AttachmentViewer attachments={tx.lampiran} />
+                      </div>
+                    )}
+
+                    {tx.buktiTransfer && (
+                      <div className="pt-1">
+                        <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-1 border-t border-gray-200/60">
                       <button
                         onClick={() => handleDelete(tx.id)}
-                        className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
-                        title="Hapus Transaksi"
+                        className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={13} /> Hapus
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                        <button onClick={() => handleSort('tanggal')} className="flex items-center gap-1 hover:text-gray-700">
+                          Tanggal <SortIcon field="tanggal" />
+                        </button>
+                      </th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Lampiran</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Kategori</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Tag</th>
+                      <th className="text-right px-4 py-3 text-gray-500 font-medium">
+                        <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
+                          Nominal <SortIcon field="nominal" />
+                        </button>
+                      </th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
+                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filtered.map(tx => (
+                      <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-gray-900">{tx.deskripsi}</p>
+                          {tx.lampiran && tx.lampiran.length > 0 && (
+                            <AttachmentViewer attachments={tx.lampiran} />
+                          )}
+                          {tx.buktiTransfer && (
+                            <div className="mt-1">
+                              <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
+                        <td className="px-4 py-3">
+                          {tx.tag ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                              ${tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi Owner'}
+                            </span>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
+                            title="Hapus Transaksi"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </Card>

@@ -12,6 +12,7 @@ import { Login } from './pages/Login';
 import { OwnerDashboard } from './pages/OwnerDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { TransactionForm } from './pages/TransactionForm';
+import { TransactionsList } from './pages/TransactionsList';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Reports } from './pages/Reports';
@@ -86,6 +87,16 @@ function AppInner() {
           <ProtectedRoute>
             <Layout>
               <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transaksi"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TransactionsList />
             </Layout>
           </ProtectedRoute>
         }

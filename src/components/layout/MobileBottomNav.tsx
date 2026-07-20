@@ -6,6 +6,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  ArrowLeftRight,
   PlusCircle,
   FolderKanban,
   BarChart3,
@@ -17,6 +18,7 @@ export function MobileBottomNav() {
 
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+    { to: '/transaksi', icon: <ArrowLeftRight size={20} />, label: 'Transaksi' },
     ...(role === 'admin'
       ? [
           {

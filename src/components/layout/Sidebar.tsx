@@ -7,6 +7,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   ArrowLeftRight,
+  PlusCircle,
   FolderKanban,
   BarChart3,
   LogOut,
@@ -25,9 +26,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
+  { to: '/transaksi', icon: <ArrowLeftRight size={20} />, label: 'Riwayat Transaksi' },
   {
     to: '/transaksi/baru',
-    icon: <ArrowLeftRight size={20} />,
+    icon: <PlusCircle size={20} />,
     label: 'Input Transaksi',
     roles: ['admin'],
   },
