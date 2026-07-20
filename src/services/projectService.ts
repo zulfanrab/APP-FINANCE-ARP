@@ -1,10 +1,10 @@
 // ============================================================
-// ARKA Finance — Project Service
-// Pola async/await: siap diganti fetch() ke backend API
+// ARKA Finance — Project Service (LocalStorage + Supabase Sync)
 // ============================================================
 
 import { type Project } from '../types';
 import { getItem, setItem, KEYS } from './storage';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 function generateId(): string {
   return `prj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -14,7 +14,52 @@ function now(): string {
   return new Date().toISOString();
 }
 
+function mapRowToProject(row: any): Project {
+  return {
+    id: row.id,
+    nama: row.nama,
+    klien: row.klien,
+    tanggalMulai: row.tanggal_mulai,
+    tanggalSelesai: row.tanggal_selesai ?? undefined,
+    status: row.status,
+    deskripsi: row.deskripsi ?? undefined,
+    dibuatPada: row.dibuat_pada,
+    diupdatePada: row.diupdate_pada,
+  };
+}
+
+function mapProjectToRow(p: Project): any {
+  return {
+    id: p.id,
+    nama: p.nama,
+    klien: p.klien,
+    tanggal_mulai: p.tanggalMulai,
+    tanggal_selesai: p.tanggalSelesai ?? null,
+    status: p.status,
+    deskripsi: p.deskripsi ?? null,
+    dibuat_pada: p.dibuatPada,
+    diupdate_pada: p.diupdatePada,
+  };
+}
+
 export async function getProjects(): Promise<Project[]> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('dibuat_pada', { ascending: false });
+
+      if (!error && data) {
+        const projects = data.map(mapRowToProject);
+        setItem(KEYS.PROJECTS, projects);
+        return projects;
+      }
+    } catch (err) {
+      console.warn('Supabase projects fetch error, falling back to local storage:', err);
+    }
+  }
+
   const data = getItem<Project[]>(KEYS.PROJECTS, []);
   return [...data].sort(
     (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
@@ -22,20 +67,18 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProjectById(id: string): Promise<Project | null> {
-  const data = getItem<Project[]>(KEYS.PROJECTS, []);
-  return data.find(p => p.id === id) ?? null;
+  const all = await getProjects();
+  return all.find(p => p.id === id) ?? null;
 }
 
 export async function getActiveProjects(): Promise<Project[]> {
-  const data = getItem<Project[]>(KEYS.PROJECTS, []);
-  return data.filter(p => p.status === 'aktif');
+  const all = await getProjects();
+  return all.filter(p => p.status === 'aktif');
 }
 
 export async function addProject(
   data: Omit<Project, 'id' | 'status' | 'dibuatPada' | 'diupdatePada'>
 ): Promise<Project> {
-  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
-
   const newProject: Project = {
     ...data,
     id: generateId(),
@@ -44,8 +87,18 @@ export async function addProject(
     diupdatePada: now(),
   };
 
+  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
   projects.push(newProject);
   setItem(KEYS.PROJECTS, projects);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('projects').insert(mapProjectToRow(newProject));
+    } catch (err) {
+      console.warn('Supabase add project error:', err);
+    }
+  }
+
   return newProject;
 }
 
@@ -57,14 +110,24 @@ export async function updateProject(
   const idx = projects.findIndex(p => p.id === id);
   if (idx === -1) throw new Error(`Project ${id} not found`);
 
-  projects[idx] = {
+  const updated: Project = {
     ...projects[idx],
     ...updates,
     diupdatePada: now(),
   };
 
+  projects[idx] = updated;
   setItem(KEYS.PROJECTS, projects);
-  return projects[idx];
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('projects').update(mapProjectToRow(updated)).eq('id', id);
+    } catch (err) {
+      console.warn('Supabase update project error:', err);
+    }
+  }
+
+  return updated;
 }
 
 export async function completeProject(id: string): Promise<Project> {
@@ -78,4 +141,12 @@ export async function deleteProject(id: string): Promise<void> {
   const projects = getItem<Project[]>(KEYS.PROJECTS, []);
   const filtered = projects.filter(p => p.id !== id);
   setItem(KEYS.PROJECTS, filtered);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('projects').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase delete project error:', err);
+    }
+  }
 }

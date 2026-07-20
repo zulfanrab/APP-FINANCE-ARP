@@ -1,12 +1,11 @@
 // ============================================================
-// ARKA Finance — Auth Service
-// Pola async/await siap diganti fetch() ke backend
+// ARKA Finance — Auth Service (LocalStorage + Supabase Sync)
 // ============================================================
 
 import { type Session, type UserRole } from '../types';
 import { getItem, setItem, removeItem, getSession, setSession, removeSession, KEYS } from './storage';
+import { supabase, isSupabaseConfigured } from './supabase';
 
-// Simple hash: SHA-256 via Web Crypto API
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(pin + 'arka_salt_v1');
@@ -16,6 +15,23 @@ async function hashPin(pin: string): Promise<string> {
 }
 
 export async function hasPin(): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'pin_hash')
+        .maybeSingle();
+
+      if (!error && data?.value) {
+        setItem(KEYS.PIN_HASH, data.value);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch failed, falling back to local storage:', err);
+    }
+  }
+
   const hash = getItem<string | null>(KEYS.PIN_HASH, null);
   return hash !== null;
 }
@@ -23,13 +39,44 @@ export async function hasPin(): Promise<boolean> {
 export async function setupPin(pin: string): Promise<void> {
   const hash = await hashPin(pin);
   setItem(KEYS.PIN_HASH, hash);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase
+        .from('app_settings')
+        .upsert({ key: 'pin_hash', value: hash });
+    } catch (err) {
+      console.warn('Supabase save failed:', err);
+    }
+  }
 }
 
 export async function verifyPin(pin: string): Promise<boolean> {
   const storedHash = getItem<string | null>(KEYS.PIN_HASH, null);
-  if (!storedHash) return false;
-  const hash = await hashPin(pin);
-  return hash === storedHash;
+  if (storedHash) {
+    const hash = await hashPin(pin);
+    if (hash === storedHash) return true;
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'pin_hash')
+        .maybeSingle();
+
+      if (!error && data?.value) {
+        setItem(KEYS.PIN_HASH, data.value);
+        const hash = await hashPin(pin);
+        return hash === data.value;
+      }
+    } catch (err) {
+      console.warn('Supabase pin verify error:', err);
+    }
+  }
+
+  return false;
 }
 
 export async function changePin(oldPin: string, newPin: string): Promise<boolean> {
