@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Layout } from './components/layout/Layout';
 import { SetupPin } from './pages/SetupPin';
 import { Login } from './pages/Login';
@@ -146,11 +147,13 @@ function AppInner() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppProvider>
-        <AuthProvider>
-          <AppInner />
-        </AuthProvider>
-      </AppProvider>
+      <ThemeProvider>
+        <AppProvider>
+          <AuthProvider>
+            <AppInner />
+          </AuthProvider>
+        </AppProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }
