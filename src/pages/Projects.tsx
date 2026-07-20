@@ -1,12 +1,13 @@
 // ============================================================
 // ARKA Finance — Projects Page
-// CRUD: tambah, edit, selesaikan proyek + kalkulasi profit
+// CRUD: tambah, edit, selesaikan proyek + kalkulasi profit & modal
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, FolderOpen, Edit2, CheckCircle, Trash2,
-  TrendingUp, TrendingDown, DollarSign, Calendar, Users
+  TrendingUp, TrendingDown, DollarSign, Calendar, Users, Wallet, ChevronRight
 } from 'lucide-react';
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject } from '../services/transactionService';
@@ -21,7 +22,18 @@ interface ProjectWithStats extends Project {
   profit: number;
 }
 
+function formatRupiahInput(value: string): string {
+  const num = value.replace(/\D/g, '');
+  if (!num) return '';
+  return new Intl.NumberFormat('id-ID').format(Number(num));
+}
+
+function parseRupiahInput(value: string): number {
+  return Number(value.replace(/\./g, '').replace(',', ''));
+}
+
 export function Projects() {
+  const navigate = useNavigate();
   const { addToast, triggerRefresh, refreshKey } = useApp();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +44,13 @@ export function Projects() {
   const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
 
   // Form
-  const [form, setForm] = useState({ nama: '', klien: '', tanggalMulai: '', deskripsi: '' });
+  const [form, setForm] = useState({
+    nama: '',
+    klien: '',
+    anggaranStr: '',
+    tanggalMulai: '',
+    deskripsi: '',
+  });
   const [saving, setSaving] = useState(false);
 
   const loadProjects = useCallback(async () => {
@@ -58,13 +76,26 @@ export function Projects() {
 
   const openAdd = () => {
     setEditingProject(null);
-    setForm({ nama: '', klien: '', tanggalMulai: new Date().toISOString().split('T')[0], deskripsi: '' });
+    setForm({
+      nama: '',
+      klien: '',
+      anggaranStr: '',
+      tanggalMulai: new Date().toISOString().split('T')[0],
+      deskripsi: '',
+    });
     setModalOpen(true);
   };
 
-  const openEdit = (p: Project) => {
+  const openEdit = (e: React.MouseEvent, p: Project) => {
+    e.stopPropagation();
     setEditingProject(p);
-    setForm({ nama: p.nama, klien: p.klien, tanggalMulai: p.tanggalMulai, deskripsi: p.deskripsi ?? '' });
+    setForm({
+      nama: p.nama,
+      klien: p.klien,
+      anggaranStr: p.anggaran ? new Intl.NumberFormat('id-ID').format(p.anggaran) : '',
+      tanggalMulai: p.tanggalMulai,
+      deskripsi: p.deskripsi ?? '',
+    });
     setModalOpen(true);
   };
 
@@ -72,12 +103,15 @@ export function Projects() {
     e.preventDefault();
     if (!form.nama.trim()) { addToast('error', 'Nama proyek wajib diisi'); return; }
     if (!form.klien.trim()) { addToast('error', 'Nama klien wajib diisi'); return; }
+
+    const anggaran = parseRupiahInput(form.anggaranStr);
     setSaving(true);
     try {
       if (editingProject) {
         await updateProject(editingProject.id, {
           nama: form.nama.trim(),
           klien: form.klien.trim(),
+          anggaran: anggaran || 0,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
@@ -86,6 +120,7 @@ export function Projects() {
         await addProject({
           nama: form.nama.trim(),
           klien: form.klien.trim(),
+          anggaran: anggaran || 0,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
@@ -99,7 +134,8 @@ export function Projects() {
     }
   };
 
-  const handleComplete = async (id: string) => {
+  const handleComplete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     await completeProject(id);
     addToast('success', 'Proyek ditandai selesai');
     loadProjects();
@@ -124,15 +160,15 @@ export function Projects() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Proyek</h1>
-          <p className="text-gray-500 text-sm mt-1">Kelola proyek dan lihat kalkulasi profit</p>
+          <h1 className="text-2xl font-bold text-gray-800">Proyek & Manajemen Anggaran</h1>
+          <p className="text-gray-500 text-sm mt-1">Kelola modal dari Owner, pengeluaran, dan profit per proyek</p>
         </div>
         <Button icon={<Plus size={16} />} onClick={openAdd}>Tambah Proyek</Button>
       </div>
 
       {/* Active Projects */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
           Proyek Aktif ({activeProjects.length})
         </h2>
         {activeProjects.length === 0 ? (
@@ -147,7 +183,14 @@ export function Projects() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {activeProjects.map(p => (
-              <ProjectCard key={p.id} project={p} onEdit={openEdit} onComplete={handleComplete} onDelete={setDeleteConfirm} />
+              <ProjectCard
+                key={p.id}
+                project={p}
+                onSelect={() => navigate(`/proyek/${p.id}`)}
+                onEdit={(e) => openEdit(e, p)}
+                onComplete={(e) => handleComplete(e, p.id)}
+                onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
+              />
             ))}
           </div>
         )}
@@ -156,12 +199,20 @@ export function Projects() {
       {/* Completed Projects */}
       {completedProjects.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
             Proyek Selesai ({completedProjects.length})
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {completedProjects.map(p => (
-              <ProjectCard key={p.id} project={p} onEdit={openEdit} onComplete={handleComplete} onDelete={setDeleteConfirm} completed />
+              <ProjectCard
+                key={p.id}
+                project={p}
+                onSelect={() => navigate(`/proyek/${p.id}`)}
+                onEdit={(e) => openEdit(e, p)}
+                onComplete={(e) => handleComplete(e, p.id)}
+                onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
+                completed
+              />
             ))}
           </div>
         </div>
@@ -194,6 +245,17 @@ export function Projects() {
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="Nama klien / perusahaan..."
               required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Anggaran / Modal dari Pak Fatwa (Rp)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={form.anggaranStr}
+              onChange={e => setForm(f => ({ ...f, anggaranStr: formatRupiahInput(e.target.value) }))}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-semibold text-emerald-700"
+              placeholder="0"
             />
           </div>
           <div>
@@ -239,36 +301,46 @@ export function Projects() {
   );
 }
 
-function ProjectCard({ project, onEdit, onComplete, onDelete, completed = false }: {
+function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, completed = false }: {
   project: ProjectWithStats;
-  onEdit: (p: Project) => void;
-  onComplete: (id: string) => void;
-  onDelete: (p: Project) => void;
+  onSelect: () => void;
+  onEdit: (e: React.MouseEvent) => void;
+  onComplete: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
   completed?: boolean;
 }) {
+  const anggaran = project.anggaran || 0;
+  const sisaModal = anggaran - project.totalPengeluaran;
+
   return (
-    <Card className={`relative ${completed ? 'opacity-70' : ''}`}>
-      {/* Status badge */}
+    <Card
+      onClick={onSelect}
+      className={`relative cursor-pointer hover:border-emerald-500/40 transition-all duration-200 hover:shadow-card-hover group ${completed ? 'opacity-75' : ''}`}
+    >
+      {/* Header Badge & Action Tools */}
       <div className="flex items-start justify-between mb-3">
         <Badge variant={completed ? 'gray' : 'green'}>
           {completed ? 'Selesai' : 'Aktif'}
         </Badge>
-        <div className="flex gap-1">
-          <button onClick={() => onEdit(project)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+          <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
             <Edit2 size={14} />
           </button>
           {!completed && (
-            <button onClick={() => onComplete(project.id)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-600 transition-colors" title="Tandai Selesai">
+            <button onClick={onComplete} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition-colors" title="Tandai Selesai">
               <CheckCircle size={14} />
             </button>
           )}
-          <button onClick={() => onDelete(project)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors">
+          <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors">
             <Trash2 size={14} />
           </button>
         </div>
       </div>
 
-      <h3 className="font-bold text-gray-800 mb-1">{project.nama}</h3>
+      <h3 className="font-bold text-gray-900 mb-1 group-hover:text-emerald-600 transition-colors flex items-center justify-between">
+        <span>{project.nama}</span>
+        <ChevronRight size={16} className="text-gray-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+      </h3>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
         <Users size={13} />
         <span>{project.klien}</span>
@@ -276,31 +348,32 @@ function ProjectCard({ project, onEdit, onComplete, onDelete, completed = false 
       <div className="flex items-center gap-2 text-xs text-gray-400 mb-4">
         <Calendar size={12} />
         <span>Mulai: {formatDate(project.tanggalMulai)}</span>
-        {project.tanggalSelesai && <span>· Selesai: {formatDate(project.tanggalSelesai)}</span>}
       </div>
 
       {/* Financial stats */}
       <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <TrendingUp size={12} className="text-green-500" />
-            <p className="text-xs text-gray-500">Masuk</p>
+            <Wallet size={12} className="text-blue-500" />
+            <p className="text-[11px] text-gray-500 font-medium">Sisa Modal</p>
           </div>
-          <p className="text-sm font-semibold text-green-600 truncate">{formatRupiah(project.totalPemasukan)}</p>
+          <p className={`text-xs font-extrabold truncate ${sisaModal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+            {formatRupiah(sisaModal)}
+          </p>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <TrendingDown size={12} className="text-red-500" />
-            <p className="text-xs text-gray-500">Keluar</p>
+            <p className="text-[11px] text-gray-500 font-medium">Terpakai</p>
           </div>
-          <p className="text-sm font-semibold text-red-600 truncate">{formatRupiah(project.totalPengeluaran)}</p>
+          <p className="text-xs font-extrabold text-red-600 truncate">{formatRupiah(project.totalPengeluaran)}</p>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
-            <DollarSign size={12} className="text-primary" />
-            <p className="text-xs text-gray-500">Profit</p>
+            <TrendingUp size={12} className="text-emerald-500" />
+            <p className="text-[11px] text-gray-500 font-medium">Profit</p>
           </div>
-          <p className={`text-sm font-bold truncate ${project.profit >= 0 ? 'text-primary' : 'text-red-600'}`}>
+          <p className={`text-xs font-extrabold truncate ${project.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {formatRupiah(project.profit)}
           </p>
         </div>

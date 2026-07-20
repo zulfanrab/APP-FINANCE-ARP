@@ -275,6 +275,11 @@ export function AdminDashboard() {
                       {tx.lampiran && tx.lampiran.length > 0 && (
                         <AttachmentViewer attachments={tx.lampiran} />
                       )}
+                      {tx.buktiTransfer && (
+                        <div className="mt-1">
+                          <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{tx.kategori}</td>
                     <td className="px-4 py-3">

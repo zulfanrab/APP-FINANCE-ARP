@@ -35,7 +35,6 @@ const navItems: NavItem[] = [
     to: '/proyek',
     icon: <FolderKanban size={20} />,
     label: 'Proyek',
-    roles: ['admin'],
   },
   { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
 ];

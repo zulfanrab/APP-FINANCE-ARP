@@ -25,9 +25,9 @@ export function MobileBottomNav() {
             label: 'Input',
             isPrimary: true,
           },
-          { to: '/proyek', icon: <FolderKanban size={20} />, label: 'Proyek' },
         ]
       : []),
+    { to: '/proyek', icon: <FolderKanban size={20} />, label: 'Proyek' },
     { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
   ];
 

@@ -13,6 +13,7 @@ import { OwnerDashboard } from './pages/OwnerDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { TransactionForm } from './pages/TransactionForm';
 import { Projects } from './pages/Projects';
+import { ProjectDetail } from './pages/ProjectDetail';
 import { Reports } from './pages/Reports';
 import { hasPin } from './services/authService';
 import { LoadingSpinner } from './components/ui';
@@ -102,9 +103,19 @@ function AppInner() {
       <Route
         path="/proyek"
         element={
-          <ProtectedRoute allowedRoles={['admin']}>
+          <ProtectedRoute>
             <Layout>
               <Projects />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/proyek/:id"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProjectDetail />
             </Layout>
           </ProtectedRoute>
         }

@@ -37,6 +37,7 @@ export interface Project {
   id: string;
   nama: string;
   klien: string;
+  anggaran?: number; // Modal/Anggaran dari Owner (Pak Fatwa)
   tanggalMulai: string;
   tanggalSelesai?: string;
   status: 'aktif' | 'selesai';

@@ -16,6 +16,7 @@ import {
 } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
+import { uploadAttachmentFile } from '../services/storageService';
 import { type Transaction, type DashboardSummary, type MonthlyChartData } from '../types';
 import { Card, Button, StatusBadge, LoadingSpinner, EmptyState, formatRupiah, formatDate, AttachmentViewer } from '../components/ui';
 
@@ -104,21 +105,30 @@ export function OwnerDashboard() {
     loadData();
   };
 
-  const handleTransferFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTransferFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setTransferFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = ev => setTransferFile(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    setTransferLoading(true);
+    try {
+      const att = await uploadAttachmentFile(file, {
+        tanggal: new Date().toISOString().split('T')[0],
+        tag: 'Bukti_Transfer',
+      });
+      setTransferFile(att.dataUrl);
+      addToast('success', 'Bukti transfer berhasil diunggah ke Google Drive');
+    } catch {
+      addToast('error', 'Gagal mengunggah bukti transfer');
+    } finally {
+      setTransferLoading(false);
+    }
   };
 
   const handleUploadTransfer = async () => {
-    if (!transferFile) { addToast('error', 'Pilih file bukti transfer terlebih dahulu'); return; }
     setTransferLoading(true);
     try {
-      await uploadBuktiTransfer(transferModal.txId, transferFile);
-      addToast('success', 'Bukti transfer berhasil diunggah, transaksi selesai!');
+      await uploadBuktiTransfer(transferModal.txId, transferFile || '');
+      addToast('success', 'Transaksi berhasil ditandai selesai/sudah transfer!');
       setTransferModal({ open: false, txId: '' });
       setTransferFile(null);
       setTransferFileName('');
