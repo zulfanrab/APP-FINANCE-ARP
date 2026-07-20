@@ -1,5 +1,5 @@
 // ============================================================
-// ARKA Finance — Direct Google Drive Upload Service (Pure Drive)
+// ARKA Finance — Direct Google Drive Upload Service (Robust)
 // ============================================================
 
 import { buildFolderPath, type UploadContext } from './storageService';
@@ -24,7 +24,6 @@ function fileToBase64(file: File): Promise<string> {
 
 /**
  * Uploads a file directly into Google Drive.
- * Throws informative errors if permission or configuration issues occur.
  */
 export async function uploadToGoogleDrive(
   file: File,
@@ -38,43 +37,57 @@ export async function uploadToGoogleDrive(
   const relativePath = buildFolderPath(file.name, context);
   const folderPath = `ARKA Finance/${relativePath.substring(0, relativePath.lastIndexOf('/'))}`;
 
-  const response = await fetch(driveWebhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
-    body: JSON.stringify({
-      name: file.name,
-      type: file.type,
-      base64: base64,
-      folderPath: folderPath,
-    }),
+  const payload = JSON.stringify({
+    name: file.name,
+    type: file.type,
+    base64: base64,
+    folderPath: folderPath,
   });
 
-  if (response.status === 403) {
-    throw new Error(
-      'Google Drive 403 Forbidden: Di Google Apps Script, ganti "Who has access" (Siapa yang memiliki akses) menjadi "Anyone" (Siapa saja).'
-    );
-  }
-
-  if (!response.ok) {
-    throw new Error(`Google Drive HTTP Error: ${response.status} ${response.statusText}`);
-  }
-
-  let resData: any;
   try {
-    resData = await response.json();
-  } catch {
-    throw new Error('Respons dari Google Drive Script bukan format JSON valid');
-  }
+    const response = await fetch(driveWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: payload,
+    });
 
-  if (resData && resData.success && resData.fileUrl) {
-    return {
-      nama: file.name,
-      tipe: file.type,
-      dataUrl: resData.fileUrl,
-    };
-  } else {
-    throw new Error(resData?.error || 'Gagal mengunggah file ke Google Drive');
+    const responseText = await response.text();
+
+    let resData: any;
+    try {
+      resData = JSON.parse(responseText);
+    } catch {
+      // If responseText contains a Drive file URL directly
+      const driveMatch = responseText.match(/https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+/);
+      if (driveMatch) {
+        return {
+          nama: file.name,
+          tipe: file.type,
+          dataUrl: driveMatch[0] + '/view?usp=sharing',
+        };
+      }
+      throw new Error(`Google Drive Response Error: ${responseText.substring(0, 150)}`);
+    }
+
+    if (resData && resData.success && resData.fileUrl) {
+      return {
+        nama: file.name,
+        tipe: file.type,
+        dataUrl: resData.fileUrl,
+      };
+    } else if (resData && resData.fileUrl) {
+      return {
+        nama: file.name,
+        tipe: file.type,
+        dataUrl: resData.fileUrl,
+      };
+    } else {
+      throw new Error(resData?.error || 'Gagal menyimpan file ke Google Drive');
+    }
+  } catch (err: any) {
+    console.error('Google Drive Upload Exception:', err);
+    throw new Error(err.message || 'Terjadi kesalahan saat mengunggah ke Google Drive');
   }
 }
