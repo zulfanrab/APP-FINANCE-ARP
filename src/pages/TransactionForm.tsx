@@ -63,13 +63,16 @@ export function TransactionForm() {
 
   useEffect(() => {
     getProjects().then(setProjects);
-    loadCategoryList();
   }, []);
 
-  const loadCategoryList = async () => {
-    const list = await getCategories();
+  useEffect(() => {
+    loadCategoryList(form.jenis);
+  }, [form.jenis]);
+
+  const loadCategoryList = async (jenis: 'masuk' | 'keluar') => {
+    const list = await getCategories(jenis);
     setCategories(list);
-    if (!form.kategori && list.length > 0) {
+    if (list.length > 0) {
       setForm(f => ({ ...f, kategori: list[0] }));
     }
   };
@@ -78,7 +81,7 @@ export function TransactionForm() {
 
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
-    const updated = await addCategory(newCatName);
+    const updated = await addCategory(newCatName, form.jenis);
     setCategories(updated);
     setField('kategori', newCatName.trim());
     setNewCatName('');
@@ -86,7 +89,7 @@ export function TransactionForm() {
   };
 
   const handleDeleteCategory = async (catName: string) => {
-    const updated = await deleteCategory(catName);
+    const updated = await deleteCategory(catName, form.jenis);
     setCategories(updated);
     addToast('success', `Kategori "${catName}" dihapus`);
   };

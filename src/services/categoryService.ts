@@ -1,56 +1,69 @@
 // ============================================================
-// ARKA Finance — Category Service (Custom Categories Management)
+// ARKA Finance — Category Service (Dynamic Income vs Expense Categories)
 // ============================================================
 
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-const DEFAULT_CATEGORIES = [
+export const DEFAULT_INCOME_CATEGORIES = [
+  'Pembayaran Klien / Proyek',
+  'DP / Termijn Proyek',
+  'Pelunasan Proyek',
+  'Setoran Modal Owner',
+  'Pengembalian Dana (Refund)',
+  'Pemasukan Lainnya',
+];
+
+export const DEFAULT_EXPENSE_CATEGORIES = [
   'Biaya Proyek',
-  'Gaji & Honorarium',
   'Bahan & Material',
+  'Gaji & Honorarium',
   'Transport & Bensin',
   'Konsumsi & Akomodasi',
   'Peralatan & Sewa Alat',
   'Operasional Kantor',
   'Prive Owner',
-  'Setoran Modal',
-  'Lain-lain',
+  'Pengeluaran Lainnya',
 ];
 
-export async function getCategories(): Promise<string[]> {
+export async function getCategories(jenis: 'masuk' | 'keluar' = 'keluar'): Promise<string[]> {
+  const defaults = jenis === 'masuk' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES;
+
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase.from('categories').select('nama').order('nama');
+      const { data, error } = await supabase.from('categories').select('nama, jenis').order('nama');
       if (!error && data && data.length > 0) {
-        const list = data.map((item: any) => item.nama);
-        setItem(KEYS.CATEGORIES, list);
-        return list;
+        const filtered = data.filter((item: any) => !item.jenis || item.jenis === jenis).map((item: any) => item.nama);
+        if (filtered.length > 0) {
+          return Array.from(new Set([...defaults, ...filtered]));
+        }
       }
     } catch {
       // Fallback
     }
   }
 
-  const stored = getItem<string[]>(KEYS.CATEGORIES, []);
+  const storedKey = jenis === 'masuk' ? 'arka_categories_masuk' : KEYS.CATEGORIES;
+  const stored = getItem<string[]>(storedKey, []);
   if (!stored || stored.length === 0) {
-    setItem(KEYS.CATEGORIES, DEFAULT_CATEGORIES);
-    return DEFAULT_CATEGORIES;
+    setItem(storedKey, defaults);
+    return defaults;
   }
-  return stored;
+  return Array.from(new Set([...defaults, ...stored]));
 }
 
-export async function addCategory(nama: string): Promise<string[]> {
-  const current = await getCategories();
+export async function addCategory(nama: string, jenis: 'masuk' | 'keluar' = 'keluar'): Promise<string[]> {
+  const current = await getCategories(jenis);
   const trimmed = nama.trim();
   if (!trimmed || current.includes(trimmed)) return current;
 
   const updated = [...current, trimmed];
-  setItem(KEYS.CATEGORIES, updated);
+  const storedKey = jenis === 'masuk' ? 'arka_categories_masuk' : KEYS.CATEGORIES;
+  setItem(storedKey, updated);
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('categories').upsert({ nama: trimmed });
+      await supabase.from('categories').upsert({ nama: trimmed, jenis });
     } catch {
       // Fallback
     }
@@ -59,10 +72,11 @@ export async function addCategory(nama: string): Promise<string[]> {
   return updated;
 }
 
-export async function deleteCategory(nama: string): Promise<string[]> {
-  const current = await getCategories();
+export async function deleteCategory(nama: string, jenis: 'masuk' | 'keluar' = 'keluar'): Promise<string[]> {
+  const current = await getCategories(jenis);
   const updated = current.filter(c => c !== nama);
-  setItem(KEYS.CATEGORIES, updated);
+  const storedKey = jenis === 'masuk' ? 'arka_categories_masuk' : KEYS.CATEGORIES;
+  setItem(storedKey, updated);
 
   if (isSupabaseConfigured && supabase) {
     try {

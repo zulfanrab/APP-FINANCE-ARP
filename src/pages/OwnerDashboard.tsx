@@ -402,8 +402,10 @@ export function OwnerDashboard() {
               <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tx.jenis === 'masuk' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {tx.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'}
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                      tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {tx.jenis === 'masuk' ? '📥 Konfirmasi Uang Masuk Bank' : 'Pengeluaran Operasional'}
                     </span>
                     <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
                     {getDaysPending(tx.tanggal) >= 2 && (
@@ -412,31 +414,34 @@ export function OwnerDashboard() {
                       </span>
                     )}
                   </div>
-                  <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
+                  <p className="font-bold text-gray-900 truncate">{tx.deskripsi}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 font-medium">Kategori: {tx.kategori}</p>
                   {tx.lampiran && tx.lampiran.length > 0 && (
                     <AttachmentViewer attachments={tx.lampiran} />
                   )}
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4">
+                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
                   <div className="text-right">
-                    <p className={`font-bold text-base ${tx.jenis === 'masuk' ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                       {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                     </p>
+                    {tx.jenis === 'masuk' && (
+                      <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">Memerlukan Konfirmasi Masuk Rekening Bank</p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setRejectModal({ open: true, txId: tx.id })}
                       className="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1 transition-colors"
                     >
-                      <XCircle size={14} /> Tolak
+                      <XCircle size={14} /> {tx.jenis === 'masuk' ? 'Belum Masuk' : 'Tolak'}
                     </button>
                     <button
                       onClick={() => handleApprove(tx.id)}
-                      className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
                     >
-                      <CheckCircle size={14} /> Setujui
+                      <CheckCircle size={14} /> {tx.jenis === 'masuk' ? 'Konfirmasi Uang Masuk' : 'Setujui'}
                     </button>
                   </div>
                 </div>
