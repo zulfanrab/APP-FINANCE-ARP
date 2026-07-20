@@ -16,7 +16,7 @@ import {
 } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState,
-  formatRupiah, formatDate
+  formatRupiah, formatDate, AttachmentViewer
 } from '../components/ui';
 import { useApp } from '../context/AppContext';
 
@@ -272,6 +272,9 @@ export function AdminDashboard() {
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-800 max-w-xs truncate">{tx.deskripsi}</p>
+                      {tx.lampiran && tx.lampiran.length > 0 && (
+                        <AttachmentViewer attachments={tx.lampiran} />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{tx.kategori}</td>
                     <td className="px-4 py-3">

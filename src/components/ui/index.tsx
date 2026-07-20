@@ -166,3 +166,6 @@ export function formatDate(dateStr: string): string {
     year: 'numeric',
   });
 }
+
+export { AttachmentViewer } from './AttachmentViewer';
+

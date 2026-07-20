@@ -17,7 +17,8 @@ import {
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
 import { type Transaction, type DashboardSummary, type MonthlyChartData } from '../types';
-import { Card, Button, StatusBadge, LoadingSpinner, EmptyState, formatRupiah, formatDate } from '../components/ui';
+import { Card, Button, StatusBadge, LoadingSpinner, EmptyState, formatRupiah, formatDate, AttachmentViewer } from '../components/ui';
+
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 
@@ -234,6 +235,9 @@ export function OwnerDashboard() {
                   </div>
                   <p className="font-medium text-gray-800 truncate">{tx.deskripsi}</p>
                   <p className="text-sm text-gray-500">{formatDate(tx.tanggal)} · {tx.kategori}</p>
+                  {tx.lampiran && tx.lampiran.length > 0 && (
+                    <AttachmentViewer attachments={tx.lampiran} />
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <p className={`font-bold text-lg ${tx.jenis === 'masuk' ? 'text-green-600' : 'text-red-600'}`}>
@@ -277,6 +281,15 @@ export function OwnerDashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-800 truncate">{tx.deskripsi}</p>
                   <p className="text-sm text-gray-500">{formatDate(tx.tanggal)} · {tx.kategori}</p>
+                  {tx.lampiran && tx.lampiran.length > 0 && (
+                    <AttachmentViewer attachments={tx.lampiran} />
+                  )}
+                  {tx.buktiTransfer && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-emerald-700 mb-1">Bukti Transfer:</p>
+                      <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="font-bold text-lg text-red-600">-{formatRupiah(tx.nominal)}</p>
