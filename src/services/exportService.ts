@@ -2,20 +2,11 @@
 // ARKA Finance — Professional Accounting Export Service
 // Generates Proper General Journal (Jurnal Umum), Debet/Kredit,
 // Kumulatif Balance, Executive Summaries & Project Realisasi Workbooks
-// Matches Official KOP: PT. AKSARA RIKSA PERDANA
 // ============================================================
 
 import * as XLSX from 'xlsx';
 import { type Transaction, type Project } from '../types';
 import { formatDate, formatRupiah } from '../components/ui';
-
-export const OFFICIAL_COMPANY_INFO = {
-  name: 'PT. AKSARA RIKSA PERDANA',
-  address: 'Jl. Cibodas Raya No. 02, Antapani Kidul, Kec. Antapani, Kota Bandung, Jawa Barat 40291',
-  phone: '+62 821-2984-9515',
-  email: 'aksara.riksa.perdana@gmail.com',
-  website: 'aksarariksapjk3.com',
-};
 
 interface ExportJournalOptions {
   title: string;
@@ -31,7 +22,7 @@ interface ExportJournalOptions {
  */
 export function exportAccountingJournalExcel({
   title,
-  companyName = OFFICIAL_COMPANY_INFO.name,
+  companyName = 'PT. AKSARA RIKSA PERDANA',
   periodText,
   transactions,
   projects = [],
@@ -55,8 +46,6 @@ export function exportAccountingJournalExcel({
   // Build Sheet 1: JURNAL UMUM (Accounting Journal Style)
   const journalRows: any[][] = [
     [companyName],
-    [`Alamat: ${OFFICIAL_COMPANY_INFO.address}`],
-    [`Kontak: ${OFFICIAL_COMPANY_INFO.phone} | Email: ${OFFICIAL_COMPANY_INFO.email} | Web: ${OFFICIAL_COMPANY_INFO.website}`],
     [title.toUpperCase()],
     [`PERIODE: ${periodText}`],
     [`DITERBITKAN: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`],
@@ -159,12 +148,9 @@ export function exportAccountingJournalExcel({
   XLSX.writeFile(wb, defaultFileName);
 }
 
-/**
- * Export a formal Project Realisasi Accounting Excel Workbook
- */
 export function exportProjectRealisasiExcel(project: Project, transactions: Transaction[]) {
   const wb = XLSX.utils.book_new();
-  const companyName = OFFICIAL_COMPANY_INFO.name;
+  const companyName = 'PT. AKSARA RIKSA PERDANA';
 
   const approvedPtx = transactions.filter(
     t => t.proyekId === project.id && (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
@@ -183,8 +169,6 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
   // Sheet 1: LAPORAN REALISASI PROYEK
   const rows: any[][] = [
     [companyName],
-    [`Alamat: ${OFFICIAL_COMPANY_INFO.address}`],
-    [`Telp: ${OFFICIAL_COMPANY_INFO.phone} | Email: ${OFFICIAL_COMPANY_INFO.email} | Web: ${OFFICIAL_COMPANY_INFO.website}`],
     ['LAPORAN REALISASI & PERTANGGUNGJAWABAN DANA PROYEK'],
     [`PROYEK: ${project.nama.toUpperCase()}`],
     [`KLIEN: ${project.klien}`],
@@ -240,10 +224,10 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
 
   // Update summary card values in rows array
   const realisasiBersih = totalBelanja - totalRefund;
-  rows[10][1] = totalBelanja;
-  rows[11][1] = totalRefund;
-  rows[12][1] = realisasiBersih;
-  rows[13][1] = currentBalance;
+  rows[8][1] = totalBelanja;
+  rows[9][1] = totalRefund;
+  rows[10][1] = realisasiBersih;
+  rows[11][1] = currentBalance;
 
   rows.push([]);
   rows.push(['', '', 'TOTAL MUTASI & POSISI SISA DANA', '', modalDisuntikkan + totalRefund, totalBelanja, currentBalance, 'VALID']);
