@@ -312,6 +312,21 @@ export function getCashflowTrend(
   return result;
 }
 
+/**
+ * Clean disruptive markdown symbols (*, #, `, _, ~) from text outputs
+ */
+export function cleanTextPunctuation(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/#{1,6}\s?/g, '')
+    .replace(/\*{1,3}/g, '')
+    .replace(/_{1,3}/g, '')
+    .replace(/`{1,3}/g, '')
+    .replace(/~{1,2}/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .trim();
+}
+
 // ---- Transaction Summary for AI ----
 export function buildAISummaryContext(
   transactions: Transaction[],
@@ -336,7 +351,6 @@ export function buildAISummaryContext(
     }
   }
 
-  // Prev month
   let prevKeluar = 0;
   for (const t of prevMonthTransactions) {
     if (isApproved(t) && isKasUtamaTransaction(t) && t.jenis === 'keluar') prevKeluar += t.nominal;
@@ -351,15 +365,69 @@ export function buildAISummaryContext(
     .map(([k, v]) => `${k}: ${fmt(v)}`)
     .join(', ');
 
-  return `Data keuangan perusahaan PT Aksara Riksa Perdana (ARP) periode ${from.toLocaleDateString('id-ID')} - ${to.toLocaleDateString('id-ID')}:
+  return `Data keuangan Kas Utama PT Aksara Riksa Perdana (ARP) periode ${from.toLocaleDateString('id-ID')} - ${to.toLocaleDateString('id-ID')}:
 - Total Pemasukan Kas Utama: ${fmt(totalMasuk)}
 - Total Pengeluaran Kas Utama: ${fmt(totalKeluar)}
-- Saldo Kas Utama periode: ${fmt(totalMasuk - totalKeluar)}
-- Jumlah transaksi kas utama: ${periodTx.length}
-- Kategori pengeluaran terbesar: ${topCats || 'tidak ada'}
-- Total pengeluaran bulan sebelumnya: ${fmt(prevKeluar)}
+- Arus Kas Bersih (Net Cashflow): ${fmt(totalMasuk - totalKeluar)}
+- Total Pengeluaran Bulan Sebelumnya: ${fmt(prevKeluar)}
+- Kategori Pengeluaran Terbesar: ${topCats || 'Tidak ada'}
 
-Catatan: Angka di atas HANYA mencakup kas utama perusahaan, TIDAK termasuk pengeluaran internal proyek (yang dikelola terpisah per amplop proyek).
-
-Buatkan ringkasan singkat 2-3 kalimat dalam Bahasa Indonesia yang profesional tentang kondisi cashflow kas utama, kategori pengeluaran terbesar, dan catatan jika ada pengeluaran tidak wajar dibanding periode sebelumnya. Gunakan tone profesional seperti laporan keuangan ringkas.`;
+Instruksi Penting:
+Buatkan analisis keuangan eksekutif yang singkat, padat, dan sangat rapi dalam Bahasa Indonesia.
+ATURAN WAJIB: SANGAT DILARANG menggunakan tanda baca simbol seperti hashtag, bintang, underscore, atau backtick. Tulislah dalam bentuk teks narasi bersih, jelas, dan profesional tanpa simbol-simbol markdown tersebut.`;
 }
+
+/**
+ * Builds AI Prompt specifically for Individual Project Financial Analysis
+ */
+export function buildProjectAISummaryContext(
+  projectNama: string,
+  klien: string,
+  anggaran: number,
+  transactions: Transaction[]
+): string {
+  let totalBelanja = 0;
+  let totalRefund = 0;
+  const categoryMap: Record<string, number> = {};
+
+  for (const t of transactions) {
+    const isApproved = t.status === 'disetujui' || t.status === 'selesai';
+    if (!isApproved) continue;
+    if (t.deskripsi.startsWith('Suntikan Modal Proyek:')) continue;
+
+    if (t.jenis === 'keluar') {
+      totalBelanja += t.nominal;
+      categoryMap[t.kategori] = (categoryMap[t.kategori] ?? 0) + t.nominal;
+    } else if (t.jenis === 'masuk') {
+      totalRefund += t.nominal;
+    }
+  }
+
+  const realisasiBersih = totalBelanja - totalRefund;
+  const sisaDana = anggaran - realisasiBersih;
+  const persentaseTerpakai = anggaran > 0 ? Math.round((realisasiBersih / anggaran) * 100) : 0;
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+
+  const topCats = Object.entries(categoryMap)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([k, v]) => `${k}: ${fmt(v)}`)
+    .join(', ');
+
+  return `Laporan Analisis Realisasi Anggaran Proyek PT Aksara Riksa Perdana:
+- Nama Proyek: ${projectNama}
+- Klien: ${klien}
+- Modal Anggaran Disuntikkan: ${fmt(anggaran)}
+- Total Pengeluaran Lapangan: ${fmt(totalBelanja)}
+- Total Refund / Pengembalian: ${fmt(totalRefund)}
+- Realisasi Bersih Terpakai: ${fmt(realisasiBersih)} (${persentaseTerpakai}% dari anggaran)
+- Sisa Dana Proyek Saat Ini: ${fmt(sisaDana)}
+- Rincian Pengeluaran Terbesar: ${topCats || 'Belum ada pengeluaran'}
+
+Instruksi Penting:
+Berikan evaluasi kesehatan finansial khusus proyek ini dalam 2-3 paragraf singkat dan rapi.
+ATURAN WAJIB: SANGAT DILARANG menggunakan simbol hashtag, bintang, underscore, atau backtick. Gunakan penulisan kalimat naratif bersih yang enak dibaca tanpa simbol-simbol dekoratif tersebut.`;
+}
+

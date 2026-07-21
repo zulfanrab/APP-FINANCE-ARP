@@ -15,7 +15,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import {
-  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext
+  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation
 } from '../services/analyticsService';
 import { exportAccountingJournalExcel } from '../services/exportService';
 import { type Transaction, type Project } from '../types';
@@ -156,36 +156,34 @@ export function Reports() {
           const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
           const result = await model.generateContent(prompt);
           const text = result.response.text();
-          setAiResult(text);
-          addToast('success', 'Ringkasan AI Gemini berhasil dibuat!');
+          setAiResult(cleanTextPunctuation(text));
+          addToast('success', 'Ringkasan AI Gemini 1.5 Flash berhasil dibuat!');
           return;
         } catch (apiErr: any) {
           console.warn('Gemini API call failed, switching to Smart AI Engine:', apiErr);
         }
       }
 
-      // Smart Fallback Financial AI Engine
+      // Smart Fallback Financial AI Engine (Clean Text without Markdown Symbols)
       const margin = summary.totalMasuk > 0 ? Math.round(((summary.totalMasuk - summary.totalKeluar) / summary.totalMasuk) * 100) : 0;
       const topCat = categoryData.length > 0 ? categoryData[0] : null;
       const privePercent = summary.totalKeluar > 0 ? Math.round((summary.privBiaya / summary.totalKeluar) * 100) : 0;
 
-      const fallbackText = `### 📊 Analisis & Executive Summary Keuangan PT Aksara Riksa Perdana
+      const fallbackText = `Analisis & Executive Summary Keuangan PT Aksara Riksa Perdana
 
-**1. Kinerja & Kesehatan Arus Kas:**
-* **Total Pemasukan:** ${formatRupiah(summary.totalMasuk)}
-* **Total Pengeluaran:** ${formatRupiah(summary.totalKeluar)} (Operasional: ${formatRupiah(summary.opsBiaya)} | Prive Owner: ${formatRupiah(summary.privBiaya)})
-* **Arus Kas Bersih (Net Cashflow):** ${summary.net >= 0 ? '+' : ''}${formatRupiah(summary.net)} (${margin}% Net Margin)
+1. Kinerja & Kesehatan Arus Kas:
+- Total Pemasukan Kas Utama: ${formatRupiah(summary.totalMasuk)}
+- Total Pengeluaran Kas Utama: ${formatRupiah(summary.totalKeluar)} (Operasional: ${formatRupiah(summary.opsBiaya)} | Prive Owner: ${formatRupiah(summary.privBiaya)})
+- Arus Kas Bersih (Net Cashflow): ${summary.net >= 0 ? '+' : ''}${formatRupiah(summary.net)} (${margin}% Net Margin)
 
-**2. Sorotan Utama & Pengeluaran Terbesar:**
-${topCat ? `* Pengeluaran terbesar tercatat pada kategori **${topCat.kategori}** sebesar **${formatRupiah(topCat.total)}** (${topCat.persentase}% dari total pengeluaran).` : '* Belum ada pengeluaran signifikan tercatat pada periode ini.'}
-* Pengambilan Prive Owner menyerap **${privePercent}%** dari total pengeluaran periode ini.
+2. Sorotan Utama & Pengeluaran Terbesar:
+${topCat ? `- Pengeluaran terbesar tercatat pada kategori ${topCat.kategori} sebesar ${formatRupiah(topCat.total)} (${topCat.persentase}% dari total pengeluaran).` : '- Belum ada pengeluaran signifikan tercatat pada periode ini.'}
+- Pengambilan Prive Owner menyerap ${privePercent}% dari total pengeluaran periode ini.
 
-**3. Rekomendasi Strategis:**
-${summary.net >= 0 ? '✅ **Arus kas dalam kondisi Sehat & Positif.** Pertahankan alokasi modal operasional proyek dan pertahankan rasio prive di bawah 20% agar modal kerja tetap kuat.' : '⚠️ **Arus kas defisit pada periode ini.** Disarankan pengetatan pengeluaran non-operasional dan mempercepat pencairan termin dari klien.'}
+3. Rekomendasi Strategis:
+${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi modal operasional proyek dan pertahankan rasio prive di bawah 20% agar modal kerja tetap kuat.' : 'Arus kas defisit pada periode ini. Disarankan pengetatan pengeluaran non-operasional dan mempercepat pencairan termin dari klien.'}`;
 
-*Catatan: ${apiKey ? 'Menggunakan ARKA Financial Analytics Engine.' : 'Masukkan VITE_GEMINI_API_KEY di .env / Vercel untuk analisis naratif mendalam via Gemini AI.'}`;
-
-      setAiResult(fallbackText);
+      setAiResult(cleanTextPunctuation(fallbackText));
       addToast('success', 'Ringkasan Analisis Keuangan berhasil dibuat!');
     } finally {
       setAiLoading(false);

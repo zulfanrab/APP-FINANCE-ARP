@@ -1,7 +1,6 @@
 // ============================================================
-// ARKA Finance — AI Gemini Receipt Scanner Service (Bulletproof)
-// Multi-Tier Gemini 2.0 / 1.5 Flash + Smart Local OCR Regex Fallback
-// Guaranteed to NEVER crash or fail even if API key is missing or quota limited
+// ARKA Finance — AI Gemini Receipt Scanner Service (Strict 1.5 Flash)
+// Uses Google Gemini 1.5 Flash Vision API exclusively
 // ============================================================
 
 import Tesseract from 'tesseract.js';
@@ -29,9 +28,6 @@ function fileToBase64(file: File): Promise<{ mimeType: string; data: string }> {
   });
 }
 
-/**
- * Extracts Rupiah nominal from raw OCR text using regex heuristics
- */
 function extractNominalFromText(text: string): number {
   const clean = text.replace(/\r/g, '');
   const lines = clean.split('\n');
@@ -39,7 +35,6 @@ function extractNominalFromText(text: string): number {
   let maxFound = 0;
   for (const line of lines) {
     const lower = line.toLowerCase();
-    // Look for total / grand total / bayar lines
     if (lower.includes('total') || lower.includes('bayar') || lower.includes('jumlah') || lower.includes('rp')) {
       const nums = line.match(/(?:rp\.?|total|bayar)?\s*([\d.,]{4,12})/gi);
       if (nums) {
@@ -56,7 +51,6 @@ function extractNominalFromText(text: string): number {
 
   if (maxFound > 0) return maxFound;
 
-  // Global search for any number between 5,000 and 500,000,000
   const allNums = text.match(/[\d.,]{5,12}/g);
   if (allNums) {
     for (const rawNum of allNums) {
@@ -74,7 +68,6 @@ function extractNominalFromText(text: string): number {
 export async function scanReceiptWithGemini(file: File): Promise<ReceiptScanResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  // TIER 1: GEMINI VISION API (If Key Configured & Quota Available)
   if (apiKey && apiKey.trim().length > 5) {
     try {
       const { mimeType, data } = await fileToBase64(file);
@@ -93,67 +86,58 @@ Tugas Anda: Baca foto struk/nota ini dengan sangat teliti dan ekstrak informasi 
 
 ATURAN PENTING:
 1. "nominal" WAJIB berupa ANGKA BULAT (integer) dari TOTAL AKHIR / TOTAL BAYAR (Grand Total). Abaikan kembalian/subtotal.
-2. Jika ada diskon atau pajak, ambil angka TOTAL BAYAR AKHIR (NET TOTAL).
-3. HANYA KELUARKAN JSON MURNI tanpa teks pembuka atau penutup.
+2. HANYA KELUARKAN JSON MURNI tanpa teks pembuka atau penutup.
 `;
 
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro'];
-
-      for (const model of models) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: promptText },
                 {
-                  parts: [
-                    { text: promptText },
-                    {
-                      inlineData: {
-                        mimeType,
-                        data,
-                      },
-                    },
-                  ],
+                  inlineData: {
+                    mimeType,
+                    data,
+                  },
                 },
               ],
-            }),
-          });
+            },
+          ],
+        }),
+      });
 
-          if (!response.ok) continue;
+      if (response.ok) {
+        const resData = await response.json();
+        const textResponse = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-          const resData = await response.json();
-          const textResponse = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleanJsonStr = textResponse
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .trim();
 
-          const cleanJsonStr = textResponse
-            .replace(/```json/g, '')
-            .replace(/```/g, '')
-            .trim();
+        const parsed = JSON.parse(cleanJsonStr);
 
-          const parsed = JSON.parse(cleanJsonStr);
-
-          if (parsed && typeof parsed.nominal === 'number') {
-            return {
-              nominal: Number(parsed.nominal) || 0,
-              deskripsi: parsed.deskripsi || `Pembelian ${file.name.replace(/\.[^/.]+$/, '')}`,
-              toko: parsed.toko || '',
-              tanggal: parsed.tanggal || '',
-              kategori: parsed.kategori || 'Bahan & Material',
-              rawText: textResponse,
-            };
-          }
-        } catch {
-          // Try next model
+        if (parsed && typeof parsed.nominal === 'number') {
+          return {
+            nominal: Number(parsed.nominal) || 0,
+            deskripsi: parsed.deskripsi || `Pembelian ${file.name.replace(/\.[^/.]+$/, '')}`,
+            toko: parsed.toko || '',
+            tanggal: parsed.tanggal || '',
+            kategori: parsed.kategori || 'Bahan & Material',
+            rawText: textResponse,
+          };
         }
       }
     } catch (err) {
-      console.warn('Gemini Vision API error, falling back to local Tesseract OCR engine:', err);
+      console.warn('Gemini 1.5 Flash Vision API call failed, fallback to local OCR:', err);
     }
   }
 
-  // TIER 2: LOCAL TESSERACT.JS OCR + REGEX ENGINE (Bulletproof Fallback)
+  // TIER 2: LOCAL OCR FALLBACK
   try {
     const ret = await Tesseract.recognize(file, 'ind+eng', {
       logger: () => {},
@@ -161,8 +145,6 @@ ATURAN PENTING:
 
     const rawText = ret.data.text || '';
     const nominal = extractNominalFromText(rawText);
-
-    // Clean first line as merchant name
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
     const toko = lines.length > 0 ? lines[0].substring(0, 40) : 'Toko / Merchant';
     const cleanFileName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9 ]/g, ' ');

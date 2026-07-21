@@ -1,7 +1,6 @@
 // ============================================================
-// ARKA Finance — Bulletproof AI Voice Transaction Parsing Service
-// Converts spoken Indonesian voice into structured transaction JSON
-// Multi-Tier Gemini 2.0 / 1.5 Flash + Smart Indonesian NLU Fallback Engine
+// ARKA Finance — AI Voice Transaction Parsing Service (Strict 1.5 Flash)
+// Uses Google Gemini 1.5 Flash API exclusively
 // ============================================================
 
 export interface ParsedVoiceTransaction {
@@ -11,18 +10,15 @@ export interface ParsedVoiceTransaction {
   kategori: string;
 }
 
-// Convert spoken Indonesian number words (e.g. "500 ribu", "20 juta", "tiga ratus ribu", "2,5 juta") to number
 export function parseSpokenRupiah(text: string): number {
   const lower = text.toLowerCase();
 
-  // Word-to-number mapping for common spoken Indonesian
   const wordNumMap: Record<string, number> = {
     satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5,
     enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10,
     sebelas: 11, seratus: 100, seribu: 1000, sejuta: 1000000,
   };
 
-  // Match numeric million / billion / thousand patterns
   const jutaMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*juta/);
   const ribuMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*ribu/);
   const rawMatch = lower.match(/(?:rp\.?|nominal|sebesar|rp)?\s*([\d.,]+)/i) || lower.match(/(\d{4,9})/);
@@ -39,7 +35,6 @@ export function parseSpokenRupiah(text: string): number {
 
   if (total > 0) return total;
 
-  // Spoken text numbers (e.g., "dua juta lima ratus ribu")
   if (lower.includes('juta')) {
     const parts = lower.split('juta');
     const millionPart = parts[0].trim();
@@ -71,14 +66,10 @@ export function parseSpokenRupiah(text: string): number {
 export async function parseVoiceSentenceWithAI(transcript: string): Promise<ParsedVoiceTransaction> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  // TIER 1: GEMINI 2.0 / 1.5 FLASH API
   if (apiKey && apiKey.trim().length > 5) {
-    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-latest'];
-
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const promptText = `
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const promptText = `
 Anda adalah AI Pengolah Suara Transaksi Keuangan Perusahaan PT Aksara Riksa Perdana.
 User (Owner Pak Fatwa) mengucapkan kalimat perintah suara berikut:
 "${transcript}"
@@ -92,36 +83,35 @@ Ekstrak informasi berikut dalam format JSON MURNI (tanpa markdown/tanpa backtick
 }
 `;
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-          }),
-        });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+        }),
+      });
 
-        if (response.ok) {
-          const resData = await response.json();
-          const textResp = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const cleanJson = textResp.replace(/```json/g, '').replace(/```/g, '').trim();
-          const parsed = JSON.parse(cleanJson);
+      if (response.ok) {
+        const resData = await response.json();
+        const textResp = resData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleanJson = textResp.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
 
-          if (parsed) {
-            return {
-              nominal: Number(parsed.nominal) || parseSpokenRupiah(transcript),
-              deskripsi: parsed.deskripsi || transcript,
-              jenisQuick: parsed.jenisQuick || (transcript.toLowerCase().includes('prive') ? 'prive' : 'operasional'),
-              kategori: parsed.kategori || 'Operasional Kantor',
-            };
-          }
+        if (parsed) {
+          return {
+            nominal: Number(parsed.nominal) || parseSpokenRupiah(transcript),
+            deskripsi: parsed.deskripsi || transcript,
+            jenisQuick: parsed.jenisQuick || (transcript.toLowerCase().includes('prive') ? 'prive' : 'operasional'),
+            kategori: parsed.kategori || 'Operasional Kantor',
+          };
         }
-      } catch {
-        // Try next model
       }
+    } catch (err) {
+      console.warn('Gemini 1.5 Flash Voice API call failed, fallback to local parser:', err);
     }
   }
 
-  // TIER 2: SMART INDONESIAN NLU PARSER FALLBACK
+  // TIER 2: SMART LOCAL PARSER FALLBACK
   const nominal = parseSpokenRupiah(transcript);
   const lower = transcript.toLowerCase();
   let jenisQuick: 'prive' | 'operasional' | 'setoran' = 'operasional';
@@ -141,7 +131,6 @@ Ekstrak informasi berikut dalam format JSON MURNI (tanpa markdown/tanpa backtick
     kategori = 'Konsumsi & Akomodasi';
   }
 
-  // Clean description
   let deskripsi = transcript;
   if (lower.includes('prive')) {
     deskripsi = `Penarikan Prive Owner (${formatRupiahSimple(nominal)})`;

@@ -5,15 +5,16 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer, Paperclip
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction } from '../services/transactionService';
-import { getProjectFinancialSummary, getProjectCategoryBreakdown } from '../services/analyticsService';
+import { getProjectFinancialSummary, getProjectCategoryBreakdown, buildProjectAISummaryContext, cleanTextPunctuation } from '../services/analyticsService';
 import { exportProjectRealisasiExcel } from '../services/exportService';
 import { type Project, type Transaction } from '../types';
 import {
@@ -52,6 +53,55 @@ export function ProjectDetail() {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundSaving, setRefundSaving] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+
+  // AI Project Analysis
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState('');
+
+  const handleProjectAiAnalysis = async () => {
+    if (!project) return;
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    setAiLoading(true);
+    setAiResult('');
+
+    try {
+      if (apiKey && apiKey.trim().length > 10) {
+        try {
+          const prompt = buildProjectAISummaryContext(project.nama, project.klien, project.anggaran || 0, transactions);
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
+          setAiResult(cleanTextPunctuation(text));
+          addToast('success', 'Analisis AI Gemini 1.5 Flash untuk proyek berhasil dibuat!');
+          return;
+        } catch (err) {
+          console.warn('Gemini 1.5 Flash API error, falling back:', err);
+        }
+      }
+
+      // Smart Fallback Project AI Engine
+      const summary = getProjectFinancialSummary(transactions, project.anggaran || 0);
+      const percent = (project.anggaran && project.anggaran > 0) ? Math.round((summary.realisasiBersih / project.anggaran) * 100) : 0;
+
+      const fallbackText = `Analisis Kesehatan Keuangan Proyek ${project.nama}
+
+1. Status Modal & Realisasi Lapangan:
+- Modal Disuntikkan: ${formatRupiah(summary.modalDisuntikkan)}
+- Total Pengeluaran Lapangan: ${formatRupiah(summary.totalPengeluaran)}
+- Pengembalian / Refund Uang: ${formatRupiah(summary.totalRefundMasuk)}
+- Realisasi Bersih Terpakai: ${formatRupiah(summary.realisasiBersih)} (${percent}% dari anggaran)
+- Sisa Dana Proyek: ${formatRupiah(summary.sisaDanaProyek)}
+
+2. Evaluasi & Rekomendasi:
+${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efisien dan masih dalam batas modal disuntikkan. Pertahankan pencatatan bukti nota secara konsisten.' : 'Pengeluaran proyek telah melebihi modal awal yang disuntikkan. Disarankan untuk mengevaluasi kembali pos belanja lapangan bersama tim.'}`;
+
+      setAiResult(cleanTextPunctuation(fallbackText));
+      addToast('success', 'Analisis Kesehatan Proyek berhasil dibuat!');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const loadProjectData = useCallback(async () => {
     if (!id) return;
@@ -227,6 +277,15 @@ export function ProjectDetail() {
           <Button
             variant="secondary"
             size="sm"
+            icon={aiLoading ? <LoadingSpinner size={14} /> : <Sparkles size={15} className="text-purple-600" />}
+            onClick={handleProjectAiAnalysis}
+            disabled={aiLoading}
+          >
+            {aiLoading ? 'Menganalisis...' : 'Analisis AI Proyek'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             icon={<Download size={15} />}
             onClick={() => exportProjectRealisasiExcel(project, transactions)}
           >
@@ -252,6 +311,23 @@ export function ProjectDetail() {
           )}
         </div>
       </div>
+
+      {/* AI Summary Banner Result for Project */}
+      {aiResult && (
+        <Card className="!p-6 bg-gradient-to-br from-purple-950 via-slate-900 to-slate-900 text-white rounded-3xl border border-purple-500/30 shadow-2xl animate-fade-in">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
+              <Sparkles size={18} className="text-purple-400" /> Executive Project AI Analysis
+            </div>
+            <span className="text-[10px] px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-full font-bold border border-purple-500/30">
+              Gemini 1.5 Flash Vision Engine
+            </span>
+          </div>
+          <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">
+            {aiResult}
+          </div>
+        </Card>
+      )}
 
       {/* ====== PROJECT FINANCIAL REPORT (Laporan Realisasi) ====== */}
       <Card className="!p-0 border border-gray-100 shadow-card overflow-hidden">
