@@ -231,6 +231,7 @@ export function TransactionForm() {
         nominal,
         kategori: form.kategori,
         tag: form.jenis === 'keluar' ? form.tag : undefined,
+        proyekId: (form.proyekId || urlProyekId) || undefined,
         lampiran: uploadedAttachments,
         status: autoApprove ? 'disetujui' : 'menunggu_approval',
       });
