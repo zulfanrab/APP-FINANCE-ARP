@@ -9,7 +9,7 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction } from '../services/transactionService';
@@ -435,10 +435,12 @@ export function ProjectDetail() {
                     <StatusBadge status={tx.status} />
                   </div>
                   <p className="font-bold text-gray-900 truncate text-sm">{tx.deskripsi}</p>
-                  <p className="text-xs text-gray-500">{tx.kategori}</p>
-
                   {tx.lampiran && tx.lampiran.length > 0 && (
-                    <AttachmentViewer attachments={tx.lampiran} />
+                    <div className="pt-1.5 flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+                      <Paperclip size={13} className="text-emerald-600" />
+                      <span>{tx.lampiran.length} Lampiran Struk</span>
+                      <span className="text-[10px] text-gray-400 font-normal">· Klik untuk lihat foto</span>
+                    </div>
                   )}
                 </div>
 

@@ -12,7 +12,7 @@ import {
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject } from '../services/transactionService';
 import { type Project } from '../types';
-import { Card, Button, Badge, LoadingSpinner, EmptyState, formatRupiah, formatDate } from '../components/ui';
+import { Card, Button, Badge, LoadingSpinner, EmptyState, formatRupiah, formatDate, ProjectsSkeleton } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 
@@ -150,7 +150,7 @@ export function Projects() {
     triggerRefresh();
   };
 
-  if (loading) return <LoadingSpinner size={32} />;
+  if (loading) return <ProjectsSkeleton />;
 
   const activeProjects = projects.filter(p => p.status === 'aktif');
   const completedProjects = projects.filter(p => p.status === 'selesai');

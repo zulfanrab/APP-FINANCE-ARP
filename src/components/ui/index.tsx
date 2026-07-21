@@ -168,7 +168,7 @@ export function formatDate(dateStr: string): string {
 }
 
 export { AttachmentViewer } from './AttachmentViewer';
-export { Skeleton, DashboardSkeleton, TransactionListSkeleton } from './Skeleton';
+export { Skeleton, DashboardSkeleton, TransactionListSkeleton, ProjectsSkeleton, ReportsSkeleton } from './Skeleton';
 export { TransactionDetailModal } from './TransactionDetailModal';
 export { PdfReportModal } from './PdfReportModal';
 

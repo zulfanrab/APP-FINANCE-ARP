@@ -99,3 +99,76 @@ export function TransactionListSkeleton() {
     </div>
   );
 }
+
+// Layout Skeleton for Projects Page & Project Detail Page
+export function ProjectsSkeleton() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-3xl shadow-card">
+        <div className="space-y-2">
+          <Skeleton className="w-44 h-7 rounded-xl" />
+          <Skeleton className="w-64 h-3 rounded-md" />
+        </div>
+        <Skeleton className="w-36 h-9 rounded-2xl" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="p-5 bg-white border border-gray-100 rounded-3xl space-y-4 shadow-card">
+            <div className="flex items-center justify-between">
+              <Skeleton className="w-40 h-5 rounded-lg" />
+              <Skeleton className="w-16 h-5 rounded-full" />
+            </div>
+            <Skeleton className="w-28 h-3.5 rounded-md" />
+            <div className="space-y-2 pt-2">
+              <div className="flex justify-between">
+                <Skeleton className="w-20 h-3 rounded-sm" />
+                <Skeleton className="w-24 h-4 rounded-md" />
+              </div>
+              <Skeleton className="w-full h-3 rounded-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Layout Skeleton for Reports Page
+export function ReportsSkeleton() {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-3xl shadow-card">
+        <div className="space-y-2">
+          <Skeleton className="w-48 h-7 rounded-xl" />
+          <Skeleton className="w-64 h-3 rounded-md" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="w-28 h-9 rounded-2xl" />
+          <Skeleton className="w-32 h-9 rounded-2xl" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="p-5 bg-white border border-gray-100 rounded-3xl space-y-3 shadow-card">
+            <Skeleton className="w-28 h-3.5 rounded-md" />
+            <Skeleton className="w-36 h-7 rounded-xl" />
+            <Skeleton className="w-24 h-3 rounded-sm" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="p-6 bg-white border border-gray-100 rounded-3xl space-y-4 shadow-card">
+          <Skeleton className="w-44 h-6 rounded-xl" />
+          <Skeleton className="w-full h-64 rounded-2xl" />
+        </div>
+        <div className="p-6 bg-white border border-gray-100 rounded-3xl space-y-4 shadow-card">
+          <Skeleton className="w-44 h-6 rounded-xl" />
+          <Skeleton className="w-full h-64 rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
