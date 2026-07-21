@@ -225,13 +225,34 @@ export function TransactionForm() {
         lampiran: uploadedAttachments,
       });
 
-      addToast('success', 'Transaksi & berkas berhasil disimpan ke Google Drive!');
+      addToast('success', 'Transaksi & berkas berhasil disimpan!');
       triggerRefresh();
-      navigate('/dashboard');
+
+      if (form.proyekId) {
+        navigate(`/proyek/${form.proyekId}`);
+      } else if (urlProyekId) {
+        navigate(`/proyek/${urlProyekId}`);
+      } else if (searchParams.get('returnUrl')) {
+        navigate(searchParams.get('returnUrl')!);
+      } else {
+        navigate(-1);
+      }
     } catch {
       addToast('error', 'Gagal menyimpan transaksi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelOrBack = () => {
+    if (form.proyekId) {
+      navigate(`/proyek/${form.proyekId}`);
+    } else if (urlProyekId) {
+      navigate(`/proyek/${urlProyekId}`);
+    } else if (searchParams.get('returnUrl')) {
+      navigate(searchParams.get('returnUrl')!);
+    } else {
+      navigate(-1);
     }
   };
 
@@ -241,7 +262,7 @@ export function TransactionForm() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={handleCancelOrBack}
           className="w-10 h-10 rounded-2xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
         >
           <ArrowLeft size={18} />
@@ -482,7 +503,7 @@ export function TransactionForm() {
 
         {/* Submit */}
         <div className="flex gap-3 justify-end pt-2">
-          <Button type="button" variant="secondary" onClick={() => navigate('/dashboard')}>
+          <Button type="button" variant="secondary" onClick={handleCancelOrBack}>
             Batal
           </Button>
           <Button type="submit" variant="primary" loading={loading} icon={<Save size={16} />}>
