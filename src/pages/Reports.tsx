@@ -1,25 +1,25 @@
 // ============================================================
 // ARKA Finance — Reports Page
-// Laporan keuangan + AI Summary via Gemini API
+// Includes Dual Export Options: Professional Accounting Excel (Jurnal) & Printable PDF KOP Surat
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart2, Download, Sparkles, Loader2, CalendarRange, TrendingUp
+  BarChart2, Download, Sparkles, Loader2, CalendarRange, TrendingUp, Printer, FileText
 } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import * as XLSX from 'xlsx';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import {
-  getCategoryBreakdown, getCashflowTrend, getDashboardSummary, buildAISummaryContext
+  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext
 } from '../services/analyticsService';
+import { exportAccountingJournalExcel } from '../services/exportService';
 import { type Transaction, type Project } from '../types';
-import { Card, Button, LoadingSpinner, formatRupiah, formatDate } from '../components/ui';
+import { Card, Button, LoadingSpinner, formatRupiah, formatDate, PdfReportModal } from '../components/ui';
 import { useApp } from '../context/AppContext';
 
 type PeriodType = 'bulan_ini' | '3_bulan' | 'custom';
@@ -54,9 +54,10 @@ export function Reports() {
   const [cashflowData, setCashflowData] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
 
-  // AI
+  // AI & PDF
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState('');
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   const getPeriodDates = useCallback((): { from: Date; to: Date } => {
     const now = new Date();
@@ -113,10 +114,6 @@ export function Reports() {
       const d = new Date(t.tanggal);
       const approved = t.status === 'disetujui' || t.status === 'selesai';
       if (!approved || d < from || d > to) return false;
-      // Only include kas utama transactions:
-      // - Transactions without proyekId
-      // - Suntikan Modal (represents money leaving kas utama)
-      // Exclude: project-internal transactions (have proyekId and are not suntikan)
       if (t.proyekId && !t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
       return true;
     });
@@ -197,86 +194,40 @@ ${summary.net >= 0 ? '✅ **Arus kas dalam kondisi Sehat & Positif.** Pertahanka
 
   const handleExportExcel = () => {
     const { from, to } = getPeriodDates();
-    // KAS UTAMA ONLY — exclude project-internal transactions
-    const periodTx = allTransactions.filter(t => {
-      const d = new Date(t.tanggal);
-      const approved = t.status === 'disetujui' || t.status === 'selesai';
-      if (!approved || d < from || d > to) return false;
-      if (t.proyekId && !t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
-      return true;
+    const periodText = `${formatDate(from.toISOString())} - ${formatDate(to.toISOString())}`;
+
+    exportAccountingJournalExcel({
+      title: 'Laporan Keuangan & Jurnal Akuntansi Kas Utama',
+      periodText,
+      transactions: allTransactions,
+      projects,
     });
 
-    const wb = XLSX.utils.book_new();
-
-    // Sheet 1: Ringkasan
-    const ringkasanData = [
-      ['LAPORAN KEUANGAN KAS UTAMA — ARKA', ''],
-      ['PT Aksara Riksa Perdana', ''],
-      ['(Tidak termasuk transaksi internal proyek)', ''],
-      ['', ''],
-      ['Periode', `${formatDate(from.toISOString())} — ${formatDate(to.toISOString())}`],
-      ['', ''],
-      ['Total Pemasukan', summary?.totalMasuk ?? 0],
-      ['Total Pengeluaran', summary?.totalKeluar ?? 0],
-      ['Saldo Periode', summary?.net ?? 0],
-      ['Pengeluaran Operasional', summary?.opsBiaya ?? 0],
-      ['Pengeluaran Pribadi Owner', summary?.privBiaya ?? 0],
-      ['Jumlah Transaksi', summary?.count ?? 0],
-    ];
-    const wsRingkasan = XLSX.utils.aoa_to_sheet(ringkasanData);
-    wsRingkasan['!cols'] = [{ wch: 25 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, wsRingkasan, 'Ringkasan');
-
-    // Sheet 2: Detail Transaksi
-    const detailRows = periodTx.map(t => ({
-      Tanggal: formatDate(t.tanggal),
-      Deskripsi: t.deskripsi,
-      Jenis: t.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran',
-      Kategori: t.kategori,
-      Tag: t.tag === 'operasional' ? 'Operasional' : t.tag === 'pribadi' ? 'Pribadi Owner' : '-',
-      'Nominal (Rp)': t.nominal,
-      Status: t.status,
-    }));
-    const wsDetail = XLSX.utils.json_to_sheet(detailRows);
-    wsDetail['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
-    XLSX.utils.book_append_sheet(wb, wsDetail, 'Detail Transaksi');
-
-    // Sheet 3: Per Proyek
-    const projectRows = projects.map(p => {
-      const ptx = periodTx.filter(t => t.proyekId === p.id);
-      const masuk = ptx.filter(t => t.jenis === 'masuk').reduce((s, t) => s + t.nominal, 0);
-      const keluar = ptx.filter(t => t.jenis === 'keluar').reduce((s, t) => s + t.nominal, 0);
-      return {
-        'Nama Proyek': p.nama,
-        Klien: p.klien,
-        Status: p.status === 'aktif' ? 'Aktif' : 'Selesai',
-        'Total Pemasukan': masuk,
-        'Total Pengeluaran': keluar,
-        Profit: masuk - keluar,
-      };
-    });
-    const wsProject = XLSX.utils.json_to_sheet(projectRows);
-    wsProject['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, wsProject, 'Per Proyek');
-
-    XLSX.writeFile(wb, `ARKA_Laporan_${new Date().toISOString().split('T')[0]}.xlsx`);
-    addToast('success', 'Laporan Excel berhasil diexport (3 sheet)!');
+    addToast('success', 'Jurnal Akuntansi Excel (Debet/Kredit/Saldo) berhasil didownload!');
   };
 
   if (loading) return <LoadingSpinner size={32} />;
 
+  const { from, to } = getPeriodDates();
+  const periodTextStr = `${formatDate(from.toISOString())} - ${formatDate(to.toISOString())}`;
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-card">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Laporan Keuangan</h1>
-          <p className="text-sm text-gray-500 mt-1">Analisis dan ringkasan keuangan per periode</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Laporan Keuangan</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Analisis arus kas &amp; ekspor laporan resmi bertanda tangan</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" icon={<Download size={14} />} onClick={handleExportExcel}>Export Excel</Button>
-          <Button variant="accent" icon={aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} onClick={handleAiSummary} disabled={aiLoading}>
-            {aiLoading ? 'Membuat...' : 'Ringkasan AI'}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" icon={<Download size={15} />} onClick={handleExportExcel}>
+            Export Excel Jurnal
+          </Button>
+          <Button variant="primary" size="sm" icon={<Printer size={15} />} onClick={() => setPdfModalOpen(true)}>
+            Cetak PDF / KOP Surat
+          </Button>
+          <Button variant="accent" size="sm" icon={aiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} onClick={handleAiSummary} disabled={aiLoading}>
+            {aiLoading ? 'Membuat...' : 'AI Gemini Analisis'}
           </Button>
         </div>
       </div>
@@ -286,154 +237,138 @@ ${summary.net >= 0 ? '✅ **Arus kas dalam kondisi Sehat & Positif.** Pertahanka
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <CalendarRange size={16} className="text-primary" />
-            <span className="text-sm font-medium text-gray-700">Periode:</span>
+            <span className="text-xs font-semibold text-gray-700">Periode:</span>
           </div>
           {(['bulan_ini', '3_bulan', 'custom'] as PeriodType[]).map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
-              className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-all
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all
                 ${period === p ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {p === 'bulan_ini' ? 'Bulan Ini' : p === '3_bulan' ? '3 Bulan' : 'Custom'}
             </button>
           ))}
           {period === 'custom' && (
-            <>
+            <div className="flex items-center gap-2">
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                className="border border-gray-200 rounded-xl px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary" />
               <span className="text-gray-400">—</span>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-            </>
+                className="border border-gray-200 rounded-xl px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary" />
+            </div>
           )}
         </div>
       </Card>
 
-      {/* AI Summary */}
+      {/* AI Summary Banner Result */}
       {aiResult && (
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
-              <Sparkles size={18} className="text-white" />
+        <Card className="!p-6 bg-gradient-to-br from-purple-950 via-slate-900 to-slate-900 text-white rounded-3xl border border-purple-500/30 shadow-2xl animate-fade-in">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2 text-purple-300 font-bold text-sm">
+              <Sparkles size={18} className="text-purple-400" /> Executive Financial AI Analysis
             </div>
-            <h2 className="text-base font-semibold text-gray-800">Ringkasan AI — Gemini</h2>
+            <span className="text-[10px] px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded-full font-bold border border-purple-500/30">
+              Gemini 1.5 Flash Vision Engine
+            </span>
           </div>
-          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aiResult}</p>
+          <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap font-medium">
+            {aiResult}
+          </div>
         </Card>
       )}
 
-      {/* Summary Cards */}
+      {/* Summary Stat Cards */}
       {summary && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Pemasukan', value: summary.totalMasuk, color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'Total Pengeluaran', value: summary.totalKeluar, color: 'text-red-600', bg: 'bg-red-50' },
-            { label: 'Saldo Periode', value: summary.net, color: summary.net >= 0 ? 'text-primary' : 'text-red-600', bg: 'bg-primary-light' },
-            { label: 'Jumlah Transaksi', value: summary.count, color: 'text-gray-800', bg: 'bg-gray-50', isCount: true },
-          ].map(item => (
-            <Card key={item.label} className={`${item.bg}`}>
-              <p className="text-xs text-gray-500 mb-1">{item.label}</p>
-              <p className={`text-xl font-bold ${item.color}`}>
-                {(item as any).isCount ? item.value : formatRupiah(item.value as number)}
-              </p>
-            </Card>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="!p-4 bg-white border border-gray-100 shadow-card">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan</p>
+            <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(summary.totalMasuk)}</p>
+            <p className="text-[11px] text-gray-400 mt-1">Periode {periodTextStr}</p>
+          </Card>
+
+          <Card className="!p-4 bg-white border border-gray-100 shadow-card">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pengeluaran</p>
+            <p className="text-2xl font-extrabold text-red-600">{formatRupiah(summary.totalKeluar)}</p>
+            <p className="text-[11px] text-gray-400 mt-1">Ops: {formatRupiah(summary.opsBiaya)} | Prive: {formatRupiah(summary.privBiaya)}</p>
+          </Card>
+
+          <Card className="!p-4 bg-white border border-gray-100 shadow-card">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Saldo Periode (Net)</p>
+            <p className={`text-2xl font-extrabold ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              {summary.net >= 0 ? '+' : ''}{formatRupiah(summary.net)}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-1">Net Cashflow Periode</p>
+          </Card>
+
+          <Card className="!p-4 bg-slate-900 text-white shadow-card">
+            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Jumlah Transaksi</p>
+            <p className="text-2xl font-extrabold">{summary.count} data</p>
+            <p className="text-[11px] text-slate-400 mt-1">Terverifikasi &amp; disetujui</p>
+          </Card>
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Pie Chart */}
-        <Card>
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Distribusi Pengeluaran per Kategori</h2>
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Category breakdown pie */}
+        <Card className="!p-5 border border-gray-100 shadow-card">
+          <h3 className="text-base font-bold text-gray-900 mb-4">Pengeluaran Per Kategori</h3>
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Tidak ada data pengeluaran</div>
+            <p className="text-xs text-gray-400 text-center py-12">Belum ada data pengeluaran pada periode ini</p>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  dataKey="nominal"
-                  nameKey="kategori"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={3}
-                  label={({ kategori, percentage }: any) => `${percentage}%`}
-                >
-                  {categoryData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<RUPIAH_TOOLTIP />} />
-                <Legend
-                  formatter={(value) => <span className="text-xs text-gray-600">{value}</span>}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    dataKey="nominal"
+                    nameKey="kategori"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ kategori, percentage }: any) => `${kategori} (${percentage}%)`}
+                  >
+                    {categoryData.map((_, idx) => (
+                      <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<RUPIAH_TOOLTIP />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </Card>
 
-        {/* Line Chart */}
-        <Card>
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Tren Cashflow</h2>
+        {/* Cashflow trend line */}
+        <Card className="!p-5 border border-gray-100 shadow-card">
+          <h3 className="text-base font-bold text-gray-900 mb-4">Tren Arus Kas Kumulatif</h3>
           {cashflowData.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Tidak ada data cashflow</div>
+            <p className="text-xs text-gray-400 text-center py-12">Belum ada tren data untuk periode ini</p>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={cashflowData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                <XAxis dataKey="tanggal" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tickFormatter={v => v >= 1000000 ? `${(v / 1000000).toFixed(1)}jt` : `${(v / 1000).toFixed(0)}rb`}
-                  tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
-                />
-                <Tooltip content={({ active, payload, label }) => {
-                  if (active && payload?.length) {
-                    return (
-                      <div className="bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-lg text-xs">
-                        <p className="font-medium mb-1">{label}</p>
-                        {payload.map((p: any) => (
-                          <p key={p.name} style={{ color: p.stroke }}>
-                            {p.name === 'kasKumulatif' ? 'Saldo' : p.name === 'pemasukan' ? 'Masuk' : 'Keluar'}: {formatRupiah(p.value)}
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  }
-                  return null;
-                }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="kasKumulatif" stroke="#299775" strokeWidth={2.5} dot={false} name="kasKumulatif" />
-                <Line type="monotone" dataKey="pemasukan" stroke="#3b82f6" strokeWidth={1.5} dot={false} name="pemasukan" strokeDasharray="4 2" />
-                <Line type="monotone" dataKey="pengeluaran" stroke="#ef4444" strokeWidth={1.5} dot={false} name="pengeluaran" strokeDasharray="4 2" />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={cashflowData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="tanggal" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={v => `Rp${(v / 1000000).toFixed(0)}M`} />
+                  <Tooltip formatter={(v: any) => formatRupiah(Number(v))} />
+                  <Line type="monotone" dataKey="kasKumulatif" stroke="#299775" strokeWidth={3} dot={false} name="Saldo Kas" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </Card>
       </div>
 
-      {/* Category Table */}
-      {categoryData.length > 0 && (
-        <Card>
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Rincian per Kategori Pengeluaran</h2>
-          <div className="space-y-3">
-            {categoryData.map((cat, i) => (
-              <div key={cat.kategori} className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                <p className="text-sm text-gray-700 flex-1">{cat.kategori}</p>
-                <div className="w-40 bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div className="h-2 rounded-full" style={{ width: `${cat.percentage}%`, background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                </div>
-                <p className="text-sm font-semibold text-gray-800 w-28 text-right">{formatRupiah(cat.nominal)}</p>
-                <p className="text-xs text-gray-400 w-10 text-right">{cat.percentage}%</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {/* Official PDF & KOP Surat Report Modal */}
+      <PdfReportModal
+        isOpen={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        title="Laporan Keuangan & Jurnal Transaksi Kas Utama"
+        periodText={periodTextStr}
+        transactions={allTransactions}
+      />
     </div>
   );
 }

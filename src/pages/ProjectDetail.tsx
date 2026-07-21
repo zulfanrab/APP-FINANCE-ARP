@@ -9,16 +9,16 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw
+  Download, ArrowUpRight, RotateCcw, Printer
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction } from '../services/transactionService';
 import { getProjectFinancialSummary, getProjectCategoryBreakdown } from '../services/analyticsService';
+import { exportProjectRealisasiExcel } from '../services/exportService';
 import { type Project, type Transaction } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState,
-  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal
+  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal, PdfReportModal
 } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -48,9 +48,10 @@ export function ProjectDetail() {
   const [editNama, setEditNama] = useState('');
   const [editKlien, setEditKlien] = useState('');
 
-  // Refund Modal
+  // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundSaving, setRefundSaving] = useState(false);
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   const loadProjectData = useCallback(async () => {
     if (!id) return;
@@ -196,37 +197,7 @@ export function ProjectDetail() {
     }
   };
 
-  // EXPORT: Excel Laporan Per Proyek
-  const handleExportProjectExcel = () => {
-    const approvedTx = transactions.filter(t =>
-      (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
-    );
 
-    const rows: any[] = approvedTx.map(t => ({
-      'Tanggal': t.tanggal,
-      'Jenis': t.jenis === 'masuk' ? 'Pemasukan / Refund' : 'Pengeluaran',
-      'Deskripsi': t.deskripsi,
-      'Kategori': t.kategori,
-      'Pengeluaran (Rp)': t.jenis === 'keluar' ? t.nominal : '',
-      'Refund Masuk (Rp)': t.jenis === 'masuk' ? t.nominal : '',
-      'Status': t.status,
-    }));
-
-    // Add summary rows
-    rows.push({});
-    rows.push({ 'Deskripsi': 'RINGKASAN KEUANGAN PROYEK' });
-    rows.push({ 'Deskripsi': 'Modal Disuntikkan', 'Refund Masuk (Rp)': financials.modalDisuntikkan });
-    rows.push({ 'Deskripsi': 'Total Pengeluaran', 'Pengeluaran (Rp)': financials.totalPengeluaran });
-    rows.push({ 'Deskripsi': 'Total Refund Masuk', 'Refund Masuk (Rp)': financials.totalRefundMasuk });
-    rows.push({ 'Deskripsi': 'REALISASI BERSIH', 'Pengeluaran (Rp)': financials.realisasiBersih });
-    rows.push({ 'Deskripsi': 'SISA DANA PROYEK', 'Refund Masuk (Rp)': financials.sisaDanaProyek });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Laporan Proyek');
-    XLSX.writeFile(wb, `Laporan_Proyek_${project.nama.replace(/\s+/g, '_')}.xlsx`);
-    addToast('success', 'Laporan Excel proyek berhasil diunduh!');
-  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-12">
@@ -253,8 +224,21 @@ export function ProjectDetail() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="secondary" size="sm" icon={<Download size={15} />} onClick={handleExportProjectExcel}>
-            Export Excel
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Download size={15} />}
+            onClick={() => exportProjectRealisasiExcel(project, transactions)}
+          >
+            Export Excel Jurnal
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Printer size={15} />}
+            onClick={() => setPdfModalOpen(true)}
+          >
+            Cetak PDF Realisasi
           </Button>
           {role === 'admin' && (
             <>
@@ -557,6 +541,17 @@ export function ProjectDetail() {
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         onUpdate={loadProjectData}
+      />
+
+      {/* Official PDF Realisasi Modal */}
+      <PdfReportModal
+        isOpen={pdfModalOpen}
+        onClose={() => setPdfModalOpen(false)}
+        title={`Laporan Realisasi & Pertanggungjawaban Dana Proyek`}
+        subtitle={`Klien: ${project.klien}`}
+        periodText={`Per ${formatDate(new Date().toISOString())}`}
+        transactions={transactions}
+        project={project}
       />
     </div>
   );
