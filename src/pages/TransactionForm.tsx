@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Save, Upload, X, Camera, Loader2, FileText,
-  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock
+  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock, Zap, Clock
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { addTransaction } from '../services/transactionService';
@@ -65,14 +65,24 @@ export function TransactionForm() {
     lampiran: [] as Attachment[],
   });
 
+  // Approval Flow Switch
+  const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
+
   useEffect(() => {
     getProjects().then(projs => {
       setProjects(projs);
       if (urlProyekId) {
         setForm(f => ({ ...f, proyekId: urlProyekId }));
+        setAutoApprove(true);
       }
     });
   }, [urlProyekId]);
+
+  useEffect(() => {
+    if (form.proyekId) {
+      setAutoApprove(true); // Project internal transactions are auto-approved by default
+    }
+  }, [form.proyekId]);
 
   useEffect(() => {
     loadCategoryList(form.jenis);
@@ -221,8 +231,8 @@ export function TransactionForm() {
         nominal,
         kategori: form.kategori,
         tag: form.jenis === 'keluar' ? form.tag : undefined,
-        proyekId: form.proyekId || undefined,
         lampiran: uploadedAttachments,
+        status: autoApprove ? 'disetujui' : 'menunggu_approval',
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -431,6 +441,56 @@ export function TransactionForm() {
                 <p>Transaksi ini hanya mengurangi saldo dana proyek, <strong>TIDAK</strong> mengurangi kas utama perusahaan.</p>
               </div>
             )}
+
+            {/* Status Approval Selector */}
+            <div className="sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
+                Status Approval Transaksi
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAutoApprove(true)}
+                  className={`p-3.5 rounded-2xl border text-left transition-all active:scale-[0.99] ${
+                    autoApprove
+                      ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm font-semibold'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5 text-emerald-800">
+                      <Zap size={14} className="text-emerald-600" /> Langsung Disetujui (Auto-Approved)
+                    </span>
+                    {autoApprove && <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-emerald-700 leading-snug">
+                    {form.proyekId
+                      ? 'Otomatis aktif untuk proyek (karena modal 20jt sudah disetujui Pak Fatwa).'
+                      : 'Transaksi langsung aktif tanpa perlu persetujuan Pak Fatwa.'}
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAutoApprove(false)}
+                  className={`p-3.5 rounded-2xl border text-left transition-all active:scale-[0.99] ${
+                    !autoApprove
+                      ? 'border-amber-600 bg-amber-50/80 text-amber-900 ring-2 ring-amber-500/20 shadow-sm font-semibold'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs flex items-center gap-1.5 text-amber-800">
+                      <Clock size={14} className="text-amber-600" /> Perlu Approval Pak Fatwa (Owner)
+                    </span>
+                    {!autoApprove && <CheckCircle2 size={16} className="text-amber-600 flex-shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-amber-700 leading-snug">
+                    Masuk ke antrean "Menunggu Approval" untuk dikonfirmasi Pak Fatwa.
+                  </p>
+                </button>
+              </div>
+            </div>
           </div>
         </Card>
 
