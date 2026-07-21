@@ -1,6 +1,8 @@
 // ============================================================
 // ARKA Finance — Analytics Service
 // Semua kalkulasi dihitung dari data transaksi real
+// KAS UTAMA = hanya transaksi TANPA proyekId
+// DANA PROYEK = hanya transaksi DENGAN proyekId (terpisah)
 // ============================================================
 
 import {
@@ -12,14 +14,6 @@ import {
 } from '../types';
 
 // ---- Helper ----
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
 function isInMonth(dateStr: string, year: number, month: number): boolean {
   const d = new Date(dateStr);
   return d.getFullYear() === year && d.getMonth() === month;
@@ -29,7 +23,37 @@ function isApproved(t: Transaction): boolean {
   return t.status === 'disetujui' || t.status === 'selesai';
 }
 
-// ---- Dashboard Summary ----
+/** Check if a transaction is a "Suntikan Modal Proyek" (capital injection into project) */
+function isSuntikanModal(t: Transaction): boolean {
+  return t.deskripsi.startsWith('Suntikan Modal Proyek:');
+}
+
+/**
+ * Check if a transaction belongs to KAS UTAMA (main company cash).
+ * Kas Utama includes:
+ * - All transactions WITHOUT proyekId
+ * - Suntikan Modal transactions (they represent money leaving kas utama INTO a project)
+ * Kas Utama excludes:
+ * - All transactions WITH proyekId (those are internal project fund movements)
+ */
+function isKasUtamaTransaction(t: Transaction): boolean {
+  // Suntikan Modal always affects kas utama (it's the act of moving money OUT)
+  if (isSuntikanModal(t)) return true;
+  // Transactions tied to a project do NOT affect kas utama
+  if (t.proyekId) return false;
+  return true;
+}
+
+/**
+ * Check if transaction is a "Refund Sisa Dana ke Kas Utama" from a completed project.
+ * These are special masuk transactions without proyekId that represent
+ * money flowing back from project pool to kas utama.
+ */
+function isRefundToKasUtama(t: Transaction): boolean {
+  return t.kategori === 'Refund Dana Proyek ke Kas Utama' && t.jenis === 'masuk' && !t.proyekId;
+}
+
+// ---- Dashboard Summary (KAS UTAMA ONLY) ----
 export function getDashboardSummary(
   transactions: Transaction[],
   proyekAktifCount: number
@@ -46,6 +70,9 @@ export function getDashboardSummary(
 
   for (const t of transactions) {
     if (!isApproved(t)) continue;
+
+    // ONLY count kas utama transactions for the main dashboard
+    if (!isKasUtamaTransaction(t)) continue;
 
     if (t.jenis === 'masuk') {
       totalMasuk += t.nominal;
@@ -70,7 +97,7 @@ export function getDashboardSummary(
   };
 }
 
-// ---- Monthly Chart (last N months) ----
+// ---- Monthly Chart (last N months) — KAS UTAMA ONLY ----
 export function getMonthlyChartData(
   transactions: Transaction[],
   months: number = 6
@@ -90,6 +117,7 @@ export function getMonthlyChartData(
 
     for (const t of transactions) {
       if (!isApproved(t)) continue;
+      if (!isKasUtamaTransaction(t)) continue;
       if (!isInMonth(t.tanggal, year, month)) continue;
 
       if (t.jenis === 'masuk') pemasukan += t.nominal;
@@ -102,7 +130,7 @@ export function getMonthlyChartData(
   return result;
 }
 
-// ---- Category Breakdown (pengeluaran) ----
+// ---- Category Breakdown (pengeluaran) — KAS UTAMA ONLY ----
 export function getCategoryBreakdown(
   transactions: Transaction[],
   from: Date,
@@ -114,6 +142,7 @@ export function getCategoryBreakdown(
   for (const t of transactions) {
     if (!isApproved(t)) continue;
     if (t.jenis !== 'keluar') continue;
+    if (!isKasUtamaTransaction(t)) continue;
 
     const d = new Date(t.tanggal);
     if (d < from || d > to) continue;
@@ -134,7 +163,74 @@ export function getCategoryBreakdown(
     .sort((a, b) => b.nominal - a.nominal);
 }
 
-// ---- Cashflow Trend ----
+// ---- Category Breakdown PER PROYEK ----
+export function getProjectCategoryBreakdown(
+  transactions: Transaction[]
+): CategoryBreakdown[] {
+  const map: Record<string, number> = {};
+  let total = 0;
+
+  for (const t of transactions) {
+    if (!isApproved(t)) continue;
+    if (t.jenis !== 'keluar') continue;
+    if (isSuntikanModal(t)) continue;
+
+    const key = t.kategori || 'Lainnya';
+    map[key] = (map[key] ?? 0) + t.nominal;
+    total += t.nominal;
+  }
+
+  if (total === 0) return [];
+
+  return Object.entries(map)
+    .map(([kategori, nominal]) => ({
+      kategori,
+      nominal,
+      percentage: Math.round((nominal / total) * 100),
+    }))
+    .sort((a, b) => b.nominal - a.nominal);
+}
+
+// ---- Project Financial Summary ----
+export interface ProjectFinancialSummary {
+  modalDisuntikkan: number;
+  totalPengeluaran: number;
+  totalRefundMasuk: number;
+  realisasiBersih: number;
+  sisaDanaProyek: number;
+}
+
+export function getProjectFinancialSummary(
+  transactions: Transaction[],
+  anggaranModal: number
+): ProjectFinancialSummary {
+  let totalPengeluaran = 0;
+  let totalRefundMasuk = 0;
+
+  for (const t of transactions) {
+    if (!isApproved(t)) continue;
+    if (isSuntikanModal(t)) continue; // Exclude the injection itself
+
+    if (t.jenis === 'keluar') {
+      totalPengeluaran += t.nominal;
+    } else if (t.jenis === 'masuk') {
+      totalRefundMasuk += t.nominal;
+    }
+  }
+
+  const realisasiBersih = totalPengeluaran - totalRefundMasuk;
+  const sisaDanaProyek = anggaranModal - realisasiBersih;
+
+  return {
+    modalDisuntikkan: anggaranModal,
+    totalPengeluaran,
+    totalRefundMasuk,
+    realisasiBersih,
+    sisaDanaProyek,
+  };
+}
+
+// ---- Cashflow Trend — KAS UTAMA ONLY ----
 export function getCashflowTrend(
   transactions: Transaction[],
   from: Date,
@@ -144,6 +240,7 @@ export function getCashflowTrend(
   let kasAwal = 0;
   for (const t of transactions) {
     if (!isApproved(t)) continue;
+    if (!isKasUtamaTransaction(t)) continue;
     const d = new Date(t.tanggal);
     if (d >= from) continue;
     if (t.jenis === 'masuk') kasAwal += t.nominal;
@@ -155,6 +252,7 @@ export function getCashflowTrend(
 
   for (const t of transactions) {
     if (!isApproved(t)) continue;
+    if (!isKasUtamaTransaction(t)) continue;
     const d = new Date(t.tanggal);
     if (d < from || d > to) continue;
 
@@ -223,7 +321,7 @@ export function buildAISummaryContext(
 ): string {
   const periodTx = transactions.filter(t => {
     const d = new Date(t.tanggal);
-    return isApproved(t) && d >= from && d <= to;
+    return isApproved(t) && isKasUtamaTransaction(t) && d >= from && d <= to;
   });
 
   let totalMasuk = 0;
@@ -241,7 +339,7 @@ export function buildAISummaryContext(
   // Prev month
   let prevKeluar = 0;
   for (const t of prevMonthTransactions) {
-    if (isApproved(t) && t.jenis === 'keluar') prevKeluar += t.nominal;
+    if (isApproved(t) && isKasUtamaTransaction(t) && t.jenis === 'keluar') prevKeluar += t.nominal;
   }
 
   const fmt = (n: number) =>
@@ -254,12 +352,14 @@ export function buildAISummaryContext(
     .join(', ');
 
   return `Data keuangan perusahaan PT Aksara Riksa Perdana (ARP) periode ${from.toLocaleDateString('id-ID')} - ${to.toLocaleDateString('id-ID')}:
-- Total Pemasukan: ${fmt(totalMasuk)}
-- Total Pengeluaran: ${fmt(totalKeluar)}
-- Saldo periode: ${fmt(totalMasuk - totalKeluar)}
-- Jumlah transaksi: ${periodTx.length}
+- Total Pemasukan Kas Utama: ${fmt(totalMasuk)}
+- Total Pengeluaran Kas Utama: ${fmt(totalKeluar)}
+- Saldo Kas Utama periode: ${fmt(totalMasuk - totalKeluar)}
+- Jumlah transaksi kas utama: ${periodTx.length}
 - Kategori pengeluaran terbesar: ${topCats || 'tidak ada'}
 - Total pengeluaran bulan sebelumnya: ${fmt(prevKeluar)}
 
-Buatkan ringkasan singkat 2-3 kalimat dalam Bahasa Indonesia yang profesional tentang kondisi cashflow, kategori pengeluaran terbesar, dan catatan jika ada pengeluaran tidak wajar dibanding periode sebelumnya. Gunakan tone profesional seperti laporan keuangan ringkas.`;
+Catatan: Angka di atas HANYA mencakup kas utama perusahaan, TIDAK termasuk pengeluaran internal proyek (yang dikelola terpisah per amplop proyek).
+
+Buatkan ringkasan singkat 2-3 kalimat dalam Bahasa Indonesia yang profesional tentang kondisi cashflow kas utama, kategori pengeluaran terbesar, dan catatan jika ada pengeluaran tidak wajar dibanding periode sebelumnya. Gunakan tone profesional seperti laporan keuangan ringkas.`;
 }

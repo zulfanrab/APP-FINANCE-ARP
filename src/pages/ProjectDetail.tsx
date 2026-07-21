@@ -1,6 +1,6 @@
 // ============================================================
 // ARKA Finance — Project Financial Hub / Detail Page
-// Tailored for Admin (full powerful management) & Owner (clean & elegant)
+// Includes: Project Fund Isolation, Realisasi Report, Refund Flow, Excel Export
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -8,10 +8,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
-  Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink
+  Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
+  Download, ArrowUpRight, RotateCcw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
-import { getTransactionsByProject, deleteTransaction } from '../services/transactionService';
+import { getTransactionsByProject, addTransaction, deleteTransaction } from '../services/transactionService';
+import { getProjectFinancialSummary, getProjectCategoryBreakdown } from '../services/analyticsService';
 import { type Project, type Transaction } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState,
@@ -43,6 +46,10 @@ export function ProjectDetail() {
   const [editBudgetStr, setEditBudgetStr] = useState('');
   const [editNama, setEditNama] = useState('');
   const [editKlien, setEditKlien] = useState('');
+
+  // Refund Modal
+  const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundSaving, setRefundSaving] = useState(false);
 
   const loadProjectData = useCallback(async () => {
     if (!id) return;
@@ -84,19 +91,17 @@ export function ProjectDetail() {
     );
   }
 
-  // Financial Calculations (Excluding initial capital injection from internal operational expenses)
+  // Financial Calculations using proper isolated project fund logic
   const anggaranModal = project.anggaran || 0;
+  const financials = getProjectFinancialSummary(transactions, anggaranModal);
+  const categoryBreakdown = getProjectCategoryBreakdown(transactions);
+
+  // Legacy compatibility
   const pemasukanKlien = transactions
     .filter(t => t.jenis === 'masuk' && t.status !== 'ditolak')
     .reduce((sum, t) => sum + t.nominal, 0);
-
-  const pengeluaranTotal = transactions
-    .filter(t => t.jenis === 'keluar' && t.status !== 'ditolak' && !t.deskripsi.startsWith('Suntikan Modal Proyek:'))
-    .reduce((sum, t) => sum + t.nominal, 0);
-
-  const sisaAnggaranModal = anggaranModal - pengeluaranTotal;
-  const profitNetto = pemasukanKlien - pengeluaranTotal;
-  const usagePercentage = anggaranModal > 0 ? Math.min(Math.round((pengeluaranTotal / anggaranModal) * 100), 100) : 0;
+  const profitNetto = pemasukanKlien - financials.realisasiBersih;
+  const usagePercentage = anggaranModal > 0 ? Math.min(Math.round((financials.realisasiBersih / anggaranModal) * 100), 100) : 0;
 
   const filteredTx = transactions.filter(t => {
     if (t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
@@ -145,6 +150,83 @@ export function ProjectDetail() {
     }
   };
 
+  // REFUND: Tarik sisa dana proyek ke kas utama
+  const handleRefundToKasUtama = async () => {
+    if (financials.sisaDanaProyek <= 0) {
+      addToast('error', 'Tidak ada sisa dana proyek untuk ditarik');
+      return;
+    }
+
+    setRefundSaving(true);
+    try {
+      const sisaDana = financials.sisaDanaProyek;
+
+      // 1. Record keluar from project pool (drain remaining funds)
+      await addTransaction({
+        tanggal: new Date().toISOString().split('T')[0],
+        jenis: 'keluar',
+        deskripsi: `Penarikan Sisa Dana Proyek: ${project.nama} → Kas Utama`,
+        nominal: sisaDana,
+        kategori: 'Refund Dana Proyek ke Kas Utama',
+        tag: 'operasional',
+        proyekId: project.id,
+        lampiran: [],
+        status: 'selesai',
+      });
+
+      // 2. Record masuk to kas utama (money flows back to main cash)
+      await addTransaction({
+        tanggal: new Date().toISOString().split('T')[0],
+        jenis: 'masuk',
+        deskripsi: `Refund Sisa Dana Proyek: ${project.nama} (${formatRupiah(sisaDana)})`,
+        nominal: sisaDana,
+        kategori: 'Refund Dana Proyek ke Kas Utama',
+        lampiran: [],
+        status: 'selesai',
+      });
+
+      addToast('success', `✅ Sisa dana ${formatRupiah(sisaDana)} berhasil ditarik ke Kas Utama!`);
+      setRefundModalOpen(false);
+      loadProjectData();
+    } catch {
+      addToast('error', 'Gagal menarik sisa dana ke Kas Utama');
+    } finally {
+      setRefundSaving(false);
+    }
+  };
+
+  // EXPORT: Excel Laporan Per Proyek
+  const handleExportProjectExcel = () => {
+    const approvedTx = transactions.filter(t =>
+      (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
+    );
+
+    const rows: any[] = approvedTx.map(t => ({
+      'Tanggal': t.tanggal,
+      'Jenis': t.jenis === 'masuk' ? 'Pemasukan / Refund' : 'Pengeluaran',
+      'Deskripsi': t.deskripsi,
+      'Kategori': t.kategori,
+      'Pengeluaran (Rp)': t.jenis === 'keluar' ? t.nominal : '',
+      'Refund Masuk (Rp)': t.jenis === 'masuk' ? t.nominal : '',
+      'Status': t.status,
+    }));
+
+    // Add summary rows
+    rows.push({});
+    rows.push({ 'Deskripsi': 'RINGKASAN KEUANGAN PROYEK' });
+    rows.push({ 'Deskripsi': 'Modal Disuntikkan', 'Refund Masuk (Rp)': financials.modalDisuntikkan });
+    rows.push({ 'Deskripsi': 'Total Pengeluaran', 'Pengeluaran (Rp)': financials.totalPengeluaran });
+    rows.push({ 'Deskripsi': 'Total Refund Masuk', 'Refund Masuk (Rp)': financials.totalRefundMasuk });
+    rows.push({ 'Deskripsi': 'REALISASI BERSIH', 'Pengeluaran (Rp)': financials.realisasiBersih });
+    rows.push({ 'Deskripsi': 'SISA DANA PROYEK', 'Refund Masuk (Rp)': financials.sisaDanaProyek });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Laporan Proyek');
+    XLSX.writeFile(wb, `Laporan_Proyek_${project.nama.replace(/\s+/g, '_')}.xlsx`);
+    addToast('success', 'Laporan Excel proyek berhasil diunduh!');
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-12">
       {/* Header Bar */}
@@ -169,128 +251,134 @@ export function ProjectDetail() {
           </div>
         </div>
 
-        {role === 'admin' && (
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" icon={<Edit3 size={15} />} onClick={() => setEditModalOpen(true)}>
-              Edit Anggaran
-            </Button>
-            <Button variant="danger" size="sm" icon={<Trash2 size={15} />} onClick={handleDeleteProject}>
-              Hapus
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="secondary" size="sm" icon={<Download size={15} />} onClick={handleExportProjectExcel}>
+            Export Excel
+          </Button>
+          {role === 'admin' && (
+            <>
+              <Button variant="secondary" size="sm" icon={<Edit3 size={15} />} onClick={() => setEditModalOpen(true)}>
+                Edit
+              </Button>
+              <Button variant="danger" size="sm" icon={<Trash2 size={15} />} onClick={handleDeleteProject}>
+                Hapus
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ADMIN VIEW: Powerful Financial Hub */}
-      {role === 'admin' ? (
-        <div className="space-y-6">
-          {/* Financial Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="!p-4 bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-none shadow-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Anggaran Modal Owner</span>
-                <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
-                  <Wallet size={18} className="text-white" />
-                </div>
-              </div>
-              <p className="text-2xl font-extrabold tracking-tight">{formatRupiah(anggaranModal)}</p>
-              <p className="text-[11px] text-emerald-200 mt-1">Dikucurkan oleh Pak Fatwa</p>
-            </Card>
+      {/* ====== PROJECT FINANCIAL REPORT (Laporan Realisasi) ====== */}
+      <Card className="!p-0 border border-gray-100 shadow-card overflow-hidden">
+        <div className="p-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
+          <h2 className="text-base font-bold text-emerald-400 flex items-center gap-2 mb-1">
+            📊 Laporan Keuangan & Realisasi Proyek
+          </h2>
+          <p className="text-xs text-slate-400">Dana proyek terpisah dari kas utama perusahaan</p>
+        </div>
 
-            <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pengeluaran Terpakai</span>
-                <div className="w-8 h-8 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
-                  <TrendingDown size={18} />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-red-600 tracking-tight">{formatRupiah(pengeluaranTotal)}</p>
-              <p className="text-[11px] text-gray-400 mt-1">{transactions.filter(t => t.jenis === 'keluar').length} transaksi belanja</p>
-            </Card>
-
-            <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sisa Modal di Admin</span>
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
-                  <Wallet size={18} />
-                </div>
-              </div>
-              <p className={`text-2xl font-bold tracking-tight ${sisaAnggaranModal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {formatRupiah(sisaAnggaranModal)}
+        <div className="p-5 space-y-5">
+          {/* Summary Cards Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Modal Disuntikkan</p>
+              <p className="text-lg font-extrabold text-emerald-800">{formatRupiah(financials.modalDisuntikkan)}</p>
+            </div>
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Total Pengeluaran</p>
+              <p className="text-lg font-extrabold text-red-700">{formatRupiah(financials.totalPengeluaran)}</p>
+            </div>
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl">
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Refund Masuk</p>
+              <p className="text-lg font-extrabold text-blue-700">+{formatRupiah(financials.totalRefundMasuk)}</p>
+            </div>
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl">
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Realisasi Bersih</p>
+              <p className="text-lg font-extrabold text-amber-800">{formatRupiah(financials.realisasiBersih)}</p>
+            </div>
+            <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl col-span-2 lg:col-span-1">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Sisa Dana Proyek</p>
+              <p className={`text-lg font-extrabold ${financials.sisaDanaProyek >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {formatRupiah(financials.sisaDanaProyek)}
               </p>
-              <p className="text-[11px] text-gray-400 mt-1">Bisa dipakai belanja proyek</p>
-            </Card>
-
-            <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Profit Bersih (Net Margin)</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <TrendingUp size={18} />
-                </div>
-              </div>
-              <p className={`text-2xl font-bold tracking-tight ${profitNetto >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {profitNetto >= 0 ? '+' : ''}{formatRupiah(profitNetto)}
-              </p>
-              <p className="text-[11px] text-gray-400 mt-1">Pemasukan Klien - Pengeluaran</p>
-            </Card>
+            </div>
           </div>
 
-          {/* Budget Usage Progress Bar */}
-          <Card className="!p-5 border border-gray-100 shadow-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <PieIcon size={18} className="text-primary" />
-                <h3 className="text-sm font-bold text-gray-800">Pemakaian Anggaran Modal ({usagePercentage}%)</h3>
-              </div>
-              <span className="text-xs font-bold text-gray-600">
-                {formatRupiah(pengeluaranTotal)} / {formatRupiah(anggaranModal)}
+          {/* Usage Progress Bar */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold text-gray-700">Pemakaian Dana ({usagePercentage}%)</span>
+              <span className="text-xs font-semibold text-gray-500">
+                {formatRupiah(financials.realisasiBersih)} / {formatRupiah(anggaranModal)}
               </span>
             </div>
-
             <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden p-0.5">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  usagePercentage > 90
-                    ? 'bg-red-500'
-                    : usagePercentage > 75
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-500'
+                  usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 75 ? 'bg-amber-500' : 'bg-emerald-500'
                 }`}
                 style={{ width: `${usagePercentage}%` }}
               />
             </div>
-          </Card>
-        </div>
-      ) : (
-        /* OWNER VIEW: Super Clean & Elegant Summary */
-        <div className="space-y-6">
-          <Card className="!p-6 bg-slate-900 text-white rounded-3xl border border-white/10 shadow-2xl">
-            <h2 className="text-base font-bold text-emerald-400 mb-4 flex items-center gap-2">
-              👑 Ringkasan Keuangan Proyek (Owner Overview)
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Total Pemasukan Klien</p>
-                <p className="text-2xl font-extrabold text-white">{formatRupiah(pemasukanKlien)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Total Pengeluaran Proyek</p>
-                <p className="text-2xl font-extrabold text-amber-400">{formatRupiah(pengeluaranTotal)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Profit Bersih (Cuan Proyek)</p>
-                <p className={`text-2xl font-extrabold ${profitNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {profitNetto >= 0 ? '+' : ''}{formatRupiah(profitNetto)}
-                </p>
-              </div>
-            </div>
+          </div>
 
-            <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
-              <span>Modal Diberikan: <strong className="text-white">{formatRupiah(anggaranModal)}</strong></span>
-              <span>Sisa Modal Admin: <strong className="text-emerald-300">{formatRupiah(sisaAnggaranModal)}</strong></span>
+          {/* Category Breakdown */}
+          {categoryBreakdown.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Komposisi Pengeluaran</h3>
+              <div className="space-y-1.5">
+                {categoryBreakdown.map(cat => (
+                  <div key={cat.kategori} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 font-medium w-40 truncate">{cat.kategori}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${cat.percentage}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 w-24 text-right">{formatRupiah(cat.nominal)}</span>
+                    <span className="text-[10px] text-gray-400 w-10 text-right">{cat.percentage}%</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </Card>
+          )}
+
+          {/* Refund Button */}
+          {financials.sisaDanaProyek > 0 && (
+            <div className="pt-3 border-t border-gray-100">
+              <button
+                onClick={() => setRefundModalOpen(true)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md"
+              >
+                <ArrowUpRight size={15} /> Tarik Sisa Dana {formatRupiah(financials.sisaDanaProyek)} ke Kas Utama
+              </button>
+              <p className="text-[10px] text-gray-400 mt-1.5">Dana akan dipindahkan dari pool proyek kembali ke kas utama perusahaan</p>
+            </div>
+          )}
         </div>
+      </Card>
+
+      {/* Profit Overview (Owner) */}
+      {role === 'owner' && (
+        <Card className="!p-6 bg-slate-900 text-white rounded-3xl border border-white/10 shadow-2xl">
+          <h2 className="text-base font-bold text-emerald-400 mb-4 flex items-center gap-2">
+            👑 Profit Proyek (Owner Overview)
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Total Pemasukan Klien</p>
+              <p className="text-2xl font-extrabold text-white">{formatRupiah(pemasukanKlien)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Realisasi Pengeluaran</p>
+              <p className="text-2xl font-extrabold text-amber-400">{formatRupiah(financials.realisasiBersih)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Profit Bersih (Cuan)</p>
+              <p className={`text-2xl font-extrabold ${profitNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {profitNetto >= 0 ? '+' : ''}{formatRupiah(profitNetto)}
+              </p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Transactions Section */}
@@ -298,7 +386,7 @@ export function ProjectDetail() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-100">
           <div>
             <h2 className="text-base font-bold text-gray-900">Daftar Transaksi Proyek ({filteredTx.length})</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Semua pengeluaran & pemasukan terkait proyek ini</p>
+            <p className="text-xs text-gray-500 mt-0.5">Pengeluaran & refund internal — TIDAK mempengaruhi kas utama</p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -319,7 +407,7 @@ export function ProjectDetail() {
                 onClick={() => setFilterType('masuk')}
                 className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'masuk' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500'}`}
               >
-                Pemasukan
+                Refund / Masuk
               </button>
             </div>
 
@@ -331,22 +419,28 @@ export function ProjectDetail() {
                 onClick={() => navigate('/transaksi/baru')}
                 className="w-full sm:w-auto justify-center"
               >
-                + Input Pengeluaran
+                + Input Transaksi
               </Button>
             )}
           </div>
         </div>
 
         {filteredTx.length === 0 ? (
-          <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/pemasukan proyek akan tampil di sini" />
+          <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />
         ) : (
           <div className="space-y-3">
             {filteredTx.map(tx => (
               <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50/70 hover:bg-gray-100/80 border border-gray-100 rounded-2xl transition-all">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                      {tx.jenis === 'masuk' ? '+ Pemasukan Klien' : '- Pengeluaran Proyek'}
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      tx.jenis === 'masuk'
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                        : tx.kategori === 'Refund Dana Proyek ke Kas Utama'
+                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {tx.jenis === 'masuk' ? '📥 Refund / Dana Masuk' : tx.kategori === 'Refund Dana Proyek ke Kas Utama' ? '📤 Tarik ke Kas Utama' : '📤 Pengeluaran Proyek'}
                     </span>
                     <span className="text-xs text-gray-500 font-medium">{formatDate(tx.tanggal)}</span>
                     <StatusBadge status={tx.status} />
@@ -354,7 +448,6 @@ export function ProjectDetail() {
                   <p className="font-bold text-gray-900 truncate text-sm">{tx.deskripsi}</p>
                   <p className="text-xs text-gray-500">{tx.kategori}</p>
 
-                  {/* Attachment Viewer */}
                   {tx.lampiran && tx.lampiran.length > 0 && (
                     <AttachmentViewer attachments={tx.lampiran} />
                   )}
@@ -416,6 +509,39 @@ export function ProjectDetail() {
           <div className="flex gap-2 justify-end pt-3">
             <Button variant="secondary" size="sm" onClick={() => setEditModalOpen(false)}>Batal</Button>
             <Button variant="primary" size="sm" onClick={handleSaveEdit}>Simpan Perubahan</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Refund Confirmation Modal */}
+      <Modal isOpen={refundModalOpen} onClose={() => setRefundModalOpen(false)} title="Tarik Sisa Dana Proyek ke Kas Utama">
+        <div className="space-y-4">
+          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
+            <p className="text-xs text-slate-400">Sisa dana proyek yang akan ditarik:</p>
+            <p className="text-3xl font-extrabold text-emerald-400">{formatRupiah(financials.sisaDanaProyek)}</p>
+            <p className="text-xs text-slate-400">Proyek: <strong className="text-white">{project.nama}</strong></p>
+          </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium space-y-1">
+            <p className="font-bold">⚠️ Perhatian:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-amber-700">
+              <li>Sisa dana proyek akan dipindahkan <strong>kembali ke Kas Utama</strong> perusahaan</li>
+              <li>Saldo dana proyek akan menjadi <strong>Rp 0</strong></li>
+              <li>Aksi ini akan tercatat di laporan kedua sisi (proyek & kas utama)</li>
+            </ul>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="secondary" size="sm" onClick={() => setRefundModalOpen(false)}>Batal</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<ArrowUpRight size={15} />}
+              loading={refundSaving}
+              onClick={handleRefundToKasUtama}
+            >
+              Konfirmasi Tarik ke Kas Utama
+            </Button>
           </div>
         </div>
       </Modal>

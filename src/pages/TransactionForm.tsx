@@ -333,6 +333,20 @@ export function TransactionForm() {
                 </select>
               </div>
             )}
+
+            {/* Smart Context Banner: Refund info */}
+            {form.jenis === 'masuk' && form.proyekId && (
+              <div className="sm:col-span-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium space-y-1">
+                <p className="font-bold text-emerald-900">📥 Pencatatan Uang Masuk ke Dana Proyek</p>
+                <p>Transaksi ini akan menambah saldo dana proyek (contoh: pengembalian sisa dana dari pekerja lapangan, refund pembelian, dll). Dana ini <strong>TIDAK</strong> masuk ke kas utama perusahaan.</p>
+              </div>
+            )}
+            {form.jenis === 'keluar' && form.proyekId && (
+              <div className="sm:col-span-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium space-y-1">
+                <p className="font-bold text-amber-900">📤 Pengeluaran dari Dana Proyek</p>
+                <p>Transaksi ini hanya mengurangi saldo dana proyek, <strong>TIDAK</strong> mengurangi kas utama perusahaan.</p>
+              </div>
+            )}
           </div>
         </Card>
 

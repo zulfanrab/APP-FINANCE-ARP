@@ -108,11 +108,17 @@ export function Reports() {
     const cats = getCategoryBreakdown(allTransactions, from, to);
     const cashflow = getCashflowTrend(allTransactions, from, to);
 
-    // Summary for period
+    // Summary for period — KAS UTAMA ONLY (exclude project-internal transactions)
     const periodTx = allTransactions.filter(t => {
       const d = new Date(t.tanggal);
       const approved = t.status === 'disetujui' || t.status === 'selesai';
-      return approved && d >= from && d <= to;
+      if (!approved || d < from || d > to) return false;
+      // Only include kas utama transactions:
+      // - Transactions without proyekId
+      // - Suntikan Modal (represents money leaving kas utama)
+      // Exclude: project-internal transactions (have proyekId and are not suntikan)
+      if (t.proyekId && !t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
+      return true;
     });
 
     let totalMasuk = 0, totalKeluar = 0, opsBiaya = 0, privBiaya = 0;
@@ -191,18 +197,22 @@ ${summary.net >= 0 ? '✅ **Arus kas dalam kondisi Sehat & Positif.** Pertahanka
 
   const handleExportExcel = () => {
     const { from, to } = getPeriodDates();
+    // KAS UTAMA ONLY — exclude project-internal transactions
     const periodTx = allTransactions.filter(t => {
       const d = new Date(t.tanggal);
       const approved = t.status === 'disetujui' || t.status === 'selesai';
-      return approved && d >= from && d <= to;
+      if (!approved || d < from || d > to) return false;
+      if (t.proyekId && !t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
+      return true;
     });
 
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Ringkasan
     const ringkasanData = [
-      ['LAPORAN KEUANGAN ARKA', ''],
+      ['LAPORAN KEUANGAN KAS UTAMA — ARKA', ''],
       ['PT Aksara Riksa Perdana', ''],
+      ['(Tidak termasuk transaksi internal proyek)', ''],
       ['', ''],
       ['Periode', `${formatDate(from.toISOString())} — ${formatDate(to.toISOString())}`],
       ['', ''],
