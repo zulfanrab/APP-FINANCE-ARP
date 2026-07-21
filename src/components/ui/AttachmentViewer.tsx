@@ -1,13 +1,13 @@
 // ============================================================
-// ARKA Finance — Embedded Attachment & Receipt Preview Component
-// Renders Visual Photo Cards directly inside the modal with 1-Click
-// Pinch-to-Zoom, Fullscreen Lightbox & Google Drive Sync Buttons
+// ARKA Finance — Professional Attachment & Receipt Preview Component
+// Hardware-Accelerated 60FPS Zoom/Pan Lightbox Engine
+// Clean Corporate Layout (No Childish Tutorial Overlay Text)
 // ============================================================
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Paperclip, ExternalLink, FileText, Image as ImageIcon, Eye, X,
-  ZoomIn, ZoomOut, RotateCw, Download, CloudCheck, Maximize2
+  ZoomIn, ZoomOut, RotateCw, CloudCheck, Maximize2, RefreshCw
 } from 'lucide-react';
 import { type Attachment } from '../../types';
 
@@ -30,12 +30,13 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
-  // Touch gesture states
+  // Touch gesture & animation frame references for smooth 60FPS performance
   const [isDragging, setIsDragging] = useState(false);
   const [touchStartDist, setTouchStartDist] = useState<number | null>(null);
   const [startZoom, setStartZoom] = useState(1);
-  const [lastPos, setLastPos] = useState<{ x: number; y: number } | null>(null);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const [lastTapTime, setLastTapTime] = useState<number>(0);
+  const animFrameRef = useRef<number | null>(null);
 
   if (!attachments || attachments.length === 0) return null;
 
@@ -68,10 +69,11 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    const delta = e.deltaY < 0 ? 0.25 : -0.25;
     setZoom(z => Math.max(0.75, Math.min(z + delta, 4)));
   };
 
+  // Touch Events with RAF smoothness
   const handleTouchStart = (e: React.TouchEvent) => {
     handleDoubleTap();
     if (e.touches.length === 2) {
@@ -83,7 +85,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
       setStartZoom(zoom);
     } else if (e.touches.length === 1) {
       setIsDragging(true);
-      setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      lastPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
   };
 
@@ -95,39 +97,47 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
       );
       const scale = (dist / touchStartDist) * startZoom;
       setZoom(Math.max(0.75, Math.min(scale, 4)));
-    } else if (e.touches.length === 1 && isDragging && lastPos && zoom > 1) {
-      const deltaX = e.touches[0].clientX - lastPos.x;
-      const deltaY = e.touches[0].clientY - lastPos.y;
-      setPan(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
-      setLastPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    } else if (e.touches.length === 1 && isDragging && lastPosRef.current && zoom > 1) {
+      const deltaX = e.touches[0].clientX - lastPosRef.current.x;
+      const deltaY = e.touches[0].clientY - lastPosRef.current.y;
+      lastPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = requestAnimationFrame(() => {
+        setPan(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
+      });
     }
   };
 
   const handleTouchEnd = () => {
     setTouchStartDist(null);
     setIsDragging(false);
-    setLastPos(null);
+    lastPosRef.current = null;
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom > 1) {
       setIsDragging(true);
-      setLastPos({ x: e.clientX, y: e.clientY });
+      lastPosRef.current = { x: e.clientX, y: e.clientY };
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && lastPos && zoom > 1) {
-      const deltaX = e.clientX - lastPos.x;
-      const deltaY = e.clientY - lastPos.y;
-      setPan(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
-      setLastPos({ x: e.clientX, y: e.clientY });
+    if (isDragging && lastPosRef.current && zoom > 1) {
+      const deltaX = e.clientX - lastPosRef.current.x;
+      const deltaY = e.clientY - lastPosRef.current.y;
+      lastPosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = requestAnimationFrame(() => {
+        setPan(prev => ({ x: prev.x + deltaX, y: prev.y + deltaY }));
+      });
     }
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    setLastPos(null);
+    lastPosRef.current = null;
   };
 
   return (
@@ -138,7 +148,6 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
           const isGoogleDrive = att.dataUrl && att.dataUrl.includes('drive.google.com');
           const driveId = isGoogleDrive ? getDriveFileId(att.dataUrl) : null;
 
-          // Determine direct preview image URL
           let imgUrl = att.dataUrl;
           if (isGoogleDrive && driveId) {
             imgUrl = `https://lh3.googleusercontent.com/d/${driveId}`;
@@ -218,7 +227,6 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                     className="max-h-[240px] w-full object-contain rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => handleOpenPreview(att, imgUrl)}
                     onError={(e) => {
-                      // Fallback for Google Drive links if thumbnail is blocked
                       const target = e.currentTarget;
                       if (isGoogleDrive && driveId && !target.dataset.fallback) {
                         target.dataset.fallback = 'true';
@@ -233,7 +241,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
         })}
       </div>
 
-      {/* FULLSCREEN PINCH-TO-ZOOM LIGHTBOX MODAL */}
+      {/* LUXURY FULLSCREEN LIGHTBOX MODAL (SMOOTH 60FPS HARDWARE ACCELERATED) */}
       {activePreview && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-6 animate-fade-in"
@@ -243,7 +251,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
             className="relative max-w-5xl w-full bg-slate-900 border border-white/10 text-white rounded-3xl overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[95vh] h-[88vh]"
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
+            {/* CLEAN CORPORATE MODAL HEADER (NO CHILDISH TUTORIAL OVERLAY) */}
             <div className="px-4 sm:px-6 py-3 bg-slate-900/95 border-b border-white/10 flex items-center justify-between gap-2 z-20">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center flex-shrink-0">
@@ -253,8 +261,8 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                   <h3 className="font-bold text-sm text-white truncate leading-tight">
                     {activePreview.att.nama}
                   </h3>
-                  <p className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium mt-0.5">
-                    <CloudCheck size={12} /> Pinch dengan 2 jari untuk zoom &amp; geser foto
+                  <p className="text-[10.5px] text-slate-400 font-medium mt-0.5">
+                    Bukti Resi &amp; Lampiran Transaksi Resmi
                   </p>
                 </div>
               </div>
@@ -286,6 +294,13 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                   >
                     <RotateCw size={16} />
                   </button>
+                  <button
+                    onClick={resetTransform}
+                    className="p-1.5 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    title="Reset Posisi & Zoom"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
                 </div>
 
                 {activePreview.att.dataUrl.includes('drive.google.com') && (
@@ -309,7 +324,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
               </div>
             </div>
 
-            {/* Viewport */}
+            {/* Hardware-Accelerated 60FPS Image Viewport */}
             <div
               className="relative flex-1 bg-slate-950 overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing select-none"
               onWheel={handleWheel}
@@ -325,8 +340,9 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                 src={activePreview.imgUrl}
                 alt={activePreview.att.nama}
                 style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                  transition: isDragging ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom}) rotate(${rotation}deg)`,
+                  willChange: 'transform',
+                  transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1)',
                 }}
                 className="max-w-full max-h-full object-contain pointer-events-none select-none"
                 draggable={false}
