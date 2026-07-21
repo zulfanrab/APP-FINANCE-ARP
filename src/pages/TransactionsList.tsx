@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { getTransactions, deleteTransaction } from '../services/transactionService';
 import { type Transaction, type TransactionType, type TransactionStatus } from '../types';
-import { Card, Button, StatusBadge, formatRupiah, formatDate, AttachmentViewer, LoadingSpinner, EmptyState } from '../components/ui';
+import { Card, Button, StatusBadge, formatRupiah, formatDate, AttachmentViewer, TransactionListSkeleton, EmptyState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
@@ -68,7 +68,7 @@ export function TransactionsList() {
     return true;
   });
 
-  if (loading) return <LoadingSpinner size={32} />;
+  if (loading) return <TransactionListSkeleton />;
 
   return (
     <div className="space-y-6 animate-fade-in pb-16">

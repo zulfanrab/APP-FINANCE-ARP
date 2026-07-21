@@ -15,7 +15,7 @@ import {
   type Transaction, type FilterOptions, type DashboardSummary
 } from '../types';
 import {
-  Card, Button, StatusBadge, LoadingSpinner, EmptyState,
+  Card, Button, StatusBadge, LoadingSpinner, EmptyState, DashboardSkeleton,
   formatRupiah, formatDate, AttachmentViewer
 } from '../components/ui';
 import { useApp } from '../context/AppContext';
@@ -147,7 +147,7 @@ export function AdminDashboard() {
     return sortDir === 'asc' ? <ChevronUp size={12} className="text-primary" /> : <ChevronDown size={12} className="text-primary" />;
   };
 
-  if (loading) return <LoadingSpinner size={32} />;
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6 animate-fade-in">
