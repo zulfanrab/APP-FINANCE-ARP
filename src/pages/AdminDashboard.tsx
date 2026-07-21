@@ -1,12 +1,12 @@
 // ============================================================
 // ARKA Finance — Admin Dashboard
-// Includes Kas Utama vs Dana Proyek Scope Badges
+// Includes Kas Utama vs Dana Proyek Scope Badges & Clickable Rows -> TransactionDetailModal
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, FolderOpen,
-  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText
+  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getTransactions, filterTransactions, deleteTransaction } from '../services/transactionService';
@@ -17,7 +17,7 @@ import {
 } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState, DashboardSkeleton,
-  formatRupiah, formatDate, AttachmentViewer
+  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal
 } from '../components/ui';
 import { useApp } from '../context/AppContext';
 
@@ -47,6 +47,9 @@ export function AdminDashboard() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [filtered, setFiltered] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+
+  // Selected Transaction Modal
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   // Filters
   const [filters, setFilters] = useState<FilterOptions>({ tag: 'semua', status: 'semua', jenis: 'semua' });
@@ -111,18 +114,6 @@ export function AdminDashboard() {
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('desc'); }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Yakin mau hapus?')) {
-      try {
-        await deleteTransaction(id);
-        addToast('success', 'Transaksi berhasil dihapus');
-        loadData();
-      } catch {
-        addToast('error', 'Gagal menghapus transaksi');
-      }
-    }
   };
 
   const handleExcelExport = () => {
@@ -251,14 +242,18 @@ export function AdminDashboard() {
             />
           ) : (
             <>
-              {/* Mobile Card List View */}
+              {/* Mobile Card List View (Clickable) */}
               <div className="md:hidden space-y-3 p-3">
                 {filtered.map(tx => {
                   const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
                   const isKas = !tx.proyekId || isSuntikan;
 
                   return (
-                    <div key={tx.id} className="p-4 bg-gray-50/90 border border-gray-200/80 rounded-2xl space-y-2">
+                    <div
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className="p-4 bg-gray-50/90 hover:bg-emerald-50/30 border border-gray-200/80 hover:border-emerald-300 rounded-2xl space-y-2 cursor-pointer transition-all active:scale-[0.99]"
+                    >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {isKas ? (
@@ -271,42 +266,30 @@ export function AdminDashboard() {
                             </span>
                           )}
                           <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
-                          <span className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-bold">
-                            {tx.kategori}
-                          </span>
                         </div>
                         <StatusBadge status={tx.status} />
                       </div>
 
                       <div className="flex items-start justify-between gap-3 pt-1">
-                        <p className="text-sm font-bold text-gray-900 leading-snug break-words flex-1">
-                          {tx.deskripsi}
-                        </p>
-                        <p className={`font-extrabold text-base flex-shrink-0 ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                        </p>
-                      </div>
-
-                      {tx.lampiran && tx.lampiran.length > 0 && (
-                        <div className="pt-2 border-t border-gray-200/60">
-                          <AttachmentViewer attachments={tx.lampiran} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900 leading-snug break-words">
+                            {tx.deskripsi}
+                          </p>
+                          <p className="text-xs text-gray-500 font-medium mt-0.5">{tx.kategori}</p>
                         </div>
-                      )}
-
-                      <div className="flex justify-end pt-1 border-t border-gray-200/60">
-                        <button
-                          onClick={() => handleDelete(tx.id)}
-                          className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50"
-                        >
-                          <Trash2 size={13} /> Hapus
-                        </button>
+                        <div className="text-right flex-shrink-0 flex items-center gap-1">
+                          <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                          </p>
+                          <ChevronRight size={16} className="text-gray-400" />
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Desktop Table View */}
+              {/* Desktop Table View (Clickable Rows) */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
@@ -317,15 +300,14 @@ export function AdminDashboard() {
                           Tanggal <SortIcon field="tanggal" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Lampiran</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Kategori</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Kategori</th>
                       <th className="text-right px-4 py-3 text-gray-500 font-medium">
                         <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
                           Nominal <SortIcon field="nominal" />
                         </button>
                       </th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
-                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-20">Aksi</th>
+                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-16">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -334,7 +316,11 @@ export function AdminDashboard() {
                       const isKas = !tx.proyekId || isSuntikan;
 
                       return (
-                        <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
+                        <tr
+                          key={tx.id}
+                          onClick={() => setSelectedTx(tx)}
+                          className="hover:bg-emerald-50/40 transition-colors cursor-pointer"
+                        >
                           <td className="px-4 py-3">
                             {isKas ? (
                               <span className="text-xs px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
@@ -346,28 +332,19 @@ export function AdminDashboard() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
                           <td className="px-4 py-3">
-                            <p className="font-semibold text-gray-900">{tx.deskripsi}</p>
-                            {tx.lampiran && tx.lampiran.length > 0 && (
-                              <AttachmentViewer attachments={tx.lampiran} />
-                            )}
+                            <p className="font-bold text-gray-900">{tx.deskripsi}</p>
+                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
                           </td>
-                          <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
                           <td className="px-4 py-3 text-right">
-                            <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            <span className={`font-extrabold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                               {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                             </span>
                           </td>
                           <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
                           <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleDelete(tx.id)}
-                              className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
-                              title="Hapus Transaksi"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            <ChevronRight size={18} className="mx-auto text-emerald-600" />
                           </td>
                         </tr>
                       );
@@ -379,6 +356,14 @@ export function AdminDashboard() {
           )}
         </div>
       </Card>
+
+      {/* Detail & Edit Modal */}
+      <TransactionDetailModal
+        transaction={selectedTx}
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        onUpdate={loadData}
+      />
     </div>
   );
 }

@@ -95,6 +95,15 @@ export function TransactionForm() {
     addToast('success', `Kategori "${catName}" dihapus`);
   };
 
+  interface StagedFormAttachment {
+    nama: string;
+    tipe: string;
+    dataUrl: string;
+    fileObj?: File;
+  }
+
+  const [stagedFiles, setStagedFiles] = useState<StagedFormAttachment[]>([]);
+
   // AI Gemini Receipt Scan (99.9% Precision)
   const handleOcrFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,12 +127,20 @@ export function TransactionForm() {
         setField('tanggal', aiResult.tanggal);
       }
 
-      // 2. Auto-upload scanned image to Google Drive
-      const att = await uploadAttachmentFile(file, {
-        tanggal: form.tanggal,
-        tag: form.tag,
-      });
-      setForm(f => ({ ...f, lampiran: [...f.lampiran, att] }));
+      // 2. Stage file locally (Do NOT upload to Drive yet)
+      const reader = new FileReader();
+      reader.onload = () => {
+        setStagedFiles(prev => [
+          ...prev,
+          {
+            nama: file.name,
+            tipe: file.type || 'image/png',
+            dataUrl: reader.result as string,
+            fileObj: file,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
 
       addToast('success', `✨ AI Gemini membaca struk: ${formatRupiah(aiResult.nominal)} (${aiResult.deskripsi})`);
     } catch {
@@ -133,29 +150,32 @@ export function TransactionForm() {
     }
   };
 
-  // Manual File Upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manual File Selection (Staged Locally)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    setUploadingFiles(true);
-    try {
-      for (const file of files) {
-        const att = await uploadAttachmentFile(file, {
-          tanggal: form.tanggal,
-          tag: form.tag,
-        });
-        setForm(f => ({ ...f, lampiran: [...f.lampiran, att] }));
-      }
-      addToast('success', `${files.length} berkas berhasil diunggah ke Google Drive`);
-    } catch {
-      addToast('error', 'Gagal mengunggah beberapa berkas');
-    } finally {
-      setUploadingFiles(false);
-    }
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setStagedFiles(prev => [
+          ...prev,
+          {
+            nama: file.name,
+            tipe: file.type || 'image/png',
+            dataUrl: reader.result as string,
+            fileObj: file,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    addToast('info', `${files.length} berkas dipilih (akan diunggah ke Drive saat disimpan).`);
   };
 
   const removeAttachment = (idx: number) => {
-    setForm(f => ({ ...f, lampiran: f.lampiran.filter((_, i) => i !== idx) }));
+    setStagedFiles(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,6 +188,24 @@ export function TransactionForm() {
 
     setLoading(true);
     try {
+      // Defer Upload to Google Drive until user clicks Simpan Transaksi!
+      const uploadedAttachments: Attachment[] = [];
+      for (const staged of stagedFiles) {
+        if (staged.fileObj) {
+          const uploaded = await uploadAttachmentFile(staged.fileObj, {
+            tanggal: form.tanggal,
+            tag: form.tag,
+          });
+          uploadedAttachments.push(uploaded);
+        } else {
+          uploadedAttachments.push({
+            nama: staged.nama,
+            tipe: staged.tipe,
+            dataUrl: staged.dataUrl,
+          });
+        }
+      }
+
       await addTransaction({
         tanggal: form.tanggal,
         jenis: form.jenis,
@@ -176,10 +214,10 @@ export function TransactionForm() {
         kategori: form.kategori,
         tag: form.jenis === 'keluar' ? form.tag : undefined,
         proyekId: form.proyekId || undefined,
-        lampiran: form.lampiran,
+        lampiran: uploadedAttachments,
       });
 
-      addToast('success', 'Transaksi berhasil disimpan!');
+      addToast('success', 'Transaksi & berkas berhasil disimpan ke Google Drive!');
       triggerRefresh();
       navigate('/dashboard');
     } catch {
@@ -391,13 +429,17 @@ export function TransactionForm() {
               </div>
             )}
 
-            {form.lampiran.length > 0 && (
+            {stagedFiles.length > 0 && (
               <div className="space-y-2 pt-2">
-                {form.lampiran.map((att, idx) => (
+                <p className="text-xs font-bold text-gray-500">Berkas Dipilih ({stagedFiles.length}):</p>
+                {stagedFiles.map((att, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
                     <div className="flex items-center gap-2 truncate min-w-0">
                       <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
                       <span className="font-semibold text-gray-800 truncate">{att.nama}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                        Diunggah saat simpan
+                      </span>
                     </div>
                     <button
                       type="button"

@@ -18,7 +18,7 @@ import { getProjectFinancialSummary, getProjectCategoryBreakdown } from '../serv
 import { type Project, type Transaction } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState,
-  formatRupiah, formatDate, AttachmentViewer
+  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal
 } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,7 @@ export function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filterType, setFilterType] = useState<'semua' | 'masuk' | 'keluar'>('semua');
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   // Edit Budget Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -430,7 +431,11 @@ export function ProjectDetail() {
         ) : (
           <div className="space-y-3">
             {filteredTx.map(tx => (
-              <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50/70 hover:bg-gray-100/80 border border-gray-100 rounded-2xl transition-all">
+              <div
+                key={tx.id}
+                onClick={() => setSelectedTx(tx)}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50/70 hover:bg-emerald-50/30 border border-gray-100 hover:border-emerald-300 rounded-2xl transition-all cursor-pointer active:scale-[0.99]"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
@@ -545,6 +550,14 @@ export function ProjectDetail() {
           </div>
         </div>
       </Modal>
+
+      {/* Transaction Detail & Edit Modal */}
+      <TransactionDetailModal
+        transaction={selectedTx}
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        onUpdate={loadProjectData}
+      />
     </div>
   );
 }

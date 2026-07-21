@@ -1,15 +1,18 @@
 // ============================================================
 // ARKA Finance — Dedicated Transactions List Module
-// Native Mobile Card View (MyBCA style) + Desktop Table
-// Includes: Scope Switcher (Kas Utama vs Internal Proyek) & Clear Badges
+// Native Mobile Card View + Desktop Table
+// Clickable Items -> Full Detail & Edit Modal with Staged Uploads
 // ============================================================
 
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban } from 'lucide-react';
+import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban, ChevronRight } from 'lucide-react';
 import { getTransactions, deleteTransaction } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { type Transaction, type TransactionType, type TransactionStatus, type Project } from '../types';
-import { Card, Button, StatusBadge, formatRupiah, formatDate, AttachmentViewer, TransactionListSkeleton, EmptyState } from '../components/ui';
+import {
+  Card, Button, StatusBadge, formatRupiah, formatDate, AttachmentViewer,
+  TransactionListSkeleton, EmptyState, TransactionDetailModal
+} from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
@@ -20,6 +23,9 @@ export function TransactionsList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Selected Transaction for Detail/Edit Modal
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   // Filters & Scope
   const [scope, setScope] = useState<'semua' | 'kas_utama' | 'proyek'>('semua');
@@ -43,30 +49,15 @@ export function TransactionsList() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Yakin ingin menghapus transaksi ini?')) return;
-    try {
-      await deleteTransaction(id);
-      addToast('success', 'Transaksi berhasil dihapus');
-      triggerRefresh();
-    } catch {
-      addToast('error', 'Gagal menghapus transaksi');
-    }
-  };
-
-  // Helper map project name
   const getProjectName = (proyekId?: string): string => {
     if (!proyekId) return '';
     const p = projects.find(prj => prj.id === proyekId);
     return p ? p.nama : 'Proyek';
   };
 
-  // Categories list
   const categories = Array.from(new Set(transactions.map(t => t.kategori)));
 
-  // Filtered
   const filtered = transactions.filter(t => {
-    // Scope Filter
     const isSuntikan = t.deskripsi.startsWith('Suntikan Modal Proyek:');
     const isKasUtama = !t.proyekId || isSuntikan;
 
@@ -96,7 +87,7 @@ export function TransactionsList() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Semua Transaksi</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Riwayat lengkap mutasi Kas Utama &amp; Internal Proyek ({filtered.length} data)
+            Klik item mana saja untuk melihat detail &amp; mengedit transaksi ({filtered.length} data)
           </p>
         </div>
 
@@ -135,12 +126,12 @@ export function TransactionsList() {
       {/* Scope Context Explanation Banner */}
       {scope === 'kas_utama' && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-medium">
-          💡 <strong>Mode Kas Utama:</strong> Menampilkan transaksi brankas kantor &amp; kucuran modal ke proyek. Pengeluaran internal proyek disembunyikan agar tidak membingungkan.
+          💡 <strong>Mode Kas Utama:</strong> Menampilkan transaksi brankas kantor &amp; kucuran modal ke proyek.
         </div>
       )}
       {scope === 'proyek' && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 font-medium">
-          💡 <strong>Mode Internal Proyek:</strong> Menampilkan belanja &amp; refund internal dari dana yang sudah disuntikkan ke proyek. Tidak memotong Kas Utama secara ganda.
+          💡 <strong>Mode Internal Proyek:</strong> Menampilkan belanja &amp; refund internal dari dana proyek.
         </div>
       )}
 
@@ -196,7 +187,7 @@ export function TransactionsList() {
           />
         ) : (
           <>
-            {/* MOBILE CARD VIEW */}
+            {/* MOBILE CARD VIEW (Directly Clickable) */}
             <div className="md:hidden space-y-3.5">
               {filtered.map(tx => {
                 const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
@@ -204,7 +195,11 @@ export function TransactionsList() {
                 const prjName = getProjectName(tx.proyekId);
 
                 return (
-                  <div key={tx.id} className="p-4 bg-gray-50/80 border border-gray-200/80 rounded-2xl space-y-2.5 shadow-sm">
+                  <div
+                    key={tx.id}
+                    onClick={() => setSelectedTx(tx)}
+                    className="p-4 bg-gray-50/90 hover:bg-emerald-50/30 border border-gray-200/80 hover:border-emerald-300 rounded-2xl space-y-2.5 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                  >
                     {/* Top Row: Scope Badge, Date & Status */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -238,48 +233,29 @@ export function TransactionsList() {
                         </div>
                       </div>
 
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right flex-shrink-0 flex items-center gap-1">
                         <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                           {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                         </p>
+                        <ChevronRight size={16} className="text-gray-400 ml-1" />
                       </div>
                     </div>
-
-                    {/* Attachments */}
-                    {tx.lampiran && tx.lampiran.length > 0 && (
-                      <div className="pt-2 border-t border-gray-200/60">
-                        <AttachmentViewer attachments={tx.lampiran} />
-                      </div>
-                    )}
-
-                    {/* Admin Delete Option */}
-                    {role === 'admin' && (
-                      <div className="flex justify-end pt-2 border-t border-gray-200/60">
-                        <button
-                          onClick={() => handleDelete(tx.id)}
-                          className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 size={13} /> Hapus
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* DESKTOP TABLE VIEW */}
+            {/* DESKTOP TABLE VIEW (Directly Clickable Rows) */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                   <tr>
                     <th className="px-4 py-3">Sumber Kas</th>
                     <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Deskripsi &amp; Lampiran</th>
-                    <th className="px-4 py-3">Kategori</th>
+                    <th className="px-4 py-3">Deskripsi &amp; Kategori</th>
                     <th className="px-4 py-3 text-right">Nominal</th>
                     <th className="px-4 py-3">Status</th>
-                    {role === 'admin' && <th className="px-4 py-3 text-center">Aksi</th>}
+                    <th className="px-4 py-3 text-center">Detail</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -289,7 +265,11 @@ export function TransactionsList() {
                     const prjName = getProjectName(tx.proyekId);
 
                     return (
-                      <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
+                      <tr
+                        key={tx.id}
+                        onClick={() => setSelectedTx(tx)}
+                        className="hover:bg-emerald-50/40 transition-colors cursor-pointer"
+                      >
                         <td className="px-4 py-3">
                           {isKas ? (
                             <span className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
@@ -301,31 +281,20 @@ export function TransactionsList() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
                         <td className="px-4 py-3">
                           <p className="font-bold text-gray-900">{tx.deskripsi}</p>
-                          {tx.lampiran && tx.lampiran.length > 0 && (
-                            <AttachmentViewer attachments={tx.lampiran} />
-                          )}
+                          <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <span className={`font-extrabold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                             {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                           </span>
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                        {role === 'admin' && (
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleDelete(tx.id)}
-                              className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                              title="Hapus Transaksi"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </td>
-                        )}
+                        <td className="px-4 py-3 text-center text-gray-400">
+                          <ChevronRight size={18} className="mx-auto text-emerald-600" />
+                        </td>
                       </tr>
                     );
                   })}
@@ -335,6 +304,14 @@ export function TransactionsList() {
           </>
         )}
       </Card>
+
+      {/* Universal Detail & Edit Modal */}
+      <TransactionDetailModal
+        transaction={selectedTx}
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        onUpdate={loadTransactions}
+      />
     </div>
   );
 }
