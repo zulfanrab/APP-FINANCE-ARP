@@ -96,6 +96,33 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 }
 
+/* Fix Native Date Input Alignment & Webkit Calendar Indicator Offside Bug */
+input[type="date"] {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  line-height: 1.25 !important;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left !important;
+  margin: 0 !important;
+  min-height: 1.25em !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 /* Transitions & Animations */
 .transition-base {
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);

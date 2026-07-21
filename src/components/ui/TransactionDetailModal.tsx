@@ -333,14 +333,18 @@ export function TransactionDetailModal({
               </div>
 
               {/* Tanggal */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal</label>
-                <input
-                  type="date"
-                  value={editForm.tanggal}
-                  onChange={e => setEditForm(f => ({ ...f, tanggal: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
-                />
+              <div className="min-w-0">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal *</label>
+                <div className="relative flex items-center">
+                  <Calendar size={14} className="absolute left-3 text-gray-400 pointer-events-none z-10" />
+                  <input
+                    type="date"
+                    value={editForm.tanggal}
+                    onChange={e => setEditForm(f => ({ ...f, tanggal: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary box-border"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Nominal */}

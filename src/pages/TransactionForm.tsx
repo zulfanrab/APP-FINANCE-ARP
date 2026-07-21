@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Save, Upload, X, Camera, Loader2, FileText,
-  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock, Zap, Clock
+  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock, Zap, Clock, Calendar
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { addTransaction } from '../services/transactionService';
@@ -311,14 +311,17 @@ export function TransactionForm() {
 
             {/* Tanggal */}
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal</label>
-              <input
-                type="date"
-                value={form.tanggal}
-                onChange={e => setField('tanggal', e.target.value)}
-                className="w-full max-w-full box-border border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white appearance-none min-w-0 overflow-hidden"
-                required
-              />
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Tanggal *</label>
+              <div className="relative flex items-center">
+                <Calendar size={16} className="absolute left-3.5 text-gray-400 pointer-events-none z-10" />
+                <input
+                  type="date"
+                  value={form.tanggal}
+                  onChange={e => setField('tanggal', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary box-border"
+                  required
+                />
+              </div>
             </div>
 
             {/* Nominal */}
