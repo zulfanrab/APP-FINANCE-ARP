@@ -18,7 +18,7 @@ interface ExportJournalOptions {
 }
 
 /**
- * Export a formal Corporate Accounting Journal Excel Workbook
+ * Export a formal Corporate Accounting Journal Excel Workbook for Kas Utama
  */
 export function exportAccountingJournalExcel({
   title,
@@ -30,12 +30,15 @@ export function exportAccountingJournalExcel({
 }: ExportJournalOptions) {
   const wb = XLSX.utils.book_new();
 
-  // Sort transactions chronologically for accounting journal (oldest to newest)
-  const sorted = [...transactions].sort(
+  // Filter approved Kas Utama transactions
+  const mainTx = transactions.filter(
+    t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || t.deskripsi.startsWith('Suntikan Modal Proyek:'))
+  );
+
+  const sorted = [...mainTx].sort(
     (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
   );
 
-  // Calculate cumulative balance & debet/kredit totals
   let runningBalance = 0;
   let totalDebet = 0;
   let totalKredit = 0;
@@ -122,13 +125,13 @@ export function exportAccountingJournalExcel({
   ];
   XLSX.utils.book_append_sheet(wb, wsJournal, 'Jurnal Umum');
 
-  // Build Sheet 2: RINGKASAN EXECUTIVE (Financial Summary)
+  // Build Sheet 2: RINGKASAN EXECUTIVE
   const summaryRows: any[][] = [
     [companyName],
-    ['RINGKASAN EKSEKUTIF KEUANGAN'],
+    ['RINGKASAN EKSEKUTIF KEUANGAN KAS UTAMA'],
     [`PERIODE: ${periodText}`],
     [],
-    ['KOMPONEN KEUANGAN', 'NOMINAL (RP)', 'KETERANGAN / MARGIN'],
+    ['KOMPONEN KEUANGAN', 'NOMINAL (RP)', 'KETERANGAN'],
     ['Total Debet (Pemasukan Kas)', totalDebet, 'Semua arus dana masuk disetujui'],
     ['Total Kredit (Pengeluaran Kas)', totalKredit, 'Semua arus dana keluar disetujui'],
     ['Net Cashflow / Saldo Periode', totalDebet - totalKredit, totalDebet > 0 ? `${Math.round(((totalDebet - totalKredit) / totalDebet) * 100)}% Net Margin` : '-'],
@@ -152,21 +155,19 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
   const wb = XLSX.utils.book_new();
   const companyName = 'PT AKSARA RIKSA PERDANA (ARP)';
 
-  const approvedTx = transactions.filter(
-    t => (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
+  const approvedPtx = transactions.filter(
+    t => t.proyekId === project.id && (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
   );
 
-  let totalPengeluaran = 0;
-  let totalRefund = 0;
-
-  approvedTx.forEach(t => {
-    if (t.jenis === 'keluar') totalPengeluaran += t.nominal;
-    else if (t.jenis === 'masuk') totalRefund += t.nominal;
-  });
+  const sortedPtx = [...approvedPtx].sort(
+    (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
+  );
 
   const modalDisuntikkan = project.anggaran || 0;
-  const realisasiBersih = totalPengeluaran - totalRefund;
-  const sisaDana = modalDisuntikkan - realisasiBersih;
+  let totalBelanja = 0;
+  let totalRefund = 0;
+
+  let currentBalance = modalDisuntikkan;
 
   // Sheet 1: LAPORAN REALISASI PROYEK
   const rows: any[][] = [
@@ -178,38 +179,71 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     [],
     ['--- KARTU DANA PROYEK ---'],
     ['Anggaran Modal Disuntikkan (Pak Fatwa)', modalDisuntikkan],
-    ['Total Pengeluaran Belanja Lapangan', totalPengeluaran],
-    ['Total Refund / Uang Kembali', totalRefund],
-    ['REALISASI BERSIH PROYEK', realisasiBersih],
-    ['SISA DANA PROYEK DI ADMIN', sisaDana],
+    ['Total Belanja Lapangan (Kredit)', 0], // calculated later
+    ['Total Refund Uang Kembali (Debet)', 0], // calculated later
+    ['REALISASI BERSIH PROYEK', 0],
+    ['SISA DANA PROYEK SAAT INI', modalDisuntikkan],
     [],
-    ['--- RINCIAN TRANSAKSI REALISASI LAPANGAN ---'],
-    ['NO', 'TANGGAL', 'DESKRIPSI BELANJA / REFUND', 'KATEGORI', 'PENGELUARAN (RP)', 'REFUND MASUK (RP)', 'STATUS'],
+    ['--- RINCIAN JURNAL REALISASI LAPANGAN ---'],
+    ['NO', 'TANGGAL', 'URAIAN / DESKRIPSI TRANSAKSI', 'KATEGORI', 'DEBET (REFUND/MODAL - RP)', 'KREDIT (BELANJA - RP)', 'SALDO SISA DANA (RP)', 'STATUS'],
   ];
 
-  approvedTx.forEach((t, idx) => {
+  // Row 1: Modal Awal Row
+  rows.push([
+    1,
+    formatDate(project.tanggalMulai),
+    'Penerimaan Modal Proyek (Disuntikkan Pak Fatwa)',
+    'Modal Disuntikkan',
+    modalDisuntikkan,
+    '',
+    currentBalance,
+    'Selesai',
+  ]);
+
+  sortedPtx.forEach((t, idx) => {
+    const isMasuk = t.jenis === 'masuk';
+    const debet = isMasuk ? t.nominal : 0;
+    const kredit = !isMasuk ? t.nominal : 0;
+
+    if (isMasuk) {
+      totalRefund += t.nominal;
+      currentBalance += t.nominal;
+    } else {
+      totalBelanja += t.nominal;
+      currentBalance -= t.nominal;
+    }
+
     rows.push([
-      idx + 1,
+      idx + 2,
       formatDate(t.tanggal),
       t.deskripsi,
       t.kategori,
-      t.jenis === 'keluar' ? t.nominal : '',
-      t.jenis === 'masuk' ? t.nominal : '',
+      debet || '',
+      kredit || '',
+      currentBalance,
       t.status === 'selesai' ? 'Selesai' : 'Disetujui',
     ]);
   });
 
+  // Update summary card values in rows array
+  const realisasiBersih = totalBelanja - totalRefund;
+  rows[8][1] = totalBelanja;
+  rows[9][1] = totalRefund;
+  rows[10][1] = realisasiBersih;
+  rows[11][1] = currentBalance;
+
   rows.push([]);
-  rows.push(['', '', 'TOTAL REALISASI LAPANGAN', '', totalPengeluaran, totalRefund, 'OK']);
+  rows.push(['', '', 'TOTAL MUTASI & POSISI SISA DANA', '', modalDisuntikkan + totalRefund, totalBelanja, currentBalance, 'VALID']);
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [
     { wch: 6 },
     { wch: 14 },
-    { wch: 40 },
+    { wch: 42 },
     { wch: 22 },
-    { wch: 22 },
-    { wch: 22 },
+    { wch: 25 },
+    { wch: 25 },
+    { wch: 25 },
     { wch: 14 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, 'Realisasi Proyek');
