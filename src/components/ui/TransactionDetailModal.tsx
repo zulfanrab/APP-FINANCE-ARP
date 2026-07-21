@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, Edit3, Trash2, Calendar, FileText, Building2, FolderKanban,
-  CheckCircle2, ArrowUpRight, ArrowDownLeft, Paperclip, Upload, Plus, Save, Loader2, Tag
+  CheckCircle2, ArrowUpRight, ArrowDownLeft, Paperclip, Upload, Plus, Save, Loader2, Tag, AlertTriangle
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { AttachmentViewer } from './AttachmentViewer';
@@ -237,6 +237,19 @@ export function TransactionDetailModal({
                 <span>Kategori: <strong className="text-emerald-300">{transaction.kategori}</strong></span>
               </div>
             </div>
+
+            {/* Rejection Note from Pak Fatwa */}
+            {transaction.status === 'ditolak' && transaction.catatanPenolakan && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl space-y-1.5 text-xs text-red-900 shadow-sm animate-fade-in">
+                <div className="flex items-center gap-1.5 font-bold text-red-700">
+                  <AlertTriangle size={15} />
+                  <span>Komentar / Alasan Penolakan dari Pak Fatwa (Owner):</span>
+                </div>
+                <p className="font-semibold text-slate-800 bg-white p-3 rounded-xl border border-red-200 italic leading-relaxed">
+                  "{transaction.catatanPenolakan}"
+                </p>
+              </div>
+            )}
 
             {/* Description Card */}
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
