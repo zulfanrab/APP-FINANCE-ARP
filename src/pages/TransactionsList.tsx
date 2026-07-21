@@ -1,13 +1,14 @@
 // ============================================================
 // ARKA Finance — Dedicated Transactions List Module
 // Native Mobile Card View (MyBCA style) + Desktop Table
-// Zero horizontal scroll on mobile with full multiline descriptions
+// Includes: Scope Switcher (Kas Utama vs Internal Proyek) & Clear Badges
 // ============================================================
 
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban } from 'lucide-react';
 import { getTransactions, deleteTransaction } from '../services/transactionService';
-import { type Transaction, type TransactionType, type TransactionStatus } from '../types';
+import { getProjects } from '../services/projectService';
+import { type Transaction, type TransactionType, type TransactionStatus, type Project } from '../types';
 import { Card, Button, StatusBadge, formatRupiah, formatDate, AttachmentViewer, TransactionListSkeleton, EmptyState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -17,9 +18,11 @@ export function TransactionsList() {
   const { addToast, refreshKey, triggerRefresh } = useApp();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters & Scope
+  const [scope, setScope] = useState<'semua' | 'kas_utama' | 'proyek'>('semua');
   const [search, setSearch] = useState('');
   const [filterJenis, setFilterJenis] = useState<TransactionType | 'semua'>('semua');
   const [filterKategori, setFilterKategori] = useState('semua');
@@ -32,8 +35,9 @@ export function TransactionsList() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const data = await getTransactions();
-      setTransactions(data);
+      const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
+      setTransactions(txs);
+      setProjects(projs);
     } finally {
       setLoading(false);
     }
@@ -50,17 +54,32 @@ export function TransactionsList() {
     }
   };
 
+  // Helper map project name
+  const getProjectName = (proyekId?: string): string => {
+    if (!proyekId) return '';
+    const p = projects.find(prj => prj.id === proyekId);
+    return p ? p.nama : 'Proyek';
+  };
+
   // Categories list
   const categories = Array.from(new Set(transactions.map(t => t.kategori)));
 
   // Filtered
   const filtered = transactions.filter(t => {
+    // Scope Filter
+    const isSuntikan = t.deskripsi.startsWith('Suntikan Modal Proyek:');
+    const isKasUtama = !t.proyekId || isSuntikan;
+
+    if (scope === 'kas_utama' && !isKasUtama) return false;
+    if (scope === 'proyek' && isKasUtama) return false;
+
     if (search) {
       const q = search.toLowerCase();
       const matchDesc = t.deskripsi.toLowerCase().includes(q);
       const matchKat = t.kategori.toLowerCase().includes(q);
       const matchNom = t.nominal.toString().includes(q);
-      if (!matchDesc && !matchKat && !matchNom) return false;
+      const matchPrj = getProjectName(t.proyekId).toLowerCase().includes(q);
+      if (!matchDesc && !matchKat && !matchNom && !matchPrj) return false;
     }
     if (filterJenis !== 'semua' && t.jenis !== filterJenis) return false;
     if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
@@ -76,9 +95,54 @@ export function TransactionsList() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-card">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Semua Transaksi</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Riwayat lengkap mutasi pengeluaran & pemasukan PT ARP ({filtered.length} data)</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Riwayat lengkap mutasi Kas Utama &amp; Internal Proyek ({filtered.length} data)
+          </p>
+        </div>
+
+        {/* Scope Switcher Tabs */}
+        <div className="flex items-center bg-gray-100 p-1.5 rounded-2xl gap-1 font-bold text-xs">
+          <button
+            type="button"
+            onClick={() => setScope('semua')}
+            className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+              scope === 'semua' ? 'bg-slate-900 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            🌐 Semua
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('kas_utama')}
+            className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+              scope === 'kas_utama' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Building2 size={14} /> Kas Utama
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope('proyek')}
+            className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+              scope === 'proyek' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <FolderKanban size={14} /> Dana Proyek
+          </button>
         </div>
       </div>
+
+      {/* Scope Context Explanation Banner */}
+      {scope === 'kas_utama' && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-medium">
+          💡 <strong>Mode Kas Utama:</strong> Menampilkan transaksi brankas kantor &amp; kucuran modal ke proyek. Pengeluaran internal proyek disembunyikan agar tidak membingungkan.
+        </div>
+      )}
+      {scope === 'proyek' && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 font-medium">
+          💡 <strong>Mode Internal Proyek:</strong> Menampilkan belanja &amp; refund internal dari dana yang sudah disuntikkan ke proyek. Tidak memotong Kas Utama secara ganda.
+        </div>
+      )}
 
       {/* Filter & Search Bar Card */}
       <Card className="!p-4">
@@ -90,7 +154,7 @@ export function TransactionsList() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Cari deskripsi, nominal, atau kategori..."
+              placeholder="Cari deskripsi, nominal, atau proyek..."
               className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
@@ -128,79 +192,80 @@ export function TransactionsList() {
           <EmptyState
             icon={<FileText size={28} />}
             title="Tidak ada transaksi ditemukan"
-            description="Coba ubah kata kunci pencarian atau filter Anda"
+            description="Coba ubah filter atau pencarian Anda"
           />
         ) : (
           <>
-            {/* MOBILE CARD VIEW (MyBCA Style - Zero horizontal scroll, full multiline text) */}
+            {/* MOBILE CARD VIEW */}
             <div className="md:hidden space-y-3.5">
-              {filtered.map(tx => (
-                <div key={tx.id} className="p-4 bg-gray-50/80 border border-gray-200/80 rounded-2xl space-y-2.5 shadow-sm">
-                  {/* Top Row: Date, Category Badge & Status */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
-                      <span className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-bold">
-                        {tx.kategori}
-                      </span>
-                      {tx.tag && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                        }`}>
-                          {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi'}
-                        </span>
-                      )}
-                    </div>
-                    <StatusBadge status={tx.status} />
-                  </div>
+              {filtered.map(tx => {
+                const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                const isKas = !tx.proyekId || isSuntikan;
+                const prjName = getProjectName(tx.proyekId);
 
-                  {/* Middle Row: Description & Nominal */}
-                  <div className="flex items-start justify-between gap-3 pt-1">
-                    <div className="flex items-start gap-2.5 flex-1">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                      }`}>
-                        {tx.jenis === 'masuk' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                return (
+                  <div key={tx.id} className="p-4 bg-gray-50/80 border border-gray-200/80 rounded-2xl space-y-2.5 shadow-sm">
+                    {/* Top Row: Scope Badge, Date & Status */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {isKas ? (
+                          <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200">
+                            🏢 Kas Utama
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 truncate max-w-[160px]">
+                            🏗️ {prjName}
+                          </span>
+                        )}
+                        <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
                       </div>
-                      <p className="text-sm font-bold text-gray-900 leading-snug break-words flex-1">
-                        {tx.deskripsi}
-                      </p>
+                      <StatusBadge status={tx.status} />
                     </div>
 
-                    <div className="text-right flex-shrink-0">
-                      <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                      </p>
+                    {/* Middle Row: Description & Nominal */}
+                    <div className="flex items-start justify-between gap-3 pt-1">
+                      <div className="flex items-start gap-2.5 flex-1">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {tx.jenis === 'masuk' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-gray-900 leading-snug break-words">
+                            {tx.deskripsi}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5 font-medium">{tx.kategori}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                        </p>
+                      </div>
                     </div>
+
+                    {/* Attachments */}
+                    {tx.lampiran && tx.lampiran.length > 0 && (
+                      <div className="pt-2 border-t border-gray-200/60">
+                        <AttachmentViewer attachments={tx.lampiran} />
+                      </div>
+                    )}
+
+                    {/* Admin Delete Option */}
+                    {role === 'admin' && (
+                      <div className="flex justify-end pt-2 border-t border-gray-200/60">
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 size={13} /> Hapus
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Attachments */}
-                  {tx.lampiran && tx.lampiran.length > 0 && (
-                    <div className="pt-2 border-t border-gray-200/60">
-                      <AttachmentViewer attachments={tx.lampiran} />
-                    </div>
-                  )}
-
-                  {/* Bukti Transfer */}
-                  {tx.buktiTransfer && (
-                    <div className="pt-1">
-                      <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
-                    </div>
-                  )}
-
-                  {/* Admin Delete Option */}
-                  {role === 'admin' && (
-                    <div className="flex justify-end pt-2 border-t border-gray-200/60">
-                      <button
-                        onClick={() => handleDelete(tx.id)}
-                        className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 size={13} /> Hapus
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* DESKTOP TABLE VIEW */}
@@ -208,59 +273,62 @@ export function TransactionsList() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                   <tr>
+                    <th className="px-4 py-3">Sumber Kas</th>
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Deskripsi &amp; Lampiran</th>
                     <th className="px-4 py-3">Kategori</th>
-                    <th className="px-4 py-3">Tag</th>
                     <th className="px-4 py-3 text-right">Nominal</th>
                     <th className="px-4 py-3">Status</th>
                     {role === 'admin' && <th className="px-4 py-3 text-center">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filtered.map(tx => (
-                    <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-900">{tx.deskripsi}</p>
-                        {tx.lampiran && tx.lampiran.length > 0 && (
-                          <AttachmentViewer attachments={tx.lampiran} />
-                        )}
-                        {tx.buktiTransfer && (
-                          <div className="mt-1">
-                            <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
-                      <td className="px-4 py-3">
-                        {tx.tag ? (
-                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                            tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi Owner'}
-                          </span>
-                        ) : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                      {role === 'admin' && (
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDelete(tx.id)}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Hapus Transaksi"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                  {filtered.map(tx => {
+                    const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                    const isKas = !tx.proyekId || isSuntikan;
+                    const prjName = getProjectName(tx.proyekId);
+
+                    return (
+                      <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-4 py-3">
+                          {isKas ? (
+                            <span className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
+                              🏢 Kas Utama
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 whitespace-nowrap">
+                              🏗️ {prjName}
+                            </span>
+                          )}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-gray-900">{tx.deskripsi}</p>
+                          {tx.lampiran && tx.lampiran.length > 0 && (
+                            <AttachmentViewer attachments={tx.lampiran} />
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
+                        {role === 'admin' && (
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleDelete(tx.id)}
+                              className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Hapus Transaksi"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

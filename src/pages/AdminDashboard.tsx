@@ -1,5 +1,6 @@
 // ============================================================
 // ARKA Finance — Admin Dashboard
+// Includes Kas Utama vs Dana Proyek Scope Badges
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -57,11 +58,14 @@ export function AdminDashboard() {
   const [sortField, setSortField] = useState<SortField>('tanggal');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  const [projectsList, setProjectsList] = useState<any[]>([]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [txns, projects] = await Promise.all([getTransactions(), getProjects()]);
       setAllTransactions(txns);
+      setProjectsList(projects);
       const activeProjects = projects.filter(p => p.status === 'aktif').length;
       setSummary(getDashboardSummary(txns, activeProjects));
     } finally {
@@ -247,58 +251,59 @@ export function AdminDashboard() {
             />
           ) : (
             <>
-              {/* Mobile Card List View (Zero Horizontal Scroll!) */}
-              <div className="md:hidden space-y-3 pt-1">
-                {filtered.map(tx => (
-                  <div key={tx.id} className="p-4 bg-gray-50/90 border border-gray-200/80 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
-                        <span className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-bold">
-                          {tx.kategori}
-                        </span>
-                        {tx.tag && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                            tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi'}
+              {/* Mobile Card List View */}
+              <div className="md:hidden space-y-3 p-3">
+                {filtered.map(tx => {
+                  const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                  const isKas = !tx.proyekId || isSuntikan;
+
+                  return (
+                    <div key={tx.id} className="p-4 bg-gray-50/90 border border-gray-200/80 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isKas ? (
+                            <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200">
+                              🏢 Kas Utama
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200">
+                              🏗️ Dana Proyek
+                            </span>
+                          )}
+                          <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full font-bold">
+                            {tx.kategori}
                           </span>
-                        )}
+                        </div>
+                        <StatusBadge status={tx.status} />
                       </div>
-                      <StatusBadge status={tx.status} />
-                    </div>
 
-                    <div className="flex items-start justify-between gap-3 pt-1">
-                      <p className="text-sm font-bold text-gray-900 leading-snug break-words flex-1">
-                        {tx.deskripsi}
-                      </p>
-                      <p className={`font-extrabold text-base flex-shrink-0 ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                      </p>
-                    </div>
-
-                    {tx.lampiran && tx.lampiran.length > 0 && (
-                      <div className="pt-2 border-t border-gray-200/60">
-                        <AttachmentViewer attachments={tx.lampiran} />
+                      <div className="flex items-start justify-between gap-3 pt-1">
+                        <p className="text-sm font-bold text-gray-900 leading-snug break-words flex-1">
+                          {tx.deskripsi}
+                        </p>
+                        <p className={`font-extrabold text-base flex-shrink-0 ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                        </p>
                       </div>
-                    )}
 
-                    {tx.buktiTransfer && (
-                      <div className="pt-1">
-                        <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
+                      {tx.lampiran && tx.lampiran.length > 0 && (
+                        <div className="pt-2 border-t border-gray-200/60">
+                          <AttachmentViewer attachments={tx.lampiran} />
+                        </div>
+                      )}
+
+                      <div className="flex justify-end pt-1 border-t border-gray-200/60">
+                        <button
+                          onClick={() => handleDelete(tx.id)}
+                          className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50"
+                        >
+                          <Trash2 size={13} /> Hapus
+                        </button>
                       </div>
-                    )}
-
-                    <div className="flex justify-end pt-1 border-t border-gray-200/60">
-                      <button
-                        onClick={() => handleDelete(tx.id)}
-                        className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-red-50"
-                      >
-                        <Trash2 size={13} /> Hapus
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Desktop Table View */}
@@ -306,6 +311,7 @@ export function AdminDashboard() {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                     <tr>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Sumber Kas</th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">
                         <button onClick={() => handleSort('tanggal')} className="flex items-center gap-1 hover:text-gray-700">
                           Tanggal <SortIcon field="tanggal" />
@@ -313,7 +319,6 @@ export function AdminDashboard() {
                       </th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Lampiran</th>
                       <th className="text-left px-4 py-3 text-gray-500 font-medium">Kategori</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Tag</th>
                       <th className="text-right px-4 py-3 text-gray-500 font-medium">
                         <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
                           Nominal <SortIcon field="nominal" />
@@ -324,46 +329,49 @@ export function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {filtered.map(tx => (
-                      <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-900">{tx.deskripsi}</p>
-                          {tx.lampiran && tx.lampiran.length > 0 && (
-                            <AttachmentViewer attachments={tx.lampiran} />
-                          )}
-                          {tx.buktiTransfer && (
-                            <div className="mt-1">
-                              <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: tx.buktiTransfer }]} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
-                        <td className="px-4 py-3">
-                          {tx.tag ? (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                              ${tx.tag === 'operasional' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                              {tx.tag === 'operasional' ? 'Operasional' : 'Pribadi Owner'}
+                    {filtered.map(tx => {
+                      const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                      const isKas = !tx.proyekId || isSuntikan;
+
+                      return (
+                        <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-4 py-3">
+                            {isKas ? (
+                              <span className="text-xs px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
+                                🏢 Kas Utama
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 whitespace-nowrap">
+                                🏗️ Dana Proyek
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(tx.tanggal)}</td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-gray-900">{tx.deskripsi}</p>
+                            {tx.lampiran && tx.lampiran.length > 0 && (
+                              <AttachmentViewer attachments={tx.lampiran} />
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 font-medium">{tx.kategori}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                             </span>
-                          ) : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`font-bold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDelete(tx.id)}
-                            className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
-                            title="Hapus Transaksi"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => handleDelete(tx.id)}
+                              className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-red-400"
+                              title="Hapus Transaksi"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
