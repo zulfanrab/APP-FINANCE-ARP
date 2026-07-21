@@ -465,28 +465,6 @@ export function PdfReportModal({
               </table>
             </div>
 
-            {/* OFFICIAL SIGNATURE BLOCK */}
-            <div className="signature-container grid grid-cols-2 gap-8 pt-8 mt-6 border-t border-slate-200">
-              <div className="text-center space-y-12">
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Dibuat Oleh,</p>
-                  <p className="text-xs font-bold text-slate-800">Admin Keuangan PT ARP</p>
-                </div>
-                <div className="signature-line border-t border-slate-900 w-40 mx-auto pt-1 font-bold text-xs">
-                  ( Admin Keuangan )
-                </div>
-              </div>
-
-              <div className="text-center space-y-12">
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Bandung, {printDate}</p>
-                  <p className="text-xs font-bold text-slate-800">Mengetahui &amp; Menyetujui,</p>
-                </div>
-                <div className="signature-line border-t border-slate-900 w-40 mx-auto pt-1 font-bold text-xs">
-                  Pak Fatwa (Direktur/Owner)
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
