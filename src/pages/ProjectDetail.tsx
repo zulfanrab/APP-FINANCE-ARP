@@ -417,7 +417,7 @@ export function ProjectDetail() {
                 variant="primary"
                 size="sm"
                 icon={<PlusCircle size={15} />}
-                onClick={() => navigate('/transaksi/baru')}
+                onClick={() => navigate(`/transaksi/baru?proyekId=${project.id}`)}
                 className="w-full sm:w-auto justify-center"
               >
                 + Input Transaksi
