@@ -249,11 +249,31 @@ export function OwnerDashboard() {
       addToast('error', 'Gagal merekam suara. Pastikan izin mikrofon aktif.');
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
     recognition.start();
+  };
+
+  const handleProcessCustomVoiceText = async (text: string) => {
+    if (!text.trim()) return;
+    setVoiceParsing(true);
+    try {
+      const result = await parseVoiceSentenceWithAI(text);
+      if (result.nominal > 0) {
+        setQuickForm(f => ({
+          ...f,
+          nominalStr: formatRupiahInput(result.nominal.toString()),
+          deskripsi: result.deskripsi,
+          mode: result.jenisQuick,
+        }));
+        addToast('success', `✨ AI Suara: ${result.deskripsi} (${formatRupiah(result.nominal)})`);
+      } else {
+        setQuickForm(f => ({ ...f, deskripsi: text }));
+        addToast('info', `Perintah terdeteksi: "${text}". Silakan masukkan nominal.`);
+      }
+    } catch {
+      addToast('error', 'Gagal memproses perintah dengan AI.');
+    } finally {
+      setVoiceParsing(false);
+    }
   };
 
   // Owner Quick Save Transaction (Instant Finish, No Approval Needed)
@@ -619,33 +639,47 @@ export function OwnerDashboard() {
                 </div>
                 <div>
                   <p className="text-xs font-bold text-white">Input Pakai Suara (AI Voice)</p>
-                  <p className="text-[10px] text-emerald-400">Pak Fatwa cukup sebutkan nominal & kebutuhan</p>
                 </div>
               </div>
-
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={voiceText}
+                onChange={e => setVoiceText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleProcessCustomVoiceText(voiceText);
+                  }
+                }}
+                placeholder='Bicara atau ketik contoh: "Tarik prive 5 juta"...'
+                className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder:text-slate-400"
+              />
               <button
                 type="button"
                 onClick={handleVoiceInput}
-                disabled={isListening || voiceParsing}
-                className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-md flex-shrink-0 ${
-                  isListening
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : voiceParsing
-                    ? 'bg-purple-600 text-white animate-bounce'
-                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-md flex-shrink-0 ${
+                  isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
                 }`}
+                title="Bicara Lewat Mikrofon"
               >
-                {isListening ? (
-                  <><MicOff size={15} /> Mendengarkan...</>
-                ) : voiceParsing ? (
-                  <><Loader2 size={15} className="animate-spin" /> Memproses AI...</>
-                ) : (
-                  <><Sparkles size={15} /> 🎙️ Mulai Bicara</>
-                )}
+                {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+                <span>{isListening ? 'Merekam...' : 'Bicara'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleProcessCustomVoiceText(voiceText)}
+                disabled={voiceParsing || !voiceText.trim()}
+                className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-md flex-shrink-0"
+              >
+                {voiceParsing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                <span>Ekstrak AI</span>
               </button>
             </div>
+          </div>
 
-            {isListening && (
+          {isListening && (
               <div className="p-2 bg-red-500/20 border border-red-500/40 rounded-xl text-center animate-pulse">
                 <p className="text-xs font-extrabold text-red-300">🔴 Mendengarkan Suara Pak Fatwa...</p>
                 <p className="text-[10px] text-red-200 mt-0.5">Ucapkan contoh: "Beli bensin dan tol 150 ribu operasional" atau "Tarik prive 5 juta"</p>
@@ -657,7 +691,6 @@ export function OwnerDashboard() {
                 <strong>Suara Terdeteksi:</strong> "{voiceText}"
               </div>
             )}
-          </div>
 
           <div className="p-3 bg-slate-50 border border-gray-100 rounded-2xl text-xs text-gray-600 leading-relaxed font-medium">
             Pencatatan oleh Owner otomatis berstatus <strong>Selesai</strong> dan langsung aktif di kas perusahaan.
