@@ -407,7 +407,7 @@ export function TransactionForm() {
                         )}
                       </div>
                       <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
-                        Jalur Disarankan: {detected.isBca ? 'Sesama BCA (Rp0)' : 'BI-FAST (Rp2.500)'}
+                        Jalur Disarankan: {detected.suggestedJalur === 'sesama_bca' ? (detected.isQrisOrEwallet ? 'QRIS / Tanpa Admin (Rp0)' : 'Sesama BCA (Rp0)') : 'BI-FAST (Rp2.500)'}
                       </span>
                     </div>
                   );
@@ -430,10 +430,10 @@ export function TransactionForm() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="font-bold text-xs">Sesama BCA</span>
+                      <span className="font-bold text-xs">Sesama BCA / QRIS</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">Rp 0</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">Tanpa Biaya Admin</p>
+                    <p className="text-[11px] text-gray-500">QRIS / Tanpa Biaya Admin</p>
                   </button>
 
                   <button

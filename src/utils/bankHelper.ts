@@ -1,6 +1,7 @@
 // ============================================================
 // ARKA Finance — Bank Detection & Recipient Autocomplete Helper
 // Pure logic regex/digit pattern detection & recipient formatting
+// Supports QRIS, E-Wallet, and Bank Accounts with smart Zero-Admin detection
 // ============================================================
 
 export interface BankDetectionResult {
@@ -8,6 +9,7 @@ export interface BankDetectionResult {
   accountNumber: string;
   recipientName: string;
   isBca: boolean;
+  isQrisOrEwallet: boolean;
   suggestedJalur: 'sesama_bca' | 'bi_fast';
   formattedDetail: string;
 }
@@ -90,7 +92,7 @@ export function formatRecipientDetail(
 }
 
 /**
- * Parses a raw recipient string like "PT Santika - BCA 0123456789" or "PT Santika 0123456789"
+ * Parses a raw recipient string like "PT Santika - BCA 0123456789" or "Laman Suba Coffee - Mandiri QRIS RRN 483686515"
  */
 export function parseRecipientString(rawInput: string): BankDetectionResult {
   const input = rawInput.trim();
@@ -100,10 +102,14 @@ export function parseRecipientString(rawInput: string): BankDetectionResult {
       accountNumber: '',
       recipientName: '',
       isBca: true,
+      isQrisOrEwallet: false,
       suggestedJalur: 'sesama_bca',
       formattedDetail: '',
     };
   }
+
+  // QRIS and E-Wallets have 0 transfer admin fees for the consumer
+  const isQrisOrEwallet = /\b(qris|qr|e-wallet|ewallet|gopay|ovo|dana|shopeepay|linkaja)\b/i.test(input);
 
   // Check if input is formatted as "[Name] - [Bank] [Acc]"
   const dashParts = input.split(' - ');
@@ -117,14 +123,15 @@ export function parseRecipientString(rawInput: string): BankDetectionResult {
 
     const detected = detectBankFromAccountNumber(accountNumber, bankText || input);
     const bankName = bankText || detected.bankName;
-    const isBca = detected.isBca || bankName.toUpperCase().includes('BCA');
+    const isBca = detected.isBca || bankName.toUpperCase().includes('BCA') || isQrisOrEwallet;
 
     return {
       bankName,
       accountNumber,
       recipientName: namePart,
       isBca,
-      suggestedJalur: isBca ? 'sesama_bca' : 'bi_fast',
+      isQrisOrEwallet,
+      suggestedJalur: (isBca || isQrisOrEwallet) ? 'sesama_bca' : 'bi_fast',
       formattedDetail: formatRecipientDetail(namePart, bankName, accountNumber),
     };
   }
@@ -135,13 +142,15 @@ export function parseRecipientString(rawInput: string): BankDetectionResult {
   const recipientName = accMatch ? input.replace(accMatch[1], '').replace(/[-–]/g, '').trim() : input;
 
   const detected = detectBankFromAccountNumber(accountNumber, input);
+  const isBca = detected.isBca || isQrisOrEwallet;
 
   return {
     bankName: detected.bankName,
     accountNumber,
     recipientName,
-    isBca: detected.isBca,
-    suggestedJalur: detected.isBca ? 'sesama_bca' : 'bi_fast',
+    isBca,
+    isQrisOrEwallet,
+    suggestedJalur: (isBca || isQrisOrEwallet) ? 'sesama_bca' : 'bi_fast',
     formattedDetail: formatRecipientDetail(recipientName, detected.bankName, accountNumber),
   };
 }

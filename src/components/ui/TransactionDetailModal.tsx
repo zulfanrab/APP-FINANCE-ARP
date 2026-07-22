@@ -452,7 +452,7 @@ export function TransactionDetailModal({
                       <div className="p-2 bg-slate-900 text-white rounded-xl text-[11px] flex items-center justify-between gap-2 shadow-sm">
                         <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detected.bankName}</span>
                         <span className="text-[10px] text-slate-300">
-                          Jalur: {detected.isBca ? 'Sesama BCA' : 'BI-FAST (Rp 2.500)'}
+                          Jalur: {detected.suggestedJalur === 'sesama_bca' ? (detected.isQrisOrEwallet ? 'QRIS (Rp0)' : 'Sesama BCA (Rp0)') : 'BI-FAST (Rp2.500)'}
                         </span>
                       </div>
                     );
@@ -474,7 +474,7 @@ export function TransactionDetailModal({
                           : 'border-gray-200 text-gray-700 bg-white'
                       }`}
                     >
-                      Sesama BCA (Rp 0)
+                      Sesama BCA / QRIS (Rp 0)
                     </button>
 
                     <button
