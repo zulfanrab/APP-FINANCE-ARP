@@ -201,7 +201,20 @@ export async function addTransaction(
       if (adminFeeTx) {
         rowsToInsert.push(mapTransactionToRow(adminFeeTx));
       }
-      const { error } = await supabase.from('transactions').insert(rowsToInsert);
+      let { error } = await supabase.from('transactions').insert(rowsToInsert);
+      
+      // Auto-fallback: if Supabase fails because 'divisi' column doesn't exist yet, retry without 'divisi' key in payload
+      if (error && (error.message?.includes('divisi') || error.details?.includes('divisi'))) {
+        console.warn('Supabase missing "divisi" column in DB schema cache. Retrying insert without "divisi" column...');
+        const retryRows = rowsToInsert.map(r => {
+          const copy = { ...r };
+          delete copy.divisi;
+          return copy;
+        });
+        const retryRes = await supabase.from('transactions').insert(retryRows);
+        error = retryRes.error;
+      }
+
       if (error) {
         console.error('Supabase add transaction error:', error);
         throw new Error(`Gagal Sinkronisasi Cloud (Supabase Error: ${error.message})`);
@@ -320,7 +333,16 @@ export async function updateTransaction(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase.from('transactions').update(mapTransactionToRow(updated)).eq('id', id);
+      const row = mapTransactionToRow(updated);
+      let { error } = await supabase.from('transactions').update(row).eq('id', id);
+
+      if (error && (error.message?.includes('divisi') || error.details?.includes('divisi'))) {
+        const copy = { ...row };
+        delete copy.divisi;
+        const retryRes = await supabase.from('transactions').update(copy).eq('id', id);
+        error = retryRes.error;
+      }
+
       if (error) throw new Error(`Supabase update error: ${error.message}`);
 
       if (childToUpdate) {
