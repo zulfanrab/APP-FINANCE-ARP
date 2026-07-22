@@ -1,24 +1,26 @@
 // ============================================================
 // ARKA Finance — Transaction Form (Input Transaksi)
-// Includes: OCR scan, multi-file cloud upload, Rupiah auto-format & Custom Category Manager
+// Includes: OCR scan, multi-file cloud upload, Rupiah auto-format,
+// Recipient Autofill & Bank Auto-Detection, Transfer Channel & Auto-Split Admin Fee
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Save, Upload, X, Camera, Loader2, FileText,
-  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock, Zap, Clock, Calendar
+  ScanLine, AlertCircle, ArrowLeft, CheckCircle2, Plus, Trash2, Tag, Building2, Lock, Zap, Clock, Calendar, Landmark
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { addTransaction } from '../services/transactionService';
+import { addTransaction, getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getCategories, addCategory, deleteCategory } from '../services/categoryService';
 import { uploadAttachmentFile } from '../services/storageService';
-import { type Project, type Attachment } from '../types';
+import { type Project, type Attachment, type JalurTransfer } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
+import { parseRecipientString, extractHistoricalRecipients } from '../utils/bankHelper';
 
 function formatRupiahInput(value: string): string {
   const num = value.replace(/\D/g, '');
@@ -41,6 +43,7 @@ export function TransactionForm() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
@@ -63,14 +66,17 @@ export function TransactionForm() {
     tag: 'operasional' as 'operasional' | 'pribadi',
     proyekId: urlProyekId || '',
     lampiran: [] as Attachment[],
+    penerimaDetail: '',
+    jalurTransfer: 'sesama_bca' as JalurTransfer,
   });
 
   // Approval Flow Switch
   const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
 
   useEffect(() => {
-    getProjects().then(projs => {
+    Promise.all([getProjects(), getTransactions()]).then(([projs, txs]) => {
       setProjects(projs);
+      setHistoricalRecipients(extractHistoricalRecipients(txs));
       if (urlProyekId) {
         setForm(f => ({ ...f, proyekId: urlProyekId }));
         setAutoApprove(true);
@@ -129,7 +135,6 @@ export function TransactionForm() {
     setOcrLoading(true);
 
     try {
-      // 1. Scan with Gemini Vision AI
       const aiResult = await scanReceiptWithGemini(file);
 
       if (aiResult.nominal && aiResult.nominal > 0) {
@@ -138,6 +143,11 @@ export function TransactionForm() {
       if (aiResult.deskripsi) {
         setField('deskripsi', aiResult.deskripsi);
       }
+      if (aiResult.toko) {
+        const detected = parseRecipientString(aiResult.toko);
+        setField('penerimaDetail', detected.formattedDetail || aiResult.toko);
+        setField('jalurTransfer', detected.suggestedJalur);
+      }
       if (aiResult.kategori && categories.includes(aiResult.kategori)) {
         setField('kategori', aiResult.kategori);
       }
@@ -145,7 +155,6 @@ export function TransactionForm() {
         setField('tanggal', aiResult.tanggal);
       }
 
-      // 2. Stage file locally (Do NOT upload to Drive yet)
       const reader = new FileReader();
       reader.onload = () => {
         setStagedFiles(prev => [
@@ -206,7 +215,6 @@ export function TransactionForm() {
 
     setLoading(true);
     try {
-      // Defer Upload to Google Drive until user clicks Simpan Transaksi!
       const uploadedAttachments: Attachment[] = [];
       for (const staged of stagedFiles) {
         if (staged.fileObj) {
@@ -234,6 +242,8 @@ export function TransactionForm() {
         proyekId: (form.proyekId || urlProyekId) || undefined,
         lampiran: uploadedAttachments,
         status: autoApprove ? 'disetujui' : 'menunggu_approval',
+        penerimaDetail: form.jenis === 'keluar' ? (form.penerimaDetail.trim() || undefined) : undefined,
+        jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -327,7 +337,7 @@ export function TransactionForm() {
 
             {/* Nominal */}
             <div className="min-w-0">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Nominal (Rp) *</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Nominal Murni (Rp) *</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -351,6 +361,128 @@ export function TransactionForm() {
                 required
               />
             </div>
+
+            {/* Penerima / Tujuan Transfer (Autofill & Bank Auto Detection) */}
+            {form.jenis === 'keluar' && (
+              <div className="sm:col-span-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                    <Landmark size={14} className="text-emerald-600" /> Penerima / Tujuan Transfer
+                  </label>
+                  <span className="text-[10px] text-gray-400">Format: [Nama] - [Bank] [Rekening]</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="historical-recipients-datalist"
+                    value={form.penerimaDetail}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setField('penerimaDetail', val);
+                      if (val.trim()) {
+                        const detected = parseRecipientString(val);
+                        setField('jalurTransfer', detected.suggestedJalur);
+                      }
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                    placeholder="Contoh: PT Santika - BCA 0123456789 (Ketik nama/nomor rekening)..."
+                  />
+                  <datalist id="historical-recipients-datalist">
+                    {historicalRecipients.map((rec, i) => (
+                      <option key={i} value={rec} />
+                    ))}
+                  </datalist>
+                </div>
+
+                {/* Live Bank Auto-Detection Badge */}
+                {form.penerimaDetail.trim() !== '' && (() => {
+                  const detected = parseRecipientString(form.penerimaDetail);
+                  return (
+                    <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs flex items-center justify-between gap-2 shadow-sm animate-fade-in">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                        <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detected.bankName}</span>
+                        {detected.accountNumber && (
+                          <span className="text-slate-300 font-mono text-[11px] truncate">({detected.accountNumber})</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
+                        Jalur Disarankan: {detected.isBca ? 'Sesama BCA (Rp0)' : 'BI-FAST (Rp2.500)'}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Jalur Transfer & Admin Fee Auto-Split */}
+            {form.jenis === 'keluar' && (
+              <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-3">
+                <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setField('jalurTransfer', 'sesama_bca')}
+                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'sesama_bca'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="font-bold text-xs">Sesama BCA</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">Rp 0</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Tanpa Biaya Admin</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setField('jalurTransfer', 'bi_fast')}
+                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'bi_fast'
+                        ? 'border-blue-500 bg-blue-50 text-blue-900 ring-2 ring-blue-500/20 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="font-bold text-xs">BI-FAST</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">Rp 2.500</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Transfer Beda Bank</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setField('jalurTransfer', 'online_rtgs')}
+                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'online_rtgs'
+                        ? 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="font-bold text-xs">Online / RTGS</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full">Rp 6.500</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Transfer Realtime / RTGS</p>
+                  </button>
+                </div>
+
+                {/* Notification Banner */}
+                {form.jalurTransfer !== 'sesama_bca' && (
+                  <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 font-medium space-y-1 animate-fade-in">
+                    <p className="font-bold text-blue-950 flex items-center gap-1.5">
+                      <Zap size={14} className="text-blue-600" />
+                      Auto-Split Biaya Admin ({form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'})
+                    </p>
+                    <p className="text-blue-800 leading-relaxed">
+                      Sistem akan membuat <strong>entri kedua "Biaya Admin Bank" ({form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'})</strong> secara otomatis yang <strong>terikat ke alokasi proyek yang sama ({form.proyekId ? projects.find(p => p.id === form.proyekId)?.nama : 'Kas Utama'})</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Kategori Custom Select */}
             <div>
@@ -448,115 +580,96 @@ export function TransactionForm() {
 
             {/* Status Approval Selector */}
             <div className="sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
-              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
-                Status Approval Transaksi
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Status Approval Transaksi</label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setAutoApprove(true)}
-                  className={`p-3.5 rounded-2xl border text-left transition-all active:scale-[0.99] ${
+                  className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
                     autoApprove
-                      ? 'border-emerald-600 bg-emerald-50/80 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm font-semibold'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      ? 'border-emerald-500 bg-emerald-50/80 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm'
+                      : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-xs flex items-center gap-1.5 text-emerald-800">
-                      <Zap size={14} className="text-emerald-600" /> Langsung Disetujui (Auto-Approved)
-                    </span>
-                    {autoApprove && <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap size={16} className={autoApprove ? 'text-emerald-600' : 'text-gray-400'} />
+                    <span className="font-extrabold text-xs">⚡ Auto-Approved</span>
                   </div>
-                  <p className="text-[11px] text-emerald-700 leading-snug">
-                    {form.proyekId
-                      ? 'Otomatis aktif untuk proyek (karena modal 20jt sudah disetujui Pak Fatwa).'
-                      : 'Transaksi langsung aktif tanpa perlu persetujuan Pak Fatwa.'}
-                  </p>
+                  <p className="text-[11px] opacity-80 leading-snug">Langsung disetujui &amp; aktif di kas/proyek tanpa antrean approval.</p>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setAutoApprove(false)}
-                  className={`p-3.5 rounded-2xl border text-left transition-all active:scale-[0.99] ${
+                  className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
                     !autoApprove
-                      ? 'border-amber-600 bg-amber-50/80 text-amber-900 ring-2 ring-amber-500/20 shadow-sm font-semibold'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      ? 'border-amber-500 bg-amber-50/80 text-amber-900 ring-2 ring-amber-500/20 shadow-sm'
+                      : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-xs flex items-center gap-1.5 text-amber-800">
-                      <Clock size={14} className="text-amber-600" /> Perlu Approval Pak Fatwa (Owner)
-                    </span>
-                    {!autoApprove && <CheckCircle2 size={16} className="text-amber-600 flex-shrink-0" />}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock size={16} className={!autoApprove ? 'text-amber-600' : 'text-gray-400'} />
+                    <span className="font-extrabold text-xs">⏰ Perlu Approval</span>
                   </div>
-                  <p className="text-[11px] text-amber-700 leading-snug">
-                    Masuk ke antrean "Menunggu Approval" untuk dikonfirmasi Pak Fatwa.
-                  </p>
+                  <p className="text-[11px] opacity-80 leading-snug">Masuk ke antrean approval Pak Fatwa terlebih dahulu.</p>
                 </button>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* OCR Scan & Attachment Card */}
+        {/* OCR Scan Section */}
         <Card>
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900">Lampiran Struk (Google Drive)</h2>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Foto Struk &amp; AI Scan Struk</h2>
+              <p className="text-xs text-gray-500">Gunakan Gemini AI untuk membaca total nominal &amp; deskripsi struk secara otomatis</p>
+            </div>
             <button
               type="button"
               onClick={() => ocrInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+              disabled={ocrLoading}
+              className="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md hover:from-purple-700 hover:to-indigo-700 transition-all active:scale-95 disabled:opacity-50"
             >
-              <ScanLine size={15} /> ✨ Scan Struk AI Gemini
+              {ocrLoading ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}
+              {ocrLoading ? 'Membaca Struk...' : '✨ Scan Struk (AI)'}
             </button>
             <input type="file" ref={ocrInputRef} accept="image/*" onChange={handleOcrFile} className="hidden" />
           </div>
 
-          {ocrLoading && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl mb-4 text-center space-y-2 animate-pulse">
-              <Loader2 size={24} className="mx-auto animate-spin text-purple-600" />
-              <p className="text-xs font-extrabold text-purple-900">✨ Gemini AI Vision sedang membaca Foto Struk...</p>
-              <p className="text-[11px] text-purple-700">Mengekstrak Total Nominal, Nama Toko, Tanggal &amp; Deskripsi secara presisi</p>
-            </div>
-          )}
-
-          {/* Upload Dropzone */}
+          {/* Staged File List */}
           <div className="space-y-3">
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-200 hover:border-emerald-500 bg-gray-50/50 hover:bg-emerald-50/30 rounded-2xl p-6 text-center cursor-pointer transition-all duration-200"
-            >
-              <Upload size={28} className="mx-auto text-gray-400 mb-2" />
-              <p className="text-sm font-semibold text-gray-700">Pilih Foto Struk / Nota PDF</p>
-              <p className="text-xs text-gray-400 mt-1">Otomatis ter-upload & tersimpan aman di Google Drive Anda</p>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-700">Lampiran Berkas ({stagedFiles.length})</label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+              >
+                <Plus size={14} /> Pilih Foto/Berkas
+              </button>
+              <input type="file" ref={fileInputRef} accept="image/*,application/pdf" multiple onChange={handleFileUpload} className="hidden" />
             </div>
-            <input type="file" ref={fileInputRef} multiple accept="image/*,application/pdf" onChange={handleFileUpload} className="hidden" />
 
-            {/* Attachment Items List */}
-            {uploadingFiles && (
-              <div className="flex items-center justify-center p-3 text-xs text-emerald-700 font-semibold bg-emerald-50 rounded-xl gap-2">
-                <Loader2 size={16} className="animate-spin" /> Uploading ke Google Drive...
+            {stagedFiles.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center text-gray-400 space-y-2">
+                <Upload size={28} className="mx-auto text-gray-300" />
+                <p className="text-xs">Belum ada lampiran. Pilih foto struk atau gunakan AI Scan Struk.</p>
               </div>
-            )}
-
-            {stagedFiles.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <p className="text-xs font-bold text-gray-500">Berkas Dipilih ({stagedFiles.length}):</p>
-                {stagedFiles.map((att, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs">
-                    <div className="flex items-center gap-2 truncate min-w-0">
-                      <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
-                      <span className="font-semibold text-gray-800 truncate">{att.nama}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
-                        Diunggah saat simpan
-                      </span>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {stagedFiles.map((staged, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText size={14} className="text-emerald-600 flex-shrink-0" />
+                      <span className="font-semibold text-gray-800 truncate">{staged.nama}</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => removeAttachment(idx)}
-                      className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                      className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg"
                     >
-                      <X size={16} />
+                      <X size={14} />
                     </button>
                   </div>
                 ))}
@@ -565,19 +678,19 @@ export function TransactionForm() {
           </div>
         </Card>
 
-        {/* Submit */}
-        <div className="flex gap-3 justify-end pt-2">
-          <Button type="button" variant="secondary" onClick={handleCancelOrBack}>
+        {/* Submit Bar */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={handleCancelOrBack} disabled={loading}>
             Batal
           </Button>
-          <Button type="submit" variant="primary" loading={loading} icon={<Save size={16} />}>
-            Simpan Transaksi
+          <Button type="submit" variant="primary" disabled={loading} icon={loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}>
+            {loading ? 'Menyimpan &amp; Uploading Drive...' : 'Simpan Transaksi'}
           </Button>
         </div>
       </form>
 
       {/* Category Manager Modal */}
-      <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)} title="Kelola Kategori Custom">
+      <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)} title={`Kelola Kategori (${form.jenis === 'masuk' ? 'Pemasukan' : 'Pengeluaran'})`}>
         <div className="space-y-4">
           <div className="flex gap-2">
             <input
@@ -585,23 +698,16 @@ export function TransactionForm() {
               value={newCatName}
               onChange={e => setNewCatName(e.target.value)}
               placeholder="Nama kategori baru..."
-              className="flex-1 border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 border border-gray-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={handleAddCategory}>
-              Tambah
-            </Button>
+            <Button size="sm" onClick={handleAddCategory}>+ Tambah</Button>
           </div>
 
-          <div className="max-h-60 overflow-y-auto space-y-1.5 pt-2">
-            {categories.map(cat => (
-              <div key={cat} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-medium text-gray-800">
-                <span>{cat}</span>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteCategory(cat)}
-                  className="text-gray-400 hover:text-red-500 p-1 transition-colors"
-                  title="Hapus Kategori"
-                >
+          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+            {categories.map(c => (
+              <div key={c} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl text-xs font-semibold text-gray-700">
+                <span>{c}</span>
+                <button type="button" onClick={() => handleDeleteCategory(c)} className="text-red-500 hover:text-red-700 p-1">
                   <Trash2 size={14} />
                 </button>
               </div>

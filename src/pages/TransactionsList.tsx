@@ -229,7 +229,14 @@ export function TransactionsList() {
                           <p className="text-sm font-bold text-gray-900 leading-snug break-words">
                             {tx.deskripsi}
                           </p>
-                          <p className="text-xs text-gray-500 mt-0.5 font-medium">{tx.kategori}</p>
+                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                            {tx.penerimaDetail && (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[200px]">
+                                🏦 {tx.penerimaDetail}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -284,7 +291,14 @@ export function TransactionsList() {
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
                         <td className="px-4 py-3">
                           <p className="font-bold text-gray-900">{tx.deskripsi}</p>
-                          <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                            {tx.penerimaDetail && (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[220px]">
+                                🏦 {tx.penerimaDetail}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={`font-extrabold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>

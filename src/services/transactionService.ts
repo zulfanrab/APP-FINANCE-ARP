@@ -1,5 +1,7 @@
 // ============================================================
 // ARKA Finance — Transaction Service (LocalStorage + Supabase Sync)
+// Includes: Auto-Split Admin Fee, Parent-Child Relational Sync,
+// Project Allocation Binding & Cascade Delete Handling
 // ============================================================
 
 import { type Transaction, type TransactionStatus, type FilterOptions } from '../types';
@@ -28,6 +30,9 @@ function mapRowToTransaction(row: any): Transaction {
     status: row.status,
     buktiTransfer: row.bukti_transfer ?? undefined,
     catatanPenolakan: row.catatan_penolakan ?? undefined,
+    penerimaDetail: row.penerima_detail ?? undefined,
+    jalurTransfer: row.jalur_transfer ?? undefined,
+    parentTransactionId: row.parent_transaction_id ?? undefined,
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -47,6 +52,9 @@ function mapTransactionToRow(t: Transaction): any {
     status: t.status,
     bukti_transfer: t.buktiTransfer ?? null,
     catatan_penolakan: t.catatanPenolakan ?? null,
+    penerima_detail: t.penerimaDetail ?? null,
+    jalur_transfer: t.jalurTransfer ?? null,
+    parent_transaction_id: t.parentTransactionId ?? null,
     dibuat_pada: t.dibuatPada,
     diupdate_pada: t.diupdatePada,
   };
@@ -101,11 +109,46 @@ export async function addTransaction(
 
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
   transactions.push(newTransaction);
+
+  // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER IS bi_fast OR online_rtgs
+  let adminFeeTx: Transaction | null = null;
+  if (
+    newTransaction.jenis === 'keluar' &&
+    newTransaction.jalurTransfer &&
+    (newTransaction.jalurTransfer === 'bi_fast' || newTransaction.jalurTransfer === 'online_rtgs')
+  ) {
+    const feeNominal = newTransaction.jalurTransfer === 'bi_fast' ? 2500 : 6500;
+    const jalurLabel = newTransaction.jalurTransfer === 'bi_fast' ? 'BI-FAST' : 'Online/RTGS';
+
+    adminFeeTx = {
+      id: generateId(),
+      tanggal: newTransaction.tanggal,
+      jenis: 'keluar',
+      deskripsi: `Biaya Admin Bank (${jalurLabel}) - ${newTransaction.deskripsi}`,
+      nominal: feeNominal,
+      kategori: 'Biaya Admin Bank',
+      tag: newTransaction.tag,
+      proyekId: newTransaction.proyekId, // CRITICAL: Bound to the SAME project allocation!
+      lampiran: [], // Admin fee entry does not require separate attachments
+      status: newTransaction.status,
+      penerimaDetail: newTransaction.penerimaDetail,
+      jalurTransfer: newTransaction.jalurTransfer,
+      parentTransactionId: newTransaction.id, // FK link to main transaction
+      dibuatPada: now(),
+      diupdatePada: now(),
+    };
+    transactions.push(adminFeeTx);
+  }
+
   setItem(KEYS.TRANSACTIONS, transactions);
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('transactions').insert(mapTransactionToRow(newTransaction));
+      const rowsToInsert = [mapTransactionToRow(newTransaction)];
+      if (adminFeeTx) {
+        rowsToInsert.push(mapTransactionToRow(adminFeeTx));
+      }
+      await supabase.from('transactions').insert(rowsToInsert);
     } catch (err) {
       console.warn('Supabase add transaction error:', err);
     }
@@ -132,12 +175,82 @@ export async function updateTransaction(
 
   if (idx !== -1) {
     transactions[idx] = updated;
-    setItem(KEYS.TRANSACTIONS, transactions);
   }
+
+  // CHECK AND SYNC CHILD ADMIN FEE TRANSACTION
+  const childIdx = transactions.findIndex(t => t.parentTransactionId === id);
+  let childToUpdate: Transaction | null = null;
+  let childToDeleteId: string | null = null;
+  let childToCreate: Transaction | null = null;
+
+  const requiresAdminFee =
+    updated.jenis === 'keluar' &&
+    updated.jalurTransfer &&
+    (updated.jalurTransfer === 'bi_fast' || updated.jalurTransfer === 'online_rtgs');
+
+  if (requiresAdminFee) {
+    const feeNominal = updated.jalurTransfer === 'bi_fast' ? 2500 : 6500;
+    const jalurLabel = updated.jalurTransfer === 'bi_fast' ? 'BI-FAST' : 'Online/RTGS';
+
+    if (childIdx !== -1) {
+      // Update existing child entry
+      childToUpdate = {
+        ...transactions[childIdx],
+        tanggal: updated.tanggal,
+        jenis: 'keluar',
+        deskripsi: `Biaya Admin Bank (${jalurLabel}) - ${updated.deskripsi}`,
+        nominal: feeNominal,
+        kategori: 'Biaya Admin Bank',
+        tag: updated.tag,
+        proyekId: updated.proyekId, // CRITICAL: Sync project allocation!
+        penerimaDetail: updated.penerimaDetail,
+        jalurTransfer: updated.jalurTransfer,
+        status: updated.status,
+        diupdatePada: now(),
+      };
+      transactions[childIdx] = childToUpdate;
+    } else {
+      // Create new child entry
+      childToCreate = {
+        id: generateId(),
+        tanggal: updated.tanggal,
+        jenis: 'keluar',
+        deskripsi: `Biaya Admin Bank (${jalurLabel}) - ${updated.deskripsi}`,
+        nominal: feeNominal,
+        kategori: 'Biaya Admin Bank',
+        tag: updated.tag,
+        proyekId: updated.proyekId, // CRITICAL: Same project allocation!
+        lampiran: [],
+        status: updated.status,
+        penerimaDetail: updated.penerimaDetail,
+        jalurTransfer: updated.jalurTransfer,
+        parentTransactionId: updated.id,
+        dibuatPada: now(),
+        diupdatePada: now(),
+      };
+      transactions.push(childToCreate);
+    }
+  } else {
+    // If sesama_bca or jenis === 'masuk', delete any existing child entry
+    if (childIdx !== -1) {
+      childToDeleteId = transactions[childIdx].id;
+      transactions.splice(childIdx, 1);
+    }
+  }
+
+  setItem(KEYS.TRANSACTIONS, transactions);
 
   if (isSupabaseConfigured && supabase) {
     try {
       await supabase.from('transactions').update(mapTransactionToRow(updated)).eq('id', id);
+
+      if (childToUpdate) {
+        await supabase.from('transactions').update(mapTransactionToRow(childToUpdate)).eq('id', childToUpdate.id);
+      } else if (childToCreate) {
+        await supabase.from('transactions').insert(mapTransactionToRow(childToCreate));
+      } else if (childToDeleteId) {
+        await supabase.from('transactions').delete().eq('id', childToDeleteId);
+      }
     } catch (err) {
       console.warn('Supabase update transaction error:', err);
     }
@@ -167,11 +280,12 @@ export async function uploadBuktiTransfer(
 
 export async function deleteTransaction(id: string): Promise<void> {
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
-  const filtered = transactions.filter(t => t.id !== id);
+  const filtered = transactions.filter(t => t.id !== id && t.parentTransactionId !== id);
   setItem(KEYS.TRANSACTIONS, filtered);
 
   if (isSupabaseConfigured && supabase) {
     try {
+      // Supabase ON DELETE CASCADE handles deleting child rows with parent_transaction_id = id
       await supabase.from('transactions').delete().eq('id', id);
     } catch (err) {
       console.warn('Supabase delete transaction error:', err);

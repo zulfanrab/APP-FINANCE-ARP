@@ -17,6 +17,7 @@ export const DEFAULT_INCOME_CATEGORIES = [
 export const DEFAULT_EXPENSE_CATEGORIES = [
   'Biaya Proyek',
   'Bahan & Material',
+  'Biaya Admin Bank',
   'Gaji & Honorarium',
   'Transport & Bensin',
   'Konsumsi & Akomodasi',

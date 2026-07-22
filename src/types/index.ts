@@ -4,6 +4,7 @@
 
 export type TransactionType = 'masuk' | 'keluar';
 export type TransactionTag = 'operasional' | 'pribadi';
+export type JalurTransfer = 'sesama_bca' | 'bi_fast' | 'online_rtgs';
 export type TransactionStatus =
   | 'menunggu_approval'
   | 'disetujui'
@@ -29,6 +30,9 @@ export interface Transaction {
   status: TransactionStatus;
   buktiTransfer?: string; // base64 image
   catatanPenolakan?: string;
+  penerimaDetail?: string; // "[Nama Penerima] - [Nama Bank] [Nomor Rekening]"
+  jalurTransfer?: JalurTransfer; // 'sesama_bca' | 'bi_fast' | 'online_rtgs'
+  parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
   dibuatPada: string; // ISO datetime
   diupdatePada: string; // ISO datetime
 }

@@ -1,24 +1,25 @@
 // ============================================================
 // ARKA Finance — Universal Transaction Detail & Edit Modal
 // Full interactive detail view + inline edit with attachment manager
-// Staged Google Drive uploads (uploads only on Save confirmation)
+// Includes Recipient Autofill, Bank Auto-Detection & Auto-Split Admin Fee
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, Edit3, Trash2, Calendar, FileText, Building2, FolderKanban,
-  CheckCircle2, ArrowUpRight, ArrowDownLeft, Paperclip, Upload, Plus, Save, Loader2, Tag, AlertTriangle
+  CheckCircle2, ArrowUpRight, ArrowDownLeft, Paperclip, Upload, Plus, Save, Loader2, Tag, AlertTriangle, Landmark, Zap
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { AttachmentViewer } from './AttachmentViewer';
-import { type Transaction, type Project } from '../../types';
-import { updateTransaction, deleteTransaction } from '../../services/transactionService';
+import { type Transaction, type Project, type JalurTransfer } from '../../types';
+import { updateTransaction, deleteTransaction, getTransactions } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
 import { uploadAttachmentFile } from '../../services/storageService';
 import { formatRupiah, formatDate, StatusBadge } from './index';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { parseRecipientString, extractHistoricalRecipients } from '../../utils/bankHelper';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -60,6 +61,7 @@ export function TransactionDetailModal({
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
 
   // Edit Form state
   const [editForm, setEditForm] = useState({
@@ -70,6 +72,8 @@ export function TransactionDetailModal({
     kategori: '',
     tag: 'operasional' as 'operasional' | 'pribadi',
     proyekId: '',
+    penerimaDetail: '',
+    jalurTransfer: 'sesama_bca' as JalurTransfer,
   });
 
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
@@ -85,6 +89,8 @@ export function TransactionDetailModal({
         kategori: transaction.kategori,
         tag: transaction.tag || 'operasional',
         proyekId: transaction.proyekId || '',
+        penerimaDetail: transaction.penerimaDetail || '',
+        jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
       });
       setStagedAttachments(
         (transaction.lampiran || []).map(att => ({
@@ -93,18 +99,21 @@ export function TransactionDetailModal({
           dataUrl: att.dataUrl,
         }))
       );
-      getProjects().then(setProjects);
-      getCategories(transaction.jenis).then(setCategories);
+      Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
+        ([projs, cats, txs]) => {
+          setProjects(projs);
+          setCategories(cats);
+          setHistoricalRecipients(extractHistoricalRecipients(txs));
+        }
+      );
     }
   }, [transaction, isOpen]);
 
   if (!transaction) return null;
 
-  const isSuntikan = transaction.deskripsi.startsWith('Suntikan Modal Proyek:');
-  const isKasUtama = !transaction.proyekId || isSuntikan;
   const projectObj = projects.find(p => p.id === transaction.proyekId);
+  const isKasUtama = !transaction.proyekId;
 
-  // Staged local file selection (NO INSTANT DRIVE UPLOAD)
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -124,16 +133,14 @@ export function TransactionDetailModal({
       };
       reader.readAsDataURL(file);
     });
-
-    addToast('info', `${files.length} berkas dipilih. Klik "Simpan Perubahan" untuk mengunggah ke Google Drive.`);
+    addToast('info', `${files.length} foto dipilih (diunggah ke Drive saat Anda klik Simpan).`);
   };
 
   const handleRemoveStagedAttachment = (idx: number) => {
     setStagedAttachments(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // Submit edits
-  const handleSaveEdit = async () => {
+  const handleSave = async () => {
     const nominal = parseRupiahInput(editForm.nominalStr);
     if (!nominal || nominal <= 0) {
       addToast('error', 'Nominal harus lebih dari 0');
@@ -173,6 +180,8 @@ export function TransactionDetailModal({
         tag: editForm.jenis === 'keluar' ? editForm.tag : undefined,
         proyekId: editForm.proyekId || undefined,
         lampiran: finalAttachments,
+        penerimaDetail: editForm.jenis === 'keluar' ? (editForm.penerimaDetail.trim() || undefined) : undefined,
+        jalurTransfer: editForm.jenis === 'keluar' ? editForm.jalurTransfer : undefined,
       });
 
       addToast('success', 'Transaksi berhasil diperbarui!');
@@ -251,6 +260,33 @@ export function TransactionDetailModal({
               </div>
             )}
 
+            {/* Recipient Details & Transfer Channel */}
+            {transaction.penerimaDetail && (
+              <div className="p-3.5 bg-emerald-50/80 border border-emerald-200/90 rounded-2xl space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                    <Landmark size={12} /> Penerima / Tujuan Transfer
+                  </span>
+                  {transaction.jalurTransfer && (
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ Sesama BCA' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : '⚡ Online/RTGS (Rp 6.500)'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-extrabold text-slate-900">{transaction.penerimaDetail}</p>
+              </div>
+            )}
+
+            {/* Parent Relational Link Badge (If this transaction is an Admin Fee Child Entry) */}
+            {transaction.parentTransactionId && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 font-medium flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold">
+                  <Zap size={14} className="text-blue-600" /> Entri Biaya Admin Bank (Terikat ke Transaksi Utama)
+                </span>
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 bg-blue-200 text-blue-900 rounded-full">Auto-Split</span>
+              </div>
+            )}
+
             {/* Description Card */}
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Deskripsi / Keterangan</h4>
@@ -324,7 +360,7 @@ export function TransactionDetailModal({
           /* ================= EDIT MODE ================= */
           <div className="space-y-4 animate-fade-in">
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 font-medium">
-              ✏️ Anda sedang mengubah data transaksi. Semua perubahan termasuk lampiran akan diperbarui secara real-time.
+              ✏️ Anda sedang mengubah data transaksi. Perubahan alokasi proyek atau jalur transfer akan secara otomatis menyelaraskan entri biaya admin bank terkait.
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -382,6 +418,97 @@ export function TransactionDetailModal({
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium bg-white"
                 />
               </div>
+
+              {/* Penerima Detail in Edit Mode */}
+              {editForm.jenis === 'keluar' && (
+                <div className="sm:col-span-2 space-y-2">
+                  <label className="block text-xs font-semibold text-gray-700">
+                    Penerima / Tujuan Transfer (Format: [Nama] - [Bank] [Nomor Rekening])
+                  </label>
+                  <input
+                    type="text"
+                    list="modal-historical-recipients-datalist"
+                    value={editForm.penerimaDetail}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setEditForm(f => ({ ...f, penerimaDetail: val }));
+                      if (val.trim()) {
+                        const detected = parseRecipientString(val);
+                        setEditForm(f => ({ ...f, jalurTransfer: detected.suggestedJalur }));
+                      }
+                    }}
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium bg-white"
+                    placeholder="Contoh: PT Santika - BCA 0123456789..."
+                  />
+                  <datalist id="modal-historical-recipients-datalist">
+                    {historicalRecipients.map((rec, i) => (
+                      <option key={i} value={rec} />
+                    ))}
+                  </datalist>
+
+                  {editForm.penerimaDetail.trim() !== '' && (() => {
+                    const detected = parseRecipientString(editForm.penerimaDetail);
+                    return (
+                      <div className="p-2 bg-slate-900 text-white rounded-xl text-[11px] flex items-center justify-between gap-2 shadow-sm">
+                        <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detected.bankName}</span>
+                        <span className="text-[10px] text-slate-300">
+                          Jalur: {detected.isBca ? 'Sesama BCA' : 'BI-FAST (Rp 2.500)'}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Jalur Transfer in Edit Mode */}
+              {editForm.jenis === 'keluar' && (
+                <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-2">
+                  <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'sesama_bca' }))}
+                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                        editForm.jalurTransfer === 'sesama_bca'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      Sesama BCA (Rp 0)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'bi_fast' }))}
+                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                        editForm.jalurTransfer === 'bi_fast'
+                          ? 'border-blue-500 bg-blue-50 text-blue-900 ring-2 ring-blue-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      BI-FAST (Rp 2.500)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'online_rtgs' }))}
+                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                        editForm.jalurTransfer === 'online_rtgs'
+                          ? 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      Online (Rp 6.500)
+                    </button>
+                  </div>
+
+                  {editForm.jalurTransfer !== 'sesama_bca' && (
+                    <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 font-medium leading-tight">
+                      ℹ️ Entri biaya admin bank ({editForm.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'}) akan otomatis disesuaikan dan <strong>tetap terikat ke alokasi proyek yang sama</strong>.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Kategori */}
               <div>
@@ -458,17 +585,18 @@ export function TransactionDetailModal({
                 type="button"
                 onClick={() => setIsEditing(false)}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold"
+                disabled={saving}
               >
-                Batal Edit
+                Batal
               </button>
               <button
                 type="button"
-                onClick={handleSaveEdit}
+                onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md"
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                <span>Simpan Perubahan</span>
+                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </div>
           </div>
