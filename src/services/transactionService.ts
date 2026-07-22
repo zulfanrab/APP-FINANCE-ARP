@@ -7,6 +7,7 @@
 import { type Transaction, type TransactionStatus, type FilterOptions } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { getProjects, addProject } from './projectService';
 
 function generateId(): string {
   return `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -132,11 +133,59 @@ export async function getTransactionsByProject(proyekId: string): Promise<Transa
     .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
 }
 
+export async function ensurePosOperasionalForDivisi(
+  divisi: 'admin' | 'ahli' | 'it' | 'umum',
+  nominal: number,
+  tanggal: string
+): Promise<string> {
+  const labelMap: Record<string, string> = {
+    it: 'Operasional Divisi IT',
+    admin: 'Operasional Divisi Admin',
+    ahli: 'Operasional Divisi Ahli',
+    umum: 'Operasional Kantor Umum',
+  };
+
+  const targetNama = labelMap[divisi] || 'Operasional Kantor';
+
+  const projects = await getProjects();
+  const existing = projects.find(
+    p => p.tipe === 'operasional_kantor' && (p.nama === targetNama || p.nama.toLowerCase().includes(divisi.toLowerCase()))
+  );
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Auto-create Pos Operasional for this Division on the fly!
+  const created = await addProject({
+    nama: targetNama,
+    klien: 'Internal Kantor',
+    tipe: 'operasional_kantor',
+    anggaran: nominal,
+    tanggalMulai: tanggal || new Date().toISOString().split('T')[0],
+    deskripsi: `Pos Operasional Kantor untuk ${targetNama}`,
+  });
+
+  return created.id;
+}
+
 export async function addTransaction(
   data: Omit<Transaction, 'id' | 'status' | 'dibuatPada' | 'diupdatePada'> & { status?: TransactionStatus }
 ): Promise<Transaction> {
+  let proyekIdFinal = data.proyekId;
+
+  // AUTO-ASSIGN / AUTO-CREATE POS OPERASIONAL IF DIVISI IS SELECTED WITHOUT PROYEK_ID
+  if (!proyekIdFinal && data.divisi) {
+    try {
+      proyekIdFinal = await ensurePosOperasionalForDivisi(data.divisi, data.nominal, data.tanggal);
+    } catch (err) {
+      console.warn('Auto-create Pos Operasional error:', err);
+    }
+  }
+
   const newTransaction: Transaction = {
     ...data,
+    proyekId: proyekIdFinal,
     id: generateId(),
     status: data.status ?? 'menunggu_approval',
     dibuatPada: now(),
