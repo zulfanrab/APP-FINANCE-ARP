@@ -18,6 +18,7 @@ import {
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { UserGuideModal } from '../ui/UserGuideModal';
+import { isSupabaseConfigured } from '../../services/supabase';
 
 interface NavItem {
   to: string;
@@ -107,6 +108,16 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Cloud Sync Status Indicator */}
+      {!collapsed && (
+        <div className="px-3 py-1.5 mx-3 mb-2 bg-white/5 rounded-xl border border-white/10 flex items-center gap-2 text-[11px]">
+          <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span className="text-white/80 font-medium">
+            {isSupabaseConfigured ? 'Cloud Sync Active' : 'Mode Lokal'}
+          </span>
+        </div>
+      )}
 
       {/* Bottom: guide + collapse toggle + logout */}
       <div className="px-2 py-3 border-t border-white/10 space-y-1">

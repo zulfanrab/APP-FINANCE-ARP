@@ -7,6 +7,7 @@ import { LogOut, BookOpen } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { UserGuideModal } from '../ui/UserGuideModal';
+import { isSupabaseConfigured } from '../../services/supabase';
 
 export function MobileHeader() {
   const { role, logout } = useAuth();
@@ -23,9 +24,12 @@ export function MobileHeader() {
           <h1 className="font-bold text-base leading-tight tracking-tight flex items-center gap-1.5">
             ARKA Finance
           </h1>
-          <p className="text-[10px] text-emerald-400 font-medium leading-none mt-0.5">
-            PT Aksara Riksa Perdana
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-[10px] text-emerald-400 font-medium leading-none">
+              {isSupabaseConfigured ? 'Cloud Sync Active' : 'Mode Lokal'}
+            </span>
+          </div>
         </div>
       </div>
 

@@ -190,9 +190,11 @@ export async function addTransaction(
       const { error } = await supabase.from('transactions').insert(rowsToInsert);
       if (error) {
         console.error('Supabase add transaction error:', error);
+        throw new Error(`Gagal Sinkronisasi Cloud (Supabase Error: ${error.message})`);
       }
-    } catch (err) {
-      console.warn('Supabase add transaction error:', err);
+    } catch (err: any) {
+      console.error('Supabase add transaction error:', err);
+      throw err;
     }
   }
 
@@ -304,7 +306,8 @@ export async function updateTransaction(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('transactions').update(mapTransactionToRow(updated)).eq('id', id);
+      const { error } = await supabase.from('transactions').update(mapTransactionToRow(updated)).eq('id', id);
+      if (error) throw new Error(`Supabase update error: ${error.message}`);
 
       if (childToUpdate) {
         await supabase.from('transactions').update(mapTransactionToRow(childToUpdate)).eq('id', childToUpdate.id);
@@ -313,8 +316,9 @@ export async function updateTransaction(
       } else if (childToDeleteId) {
         await supabase.from('transactions').delete().eq('id', childToDeleteId);
       }
-    } catch (err) {
-      console.warn('Supabase update transaction error:', err);
+    } catch (err: any) {
+      console.error('Supabase update transaction error:', err);
+      throw err;
     }
   }
 
@@ -347,10 +351,11 @@ export async function deleteTransaction(id: string): Promise<void> {
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // Supabase ON DELETE CASCADE handles deleting child rows with parent_transaction_id = id
-      await supabase.from('transactions').delete().eq('id', id);
-    } catch (err) {
-      console.warn('Supabase delete transaction error:', err);
+      const { error } = await supabase.from('transactions').delete().eq('id', id);
+      if (error) throw new Error(`Supabase delete error: ${error.message}`);
+    } catch (err: any) {
+      console.error('Supabase delete transaction error:', err);
+      throw err;
     }
   }
 }
