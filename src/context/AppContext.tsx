@@ -7,9 +7,11 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useEffect,
   type ReactNode,
 } from 'react';
 import { type ToastMessage } from '../types';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 interface AppContextType {
   toasts: ToastMessage[];
@@ -42,6 +44,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const triggerRefresh = useCallback(() => {
     setRefreshKey(k => k + 1);
   }, []);
+
+  // 1. REALTIME CROSS-DEVICE SYNC WITH SUPABASE REALTIME CHANNEL
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const channel = supabase
+      .channel('arka-cross-device-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        (payload) => {
+          console.info('⚡ Realtime Supabase event received for transactions:', payload.eventType);
+          triggerRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projects' },
+        (payload) => {
+          console.info('⚡ Realtime Supabase event received for projects:', payload.eventType);
+          triggerRefresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, [triggerRefresh]);
+
+  // 2. AUTO-REFETCH WHEN SWITCHING TABS OR UNLOCKING HP SCREEN
+  useEffect(() => {
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        triggerRefresh();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+    };
+  }, [triggerRefresh]);
 
   return (
     <AppContext.Provider

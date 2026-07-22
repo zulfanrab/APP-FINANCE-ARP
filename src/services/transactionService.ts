@@ -81,14 +81,19 @@ export async function getTransactions(): Promise<Transaction[]> {
         const remoteTxs = data.map(mapRowToTransaction);
         const remoteIds = new Set(remoteTxs.map(t => t.id));
 
-        // Smart Merge: Keep any local transactions that haven't synced to Supabase yet
-        const unsyncedLocal = localData.filter(t => !remoteIds.has(t.id));
+        // Only keep local transactions that were explicitly created offline and never synced to Supabase
+        const unsyncedLocal = localData.filter(
+          t => !remoteIds.has(t.id) && (t as any).isLocalUnsynced === true
+        );
 
         if (unsyncedLocal.length > 0) {
           console.info(`Found ${unsyncedLocal.length} unsynced local transactions. Resyncing to Supabase...`);
           const rowsToInsert = unsyncedLocal.map(mapTransactionToRow);
           supabase.from('transactions').insert(rowsToInsert).then(({ error: syncErr }) => {
-            if (syncErr) console.warn('Resync unsynced transactions error:', syncErr);
+            if (!syncErr) {
+              unsyncedLocal.forEach(ut => delete (ut as any).isLocalUnsynced);
+              setItem(KEYS.TRANSACTIONS, [...remoteTxs, ...unsyncedLocal]);
+            }
           });
         }
 
