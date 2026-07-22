@@ -218,8 +218,8 @@ export function TransactionsList() {
                     </div>
 
                     {/* Middle Row: Description & Nominal */}
-                    <div className="flex items-start justify-between gap-3 pt-1">
-                      <div className="flex items-start gap-2.5 flex-1">
+                    <div className="flex items-start justify-between gap-2 pt-1 min-w-0">
+                      <div className="flex items-start gap-2 flex-1 min-w-0 overflow-hidden">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                         }`}>
@@ -229,10 +229,10 @@ export function TransactionsList() {
                           <p className="text-sm font-bold text-gray-900 leading-snug break-words">
                             {tx.deskripsi}
                           </p>
-                          <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5 min-w-0 max-w-full">
+                            <p className="text-xs text-gray-500 font-medium whitespace-nowrap">{tx.kategori}</p>
                             {tx.penerimaDetail && (
-                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[200px]">
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-full">
                                 🏦 {tx.penerimaDetail}
                               </span>
                             )}
@@ -240,11 +240,11 @@ export function TransactionsList() {
                         </div>
                       </div>
 
-                      <div className="text-right flex-shrink-0 flex items-center gap-1">
-                        <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <div className="text-right flex-shrink-0 flex items-center gap-1 min-w-max ml-1">
+                        <p className={`font-extrabold text-xs sm:text-sm md:text-base whitespace-nowrap tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                           {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                         </p>
-                        <ChevronRight size={16} className="text-gray-400 ml-1" />
+                        <ChevronRight size={16} className="text-gray-400 ml-0.5 flex-shrink-0" />
                       </div>
                     </div>
                   </div>
@@ -290,18 +290,18 @@ export function TransactionsList() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
                         <td className="px-4 py-3">
-                          <p className="font-bold text-gray-900">{tx.deskripsi}</p>
+                          <p className="font-bold text-gray-900 break-words">{tx.deskripsi}</p>
                           <div className="flex items-center gap-2 flex-wrap mt-0.5">
                             <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
                             {tx.penerimaDetail && (
-                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[220px]">
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[280px]">
                                 🏦 {tx.penerimaDetail}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`font-extrabold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <span className={`font-extrabold tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                             {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                           </span>
                         </td>

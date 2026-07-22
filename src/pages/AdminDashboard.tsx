@@ -28,14 +28,14 @@ function SummaryCard({ label, value, icon, color, sub }: {
   label: string; value: string; icon: React.ReactNode; color: string; sub?: string;
 }) {
   return (
-    <Card className="flex items-start gap-4">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${color}`}>
+    <Card className="flex items-start gap-3.5 p-4 sm:p-5 min-w-0">
+      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${color}`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-sm text-gray-500 mb-0.5">{label}</p>
-        <p className="text-xl font-bold text-gray-800 truncate">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <p className="text-xs sm:text-sm text-gray-500 font-medium mb-0.5 truncate">{label}</p>
+        <p className="text-base sm:text-lg lg:text-xl font-extrabold text-gray-900 truncate tabular-nums tracking-tight">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate font-medium">{sub}</p>}
       </div>
     </Card>
   );
@@ -270,18 +270,18 @@ export function AdminDashboard() {
                         <StatusBadge status={tx.status} />
                       </div>
 
-                      <div className="flex items-start justify-between gap-3 pt-1">
-                        <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 pt-1 min-w-0">
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <p className="text-sm font-bold text-gray-900 leading-snug break-words">
                             {tx.deskripsi}
                           </p>
                           <p className="text-xs text-gray-500 font-medium mt-0.5">{tx.kategori}</p>
                         </div>
-                        <div className="text-right flex-shrink-0 flex items-center gap-1">
-                          <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <div className="text-right flex-shrink-0 flex items-center gap-1 min-w-max ml-1">
+                          <p className={`font-extrabold text-xs sm:text-sm md:text-base whitespace-nowrap tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                             {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                           </p>
-                          <ChevronRight size={16} className="text-gray-400" />
+                          <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
                         </div>
                       </div>
                     </div>

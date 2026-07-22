@@ -340,26 +340,26 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
         <div className="p-5 space-y-5">
           {/* Summary Cards Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl">
-              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Modal Disuntikkan</p>
-              <p className="text-lg font-extrabold text-emerald-800">{formatRupiah(financials.modalDisuntikkan)}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Modal Disuntikkan</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-emerald-800 truncate tabular-nums">{formatRupiah(financials.modalDisuntikkan)}</p>
             </div>
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl">
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Total Pengeluaran</p>
-              <p className="text-lg font-extrabold text-red-700">{formatRupiah(financials.totalPengeluaran)}</p>
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1 truncate">Total Pengeluaran</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-red-700 truncate tabular-nums">{formatRupiah(financials.totalPengeluaran)}</p>
             </div>
-            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl">
-              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Refund Masuk</p>
-              <p className="text-lg font-extrabold text-blue-700">+{formatRupiah(financials.totalRefundMasuk)}</p>
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Refund Masuk</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-blue-700 truncate tabular-nums">+{formatRupiah(financials.totalRefundMasuk)}</p>
             </div>
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl">
-              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Realisasi Bersih</p>
-              <p className="text-lg font-extrabold text-amber-800">{formatRupiah(financials.realisasiBersih)}</p>
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1 truncate">Realisasi Bersih</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-amber-800 truncate tabular-nums">{formatRupiah(financials.realisasiBersih)}</p>
             </div>
-            <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl col-span-2 lg:col-span-1">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">Sisa Dana Proyek</p>
-              <p className={`text-lg font-extrabold ${financials.sisaDanaProyek >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl col-span-2 sm:col-span-1 lg:col-span-1 min-w-0">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 truncate">Sisa Dana Proyek</p>
+              <p className={`text-sm sm:text-base lg:text-lg font-extrabold truncate tabular-nums ${financials.sisaDanaProyek >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatRupiah(financials.sisaDanaProyek)}
               </p>
             </div>

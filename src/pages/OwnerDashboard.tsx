@@ -29,14 +29,14 @@ function SummaryCard({ label, value, icon, color, sub }: {
   label: string; value: string; icon: React.ReactNode; color: string; sub?: string;
 }) {
   return (
-    <Card className="flex items-start gap-4">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${color}`}>
+    <Card className="flex items-start gap-3.5 p-4 sm:p-5 min-w-0">
+      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${color}`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-sm text-gray-500 mb-0.5">{label}</p>
-        <p className="text-xl font-bold text-gray-800 truncate">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <p className="text-xs sm:text-sm text-gray-500 font-medium mb-0.5 truncate">{label}</p>
+        <p className="text-base sm:text-lg lg:text-xl font-extrabold text-gray-900 truncate tabular-nums tracking-tight">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate font-medium">{sub}</p>}
       </div>
     </Card>
   );

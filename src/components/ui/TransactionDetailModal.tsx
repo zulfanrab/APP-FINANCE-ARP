@@ -238,16 +238,16 @@ export function TransactionDetailModal({
                 <StatusBadge status={transaction.status} />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-slate-400 mb-0.5">Nominal Transaksi</p>
-                <p className={`text-3xl font-extrabold ${transaction.jenis === 'masuk' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <p className={`text-2xl sm:text-3xl font-extrabold truncate tabular-nums tracking-tight ${transaction.jenis === 'masuk' ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {transaction.jenis === 'masuk' ? '+' : '-'}{formatRupiah(transaction.nominal)}
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
-                <span>Tanggal: <strong className="text-white">{formatDate(transaction.tanggal)}</strong></span>
-                <span>Kategori: <strong className="text-emerald-300">{transaction.kategori}</strong></span>
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 gap-2 flex-wrap min-w-0">
+                <span className="truncate">Tanggal: <strong className="text-white">{formatDate(transaction.tanggal)}</strong></span>
+                <span className="truncate">Kategori: <strong className="text-emerald-300">{transaction.kategori}</strong></span>
               </div>
             </div>
 
@@ -258,7 +258,7 @@ export function TransactionDetailModal({
                   <AlertTriangle size={15} />
                   <span>Komentar / Alasan Penolakan dari Pak Fatwa (Owner):</span>
                 </div>
-                <p className="font-semibold text-slate-800 bg-white p-3 rounded-xl border border-red-200 italic leading-relaxed">
+                <p className="font-semibold text-slate-800 bg-white p-3 rounded-xl border border-red-200 italic leading-relaxed break-words">
                   "{transaction.catatanPenolakan}"
                 </p>
               </div>
@@ -266,18 +266,18 @@ export function TransactionDetailModal({
 
             {/* Recipient Details & Transfer Channel */}
             {transaction.penerimaDetail && (
-              <div className="p-3.5 bg-emerald-50/80 border border-emerald-200/90 rounded-2xl space-y-1 text-xs">
-                <div className="flex items-center justify-between">
+              <div className="p-3.5 bg-emerald-50/80 border border-emerald-200/90 rounded-2xl space-y-1 text-xs min-w-0">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
                     <Landmark size={12} /> Penerima / Tujuan Transfer
                   </span>
                   {transaction.jalurTransfer && (
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 truncate max-w-full">
                       {transaction.jalurTransfer === 'sesama_bca' ? '⚡ BCA/QRIS/VA (Rp0)' : transaction.jalurTransfer === 'ewallet' ? '⚡ Top Up E-Wallet (Rp 1.000)' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : transaction.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Custom Admin'}
                     </span>
                   )}
                 </div>
-                <p className="text-sm font-extrabold text-slate-900">{transaction.penerimaDetail}</p>
+                <p className="text-sm font-extrabold text-slate-900 break-words">{transaction.penerimaDetail}</p>
               </div>
             )}
 
