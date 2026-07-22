@@ -59,10 +59,13 @@ export interface Session {
 }
 
 export interface DashboardSummary {
-  sisaKas: number;
-  totalPemasukanBulanIni: number;
-  totalPengeluaranOperasionalBulanIni: number;
-  totalPribadiOwnerBulanIni: number;
+  sisaKasTotal: number; // Total Kas Perusahaan (Kas Utama + Kas Proyek)
+  sisaKasUtama: number; // Kas Utama Perusahaan
+  totalKasProyek: number; // Total Kas di Seluruh Proyek
+  sisaKas?: number; // Legacy compatibility
+  totalPemasukanBulanIni: number; // Omzet Riil (Non-Mutasi)
+  totalPengeluaranOperasionalBulanIni: number; // Beban Operasional Riil
+  totalPribadiOwnerBulanIni: number; // Prive Owner
   proyekAktif: number;
 }
 

@@ -380,22 +380,28 @@ export function PdfReportModal({
 
             {/* EXECUTIVE FINANCIAL SUMMARY */}
             {project ? (
-              <div className="summary-box bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center my-4">
+              <div className="summary-box bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center my-4">
                 <div>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Modal Disuntikkan</span>
-                  <p className="summary-val text-sm font-black text-slate-900">{formatRupiah(modalAwal)}</p>
+                  <p className="summary-val text-sm font-black text-purple-800">{formatRupiah(modalAwal)}</p>
                 </div>
                 <div>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Total Belanja Lapangan</span>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Invoice Klien</span>
+                  <p className="summary-val val-masuk text-sm font-black text-blue-700">{formatRupiah(totalDebet > modalAwal ? totalDebet - modalAwal : 0)}</p>
+                </div>
+                <div>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Pengeluaran Riil</span>
                   <p className="summary-val val-keluar text-sm font-black text-red-700">{formatRupiah(totalKredit)}</p>
                 </div>
                 <div>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Total Refund Masuk</span>
-                  <p className="summary-val val-masuk text-sm font-black text-emerald-700">{formatRupiah(totalDebet - modalAwal)}</p>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Laba - Rugi (P&L)</span>
+                  <p className={`summary-val text-sm font-black ${((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {formatRupiah((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit)}
+                  </p>
                 </div>
                 <div>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Sisa Dana Proyek</span>
-                  <p className={`summary-val val-net text-sm font-black ${sisaDana >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Saldo Kas Proyek</span>
+                  <p className={`summary-val val-net text-sm font-black ${sisaDana >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatRupiah(sisaDana)}
                   </p>
                 </div>

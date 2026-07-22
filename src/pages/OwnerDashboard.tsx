@@ -384,11 +384,11 @@ export function OwnerDashboard() {
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <SummaryCard
-            label="Sisa Kas"
-            value={formatRupiah(summary.sisaKas)}
+            label="Total Kas Perusahaan"
+            value={formatRupiah(summary.sisaKasTotal)}
             icon={<Wallet size={22} className="text-white" />}
             color="gradient-primary"
-            sub="Total saldo semua transaksi selesai"
+            sub={`Utama: ${formatRupiah(summary.sisaKasUtama)} · Proyek: ${formatRupiah(summary.totalKasProyek)}`}
           />
           <SummaryCard
             label="Pemasukan Bulan Ini"

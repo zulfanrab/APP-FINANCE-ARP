@@ -339,29 +339,45 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Summary Cards Row */}
+          {/* Summary Cards Row — P&L vs Cash Flow */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Modal Disuntikkan</p>
-              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-emerald-800 truncate tabular-nums">{formatRupiah(financials.modalDisuntikkan)}</p>
-            </div>
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1 truncate">Total Pengeluaran</p>
-              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-red-700 truncate tabular-nums">{formatRupiah(financials.totalPengeluaran)}</p>
-            </div>
-            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Refund Masuk</p>
-              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-blue-700 truncate tabular-nums">+{formatRupiah(financials.totalRefundMasuk)}</p>
-            </div>
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1 truncate">Realisasi Bersih</p>
-              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-amber-800 truncate tabular-nums">{formatRupiah(financials.realisasiBersih)}</p>
-            </div>
-            <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl col-span-2 sm:col-span-1 lg:col-span-1 min-w-0">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 truncate">Sisa Dana Proyek</p>
+            {/* 1. Saldo Kas Proyek Saat Ini */}
+            <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl min-w-0 shadow-sm">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 truncate">Sisa Saldo Kas Proyek</p>
               <p className={`text-sm sm:text-base lg:text-lg font-extrabold truncate tabular-nums ${financials.sisaDanaProyek >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatRupiah(financials.sisaDanaProyek)}
               </p>
+              <p className="text-[10px] text-slate-400 truncate mt-0.5">Arus Kas / Likuiditas</p>
+            </div>
+
+            {/* 2. Laba - Rugi Proyek (P&L) */}
+            <div className="p-3.5 bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/40 rounded-2xl min-w-0 shadow-sm">
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Laba - Rugi Proyek (P&L)</p>
+              <p className={`text-sm sm:text-base lg:text-lg font-extrabold truncate tabular-nums ${financials.labaRugiProyek >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                {financials.labaRugiProyek >= 0 ? '+' : ''}{formatRupiah(financials.labaRugiProyek)}
+              </p>
+              <p className="text-[10px] text-emerald-700 truncate mt-0.5">Omzet Klien - Pengeluaran</p>
+            </div>
+
+            {/* 3. Pendapatan Riil Klien */}
+            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Invoice / Termin Klien</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-blue-700 truncate tabular-nums">+{formatRupiah(financials.pemasukanKlien)}</p>
+              <p className="text-[10px] text-blue-600 truncate mt-0.5">Omzet Riil Klien</p>
+            </div>
+
+            {/* 4. Modal Disuntikkan (Transfer Internal) */}
+            <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1 truncate">Modal Disuntikkan</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-purple-800 truncate tabular-nums">{formatRupiah(financials.modalDisuntikkan)}</p>
+              <p className="text-[10px] text-purple-600 truncate mt-0.5">Transfer Internal</p>
+            </div>
+
+            {/* 5. Total Pengeluaran Riil */}
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl min-w-0">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1 truncate">Total Pengeluaran</p>
+              <p className="text-sm sm:text-base lg:text-lg font-extrabold text-red-700 truncate tabular-nums">{formatRupiah(financials.totalPengeluaran)}</p>
+              <p className="text-[10px] text-red-600 truncate mt-0.5">Beban Lapangan & Material</p>
             </div>
           </div>
 

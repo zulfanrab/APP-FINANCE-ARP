@@ -10,6 +10,8 @@ export const DEFAULT_INCOME_CATEGORIES = [
   'DP / Termijn Proyek',
   'Pelunasan Proyek',
   'Setoran Modal Owner',
+  'Refund Sisa Dana Proyek ke Kas Utama',
+  'Mutasi Internal / Transfer Kas',
   'Pengembalian Dana (Refund)',
   'Pemasukan Lainnya',
 ];
@@ -23,6 +25,8 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'Konsumsi & Akomodasi',
   'Peralatan & Sewa Alat',
   'Operasional Kantor',
+  'Suntikan Modal Proyek',
+  'Mutasi Internal / Transfer Kas',
   'Prive Owner',
   'Pengeluaran Lainnya',
 ];
