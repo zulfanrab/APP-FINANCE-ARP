@@ -112,28 +112,29 @@ export async function addTransaction(
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
   transactions.push(newTransaction);
 
-  // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER IS bi_fast, online_rtgs, OR virtual_account
+  // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER REQUIRES FEE
   let adminFeeTx: Transaction | null = null;
   if (
     newTransaction.jenis === 'keluar' &&
     newTransaction.jalurTransfer &&
-    (newTransaction.jalurTransfer === 'bi_fast' ||
-     newTransaction.jalurTransfer === 'online_rtgs' ||
-     newTransaction.jalurTransfer === 'virtual_account')
+    newTransaction.jalurTransfer !== 'sesama_bca'
   ) {
     let feeNominal = 0;
     let jalurLabel = '';
-    if (newTransaction.jalurTransfer === 'bi_fast') {
+    if (newTransaction.jalurTransfer === 'ewallet') {
+      feeNominal = 1000;
+      jalurLabel = 'Top Up E-Wallet';
+    } else if (newTransaction.jalurTransfer === 'bi_fast') {
       feeNominal = 2500;
       jalurLabel = 'BI-FAST';
     } else if (newTransaction.jalurTransfer === 'online_rtgs') {
       feeNominal = 6500;
       jalurLabel = 'Online/RTGS';
-    } else if (newTransaction.jalurTransfer === 'virtual_account') {
+    } else if (newTransaction.jalurTransfer === 'custom') {
       feeNominal = newTransaction.adminNominalCustom && newTransaction.adminNominalCustom >= 0
         ? newTransaction.adminNominalCustom
-        : 1000;
-      jalurLabel = 'Virtual Account';
+        : 0;
+      jalurLabel = 'Admin Custom';
     }
 
     if (feeNominal > 0) {
@@ -204,24 +205,25 @@ export async function updateTransaction(
   const requiresAdminFee =
     updated.jenis === 'keluar' &&
     updated.jalurTransfer &&
-    (updated.jalurTransfer === 'bi_fast' ||
-     updated.jalurTransfer === 'online_rtgs' ||
-     updated.jalurTransfer === 'virtual_account');
+    updated.jalurTransfer !== 'sesama_bca';
 
   if (requiresAdminFee) {
     let feeNominal = 0;
     let jalurLabel = '';
-    if (updated.jalurTransfer === 'bi_fast') {
+    if (updated.jalurTransfer === 'ewallet') {
+      feeNominal = 1000;
+      jalurLabel = 'Top Up E-Wallet';
+    } else if (updated.jalurTransfer === 'bi_fast') {
       feeNominal = 2500;
       jalurLabel = 'BI-FAST';
     } else if (updated.jalurTransfer === 'online_rtgs') {
       feeNominal = 6500;
       jalurLabel = 'Online/RTGS';
-    } else if (updated.jalurTransfer === 'virtual_account') {
+    } else if (updated.jalurTransfer === 'custom') {
       feeNominal = updated.adminNominalCustom && updated.adminNominalCustom >= 0
         ? updated.adminNominalCustom
-        : 1000;
-      jalurLabel = 'Virtual Account';
+        : 0;
+      jalurLabel = 'Admin Custom';
     }
 
     if (feeNominal > 0) {

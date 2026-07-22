@@ -4,7 +4,7 @@
 
 export type TransactionType = 'masuk' | 'keluar';
 export type TransactionTag = 'operasional' | 'pribadi';
-export type JalurTransfer = 'sesama_bca' | 'bi_fast' | 'online_rtgs' | 'virtual_account';
+export type JalurTransfer = 'sesama_bca' | 'ewallet' | 'bi_fast' | 'online_rtgs' | 'custom';
 export type TransactionStatus =
   | 'menunggu_approval'
   | 'disetujui'
@@ -31,8 +31,8 @@ export interface Transaction {
   buktiTransfer?: string; // base64 image
   catatanPenolakan?: string;
   penerimaDetail?: string; // "[Nama Penerima] - [Nama Bank] [Nomor Rekening]"
-  jalurTransfer?: JalurTransfer; // 'sesama_bca' | 'bi_fast' | 'online_rtgs' | 'virtual_account'
-  adminNominalCustom?: number; // Nominal admin custom untuk Virtual Account
+  jalurTransfer?: JalurTransfer; // 'sesama_bca' | 'ewallet' | 'bi_fast' | 'online_rtgs' | 'custom'
+  adminNominalCustom?: number; // Nominal admin custom untuk pilihan 'custom'
   parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
   dibuatPada: string; // ISO datetime
   diupdatePada: string; // ISO datetime

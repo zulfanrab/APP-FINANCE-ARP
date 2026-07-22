@@ -247,7 +247,7 @@ export function TransactionForm() {
         status: autoApprove ? 'disetujui' : 'menunggu_approval',
         penerimaDetail: form.jenis === 'keluar' ? (form.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
-        adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'virtual_account' ? adminNominalCustom : undefined,
+        adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -411,7 +411,13 @@ export function TransactionForm() {
                         )}
                       </div>
                       <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
-                        Jalur Disarankan: {detected.suggestedJalur === 'sesama_bca' ? (detected.isQrisOrEwallet ? 'QRIS / Tanpa Admin (Rp0)' : 'Sesama BCA (Rp0)') : 'BI-FAST (Rp2.500)'}
+                        Jalur Disarankan: {
+                          detected.suggestedJalur === 'sesama_bca'
+                            ? (detected.isQrisOrVa ? 'QRIS/VA (Rp0)' : 'Sesama BCA (Rp0)')
+                            : detected.suggestedJalur === 'ewallet'
+                            ? 'Top Up E-Wallet (Rp1.000)'
+                            : 'BI-FAST (Rp2.500)'
+                        }
                       </span>
                     </div>
                   );
@@ -419,81 +425,102 @@ export function TransactionForm() {
               </div>
             )}
 
-            {/* Jalur Transfer & Admin Fee Auto-Split */}
+            {/* Jalur Transfer & Admin Fee Auto-Split (5-Point Classification) */}
             {form.jenis === 'keluar' && (
               <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-3">
                 <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank *</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {/* 1. BCA / QRIS / VA */}
                   <button
                     type="button"
                     onClick={() => setField('jalurTransfer', 'sesama_bca')}
-                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                    className={`p-2.5 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
                       form.jalurTransfer === 'sesama_bca'
                         ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="font-bold text-xs">Sesama BCA / QRIS</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">Rp 0</span>
+                      <span className="font-bold text-xs truncate">BCA / QRIS / VA</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full flex-shrink-0">Rp 0</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">QRIS / Tanpa Admin</p>
+                    <p className="text-[10px] text-gray-500">Tanpa Admin</p>
                   </button>
 
+                  {/* 2. Top Up E-Wallet */}
+                  <button
+                    type="button"
+                    onClick={() => setField('jalurTransfer', 'ewallet')}
+                    className={`p-2.5 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'ewallet'
+                        ? 'border-teal-500 bg-teal-50 text-teal-900 ring-2 ring-teal-500/20 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="font-bold text-xs truncate">Top Up E-Wallet</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-teal-100 text-teal-800 rounded-full flex-shrink-0">Rp 1.000</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500">GoPay, DANA, OVO, ShopeePay</p>
+                  </button>
+
+                  {/* 3. BI-FAST */}
                   <button
                     type="button"
                     onClick={() => setField('jalurTransfer', 'bi_fast')}
-                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                    className={`p-2.5 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
                       form.jalurTransfer === 'bi_fast'
                         ? 'border-blue-500 bg-blue-50 text-blue-900 ring-2 ring-blue-500/20 shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="font-bold text-xs">BI-FAST</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full">Rp 2.500</span>
+                      <span className="font-bold text-xs truncate">BI-FAST</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full flex-shrink-0">Rp 2.500</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">Transfer Beda Bank</p>
+                    <p className="text-[10px] text-gray-500">Transfer Beda Bank</p>
                   </button>
 
+                  {/* 4. Online / RTGS */}
                   <button
                     type="button"
                     onClick={() => setField('jalurTransfer', 'online_rtgs')}
-                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                    className={`p-2.5 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
                       form.jalurTransfer === 'online_rtgs'
                         ? 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20 shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="font-bold text-xs">Online / RTGS</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded-full">Rp 6.500</span>
+                      <span className="font-bold text-xs truncate">Online / RTGS</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded-full flex-shrink-0">Rp 6.500</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">Transfer Online</p>
+                    <p className="text-[10px] text-gray-500">Transfer Online</p>
                   </button>
 
+                  {/* 5. Custom / Lainnya */}
                   <button
                     type="button"
-                    onClick={() => setField('jalurTransfer', 'virtual_account')}
-                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
-                      form.jalurTransfer === 'virtual_account'
+                    onClick={() => setField('jalurTransfer', 'custom')}
+                    className={`p-2.5 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'custom'
                         ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20 shadow-sm'
                         : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full mb-1">
-                      <span className="font-bold text-xs">Virtual Account</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full">Custom</span>
+                      <span className="font-bold text-xs truncate">Custom Admin</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full flex-shrink-0">Manual</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">Isi Nominal Admin VA</p>
+                    <p className="text-[10px] text-gray-500">Input Admin Khusus</p>
                   </button>
                 </div>
 
-                {/* Input Nominal Custom Admin VA */}
-                {form.jalurTransfer === 'virtual_account' && (
+                {/* Input Nominal Custom Admin */}
+                {form.jalurTransfer === 'custom' && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 animate-fade-in">
                     <label className="block text-xs font-bold text-amber-900">
-                      Nominal Biaya Admin Virtual Account / Merchant (Rp)
+                      Nominal Biaya Admin Khusus (Rp)
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -502,11 +529,11 @@ export function TransactionForm() {
                         value={form.adminNominalCustomStr}
                         onChange={e => setField('adminNominalCustomStr', formatRupiahInput(e.target.value))}
                         className="w-full border border-amber-300 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-950 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-                        placeholder="Contoh: 1.000 atau 2.500"
+                        placeholder="Contoh: 1.500 atau 3.000"
                       />
                     </div>
                     <p className="text-[11px] text-amber-800">
-                      Isi nominal biaya admin sesuai struk tagihan VA (misal Rp 1.000, Rp 2.000, dll).
+                      Isi nominal biaya admin khusus sesuai struk bukti transaksi.
                     </p>
                   </div>
                 )}
@@ -517,6 +544,7 @@ export function TransactionForm() {
                     <p className="font-bold text-blue-950 flex items-center gap-1.5">
                       <Zap size={14} className="text-blue-600" />
                       Auto-Split Biaya Admin ({
+                        form.jalurTransfer === 'ewallet' ? 'Rp 1.000' :
                         form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
                         form.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
                         `Rp ${form.adminNominalCustomStr || '0'}`
@@ -524,6 +552,7 @@ export function TransactionForm() {
                     </p>
                     <p className="text-blue-800 leading-relaxed">
                       Sistem akan membuat <strong>entri kedua "Biaya Admin Bank" ({
+                        form.jalurTransfer === 'ewallet' ? 'Rp 1.000' :
                         form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
                         form.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
                         `Rp ${form.adminNominalCustomStr || '0'}`

@@ -185,7 +185,7 @@ export function TransactionDetailModal({
         lampiran: finalAttachments,
         penerimaDetail: editForm.jenis === 'keluar' ? (editForm.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: editForm.jenis === 'keluar' ? editForm.jalurTransfer : undefined,
-        adminNominalCustom: editForm.jenis === 'keluar' && editForm.jalurTransfer === 'virtual_account' ? adminNominalCustom : undefined,
+        adminNominalCustom: editForm.jenis === 'keluar' && editForm.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
       });
 
       addToast('success', 'Transaksi berhasil diperbarui!');
@@ -273,7 +273,7 @@ export function TransactionDetailModal({
                   </span>
                   {transaction.jalurTransfer && (
                     <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ Sesama BCA / QRIS' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : transaction.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Virtual Account'}
+                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ BCA/QRIS/VA (Rp0)' : transaction.jalurTransfer === 'ewallet' ? '⚡ Top Up E-Wallet (Rp 1.000)' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : transaction.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Custom Admin'}
                     </span>
                   )}
                 </div>
@@ -456,7 +456,13 @@ export function TransactionDetailModal({
                       <div className="p-2 bg-slate-900 text-white rounded-xl text-[11px] flex items-center justify-between gap-2 shadow-sm">
                         <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detected.bankName}</span>
                         <span className="text-[10px] text-slate-300">
-                          Jalur: {detected.suggestedJalur === 'sesama_bca' ? (detected.isQrisOrEwallet ? 'QRIS (Rp0)' : 'Sesama BCA (Rp0)') : 'BI-FAST (Rp2.500)'}
+                          Jalur: {
+                            detected.suggestedJalur === 'sesama_bca'
+                              ? (detected.isQrisOrVa ? 'QRIS/VA (Rp0)' : 'BCA (Rp0)')
+                              : detected.suggestedJalur === 'ewallet'
+                              ? 'E-Wallet (Rp1.000)'
+                              : 'BI-FAST (Rp2.500)'
+                          }
                         </span>
                       </div>
                     );
@@ -464,27 +470,39 @@ export function TransactionDetailModal({
                 </div>
               )}
 
-              {/* Jalur Transfer in Edit Mode */}
+              {/* Jalur Transfer in Edit Mode (5-Point Classification) */}
               {editForm.jenis === 'keluar' && (
                 <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-2">
                   <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                     <button
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'sesama_bca' }))}
-                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
                         editForm.jalurTransfer === 'sesama_bca'
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
                           : 'border-gray-200 text-gray-700 bg-white'
                       }`}
                     >
-                      BCA / QRIS (Rp 0)
+                      BCA/QRIS/VA (Rp 0)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'ewallet' }))}
+                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
+                        editForm.jalurTransfer === 'ewallet'
+                          ? 'border-teal-500 bg-teal-50 text-teal-900 ring-2 ring-teal-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      E-Wallet (Rp 1.000)
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'bi_fast' }))}
-                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
                         editForm.jalurTransfer === 'bi_fast'
                           ? 'border-blue-500 bg-blue-50 text-blue-900 ring-2 ring-blue-500/20'
                           : 'border-gray-200 text-gray-700 bg-white'
@@ -496,7 +514,7 @@ export function TransactionDetailModal({
                     <button
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'online_rtgs' }))}
-                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
                         editForm.jalurTransfer === 'online_rtgs'
                           ? 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20'
                           : 'border-gray-200 text-gray-700 bg-white'
@@ -507,21 +525,21 @@ export function TransactionDetailModal({
 
                     <button
                       type="button"
-                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'virtual_account' }))}
-                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
-                        editForm.jalurTransfer === 'virtual_account'
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'custom' }))}
+                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
+                        editForm.jalurTransfer === 'custom'
                           ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20'
                           : 'border-gray-200 text-gray-700 bg-white'
                       }`}
                     >
-                      Virtual Account
+                      Custom Admin
                     </button>
                   </div>
 
-                  {editForm.jalurTransfer === 'virtual_account' && (
+                  {editForm.jalurTransfer === 'custom' && (
                     <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 animate-fade-in">
                       <label className="block text-[11px] font-bold text-amber-900">
-                        Nominal Biaya Admin VA / Merchant (Rp)
+                        Nominal Biaya Admin Khusus (Rp)
                       </label>
                       <input
                         type="text"
@@ -529,7 +547,7 @@ export function TransactionDetailModal({
                         value={editForm.adminNominalCustomStr}
                         onChange={e => setEditForm(f => ({ ...f, adminNominalCustomStr: formatRupiahInput(e.target.value) }))}
                         className="w-full border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-bold text-amber-950 bg-white"
-                        placeholder="Contoh: 1.000 atau 2.000"
+                        placeholder="Contoh: 1.500 atau 3.000"
                       />
                     </div>
                   )}
@@ -537,6 +555,7 @@ export function TransactionDetailModal({
                   {editForm.jalurTransfer !== 'sesama_bca' && (
                     <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 font-medium leading-tight">
                       ℹ️ Entri biaya admin bank ({
+                        editForm.jalurTransfer === 'ewallet' ? 'Rp 1.000' :
                         editForm.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
                         editForm.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
                         `Rp ${editForm.adminNominalCustomStr || '0'}`
