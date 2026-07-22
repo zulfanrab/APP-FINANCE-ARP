@@ -19,6 +19,7 @@ function mapRowToProject(row: any): Project {
     id: row.id,
     nama: row.nama,
     klien: row.klien,
+    tipe: row.tipe_proyek ?? 'proyek_klien',
     anggaran: row.anggaran ? Number(row.anggaran) : 0,
     tanggalMulai: row.tanggal_mulai,
     tanggalSelesai: row.tanggal_selesai ?? undefined,
@@ -30,7 +31,7 @@ function mapRowToProject(row: any): Project {
 }
 
 function mapProjectToRow(p: Project): any {
-  return {
+  const row: any = {
     id: p.id,
     nama: p.nama,
     klien: p.klien,
@@ -42,6 +43,12 @@ function mapProjectToRow(p: Project): any {
     dibuat_pada: p.dibuatPada,
     diupdate_pada: p.diupdatePada,
   };
+
+  if (p.tipe) {
+    row.tipe_proyek = p.tipe;
+  }
+
+  return row;
 }
 
 export async function syncProjectBudgetTransaction(project: Project): Promise<void> {

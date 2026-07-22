@@ -42,6 +42,7 @@ export interface Project {
   id: string;
   nama: string;
   klien: string;
+  tipe?: 'proyek_klien' | 'operasional_kantor'; // 'proyek_klien' (default) vs 'operasional_kantor'
   anggaran?: number; // Modal/Anggaran dari Owner (Pak Fatwa)
   tanggalMulai: string;
   tanggalSelesai?: string;

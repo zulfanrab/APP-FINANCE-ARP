@@ -629,15 +629,17 @@ export function TransactionForm() {
               </div>
             ) : projects.length > 0 ? (
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek (Opsional)</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek / Pos Operasional (Opsional)</label>
                 <select
                   value={form.proyekId}
                   onChange={e => setField('proyekId', e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 >
-                  <option value="">-- Tanpa Proyek (Kas Utama) --</option>
+                  <option value="">-- Tanpa Alokasi (Kas Utama) --</option>
                   {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.nama} ({p.klien})</option>
+                    <option key={p.id} value={p.id}>
+                      {p.tipe === 'operasional_kantor' ? '💼 Pos Kantor: ' : '🏢 Proyek: '}{p.nama} ({p.klien})
+                    </option>
                   ))}
                 </select>
               </div>
