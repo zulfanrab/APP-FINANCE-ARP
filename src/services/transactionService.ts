@@ -40,7 +40,7 @@ function mapRowToTransaction(row: any): Transaction {
 }
 
 function mapTransactionToRow(t: Transaction): any {
-  return {
+  const row: any = {
     id: t.id,
     tanggal: t.tanggal,
     jenis: t.jenis,
@@ -55,11 +55,16 @@ function mapTransactionToRow(t: Transaction): any {
     catatan_penolakan: t.catatanPenolakan ?? null,
     penerima_detail: t.penerimaDetail ?? null,
     jalur_transfer: t.jalurTransfer ?? null,
-    admin_nominal_custom: t.adminNominalCustom ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
     dibuat_pada: t.dibuatPada,
     diupdate_pada: t.diupdatePada,
   };
+
+  if (t.adminNominalCustom !== undefined && t.adminNominalCustom !== null) {
+    row.admin_nominal_custom = t.adminNominalCustom;
+  }
+
+  return row;
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
