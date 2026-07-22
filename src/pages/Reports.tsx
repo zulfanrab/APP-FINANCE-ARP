@@ -118,6 +118,8 @@ export function Reports() {
     });
 
     let totalMasuk = 0, dropDanaOwner = 0, omzetKlien = 0, totalKeluar = 0, opsBiaya = 0, privBiaya = 0;
+    let adminDivisiBiaya = 0, itDivisiBiaya = 0, ahliDivisiBiaya = 0;
+
     for (const t of periodTx) {
       if (t.jenis === 'masuk') {
         totalMasuk += t.nominal;
@@ -130,6 +132,10 @@ export function Reports() {
         totalKeluar += t.nominal;
         if (t.tag === 'operasional') opsBiaya += t.nominal;
         if (t.tag === 'pribadi') privBiaya += t.nominal;
+
+        if (t.divisi === 'admin') adminDivisiBiaya += t.nominal;
+        else if (t.divisi === 'it') itDivisiBiaya += t.nominal;
+        else if (t.divisi === 'ahli') ahliDivisiBiaya += t.nominal;
       }
     }
 
@@ -142,6 +148,9 @@ export function Reports() {
       totalKeluar,
       opsBiaya,
       privBiaya,
+      adminDivisiBiaya,
+      itDivisiBiaya,
+      ahliDivisiBiaya,
       net: totalMasuk - totalKeluar,
       count: periodTx.length,
     });
@@ -321,6 +330,45 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
             <p className="text-[11px] text-slate-400 mt-1">Terverifikasi &amp; disetujui</p>
           </Card>
         </div>
+      )}
+
+      {/* Realisasi Pengeluaran Per Divisi (Admin, IT, Ahli) */}
+      {summary && (
+        <Card className="!p-5 border border-gray-100 shadow-card bg-white">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <span>🏛️</span> Realisasi Pengeluaran Per Divisi
+            </h3>
+            <span className="text-xs font-bold px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full border border-blue-200">
+              Divisi Unit
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 bg-blue-50/80 border border-blue-200/90 rounded-2xl">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-blue-900">💼 Divisi Admin</span>
+              </div>
+              <p className="text-lg font-extrabold text-blue-950">{formatRupiah(summary.adminDivisiBiaya || 0)}</p>
+              <p className="text-[10.5px] text-blue-700 font-medium mt-0.5">Wi-Fi, ATK, Listrik, Kantor</p>
+            </div>
+
+            <div className="p-3.5 bg-indigo-50/80 border border-indigo-200/90 rounded-2xl">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-indigo-900">💻 Divisi IT</span>
+              </div>
+              <p className="text-lg font-extrabold text-indigo-950">{formatRupiah(summary.itDivisiBiaya || 0)}</p>
+              <p className="text-[10.5px] text-indigo-700 font-medium mt-0.5">Server, Hardware, Tools</p>
+            </div>
+
+            <div className="p-3.5 bg-purple-50/80 border border-purple-200/90 rounded-2xl">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-purple-900">🛠️ Divisi Ahli</span>
+              </div>
+              <p className="text-lg font-extrabold text-purple-950">{formatRupiah(summary.ahliDivisiBiaya || 0)}</p>
+              <p className="text-[10.5px] text-purple-700 font-medium mt-0.5">Honorarium &amp; Spesialis</p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* Charts Row */}

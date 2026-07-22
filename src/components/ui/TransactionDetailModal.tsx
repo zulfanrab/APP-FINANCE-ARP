@@ -75,6 +75,7 @@ export function TransactionDetailModal({
     penerimaDetail: '',
     jalurTransfer: 'sesama_bca' as JalurTransfer,
     adminNominalCustomStr: '1.000',
+    divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
   });
 
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
@@ -93,6 +94,7 @@ export function TransactionDetailModal({
         penerimaDetail: transaction.penerimaDetail || '',
         jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
         adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
+        divisi: transaction.divisi || undefined,
       });
       setStagedAttachments(
         (transaction.lampiran || []).map(att => ({
@@ -186,6 +188,7 @@ export function TransactionDetailModal({
         penerimaDetail: editForm.jenis === 'keluar' ? (editForm.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: editForm.jenis === 'keluar' ? editForm.jalurTransfer : undefined,
         adminNominalCustom: editForm.jenis === 'keluar' && editForm.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
+        divisi: editForm.divisi || undefined,
       });
 
       addToast('success', 'Transaksi berhasil diperbarui!');
@@ -584,15 +587,45 @@ export function TransactionDetailModal({
 
               {/* Proyek Link */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek / Pos</label>
                 <select
                   value={editForm.proyekId}
                   onChange={e => setEditForm(f => ({ ...f, proyekId: e.target.value }))}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
                 >
                   <option value="">-- Tanpa Proyek (Kas Utama) --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.tipe === 'operasional_kantor' ? '💼 Pos: ' : '🏢 Proyek: '}{p.nama}
+                    </option>
+                  ))}
                 </select>
+              </div>
+
+              {/* Sub-Divisi Selector in Edit Mode */}
+              <div className="sm:col-span-2 border-t border-gray-100 pt-2.5 mt-1">
+                <label className="block text-xs font-bold text-gray-700 mb-1">Sub-Divisi Pengaju</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: undefined, label: '🌐 Umum' },
+                    { id: 'admin', label: '💼 Admin' },
+                    { id: 'it', label: '💻 IT' },
+                    { id: 'ahli', label: '🛠️ Ahli' },
+                  ].map(d => (
+                    <button
+                      key={d.label}
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, divisi: d.id as any }))}
+                      className={`p-2 rounded-xl border text-center text-xs font-bold transition-all ${
+                        editForm.divisi === d.id
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
