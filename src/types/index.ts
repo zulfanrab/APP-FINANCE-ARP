@@ -34,6 +34,7 @@ export interface Transaction {
   jalurTransfer?: JalurTransfer; // 'sesama_bca' | 'ewallet' | 'bi_fast' | 'online_rtgs' | 'custom'
   adminNominalCustom?: number; // Nominal admin custom untuk pilihan 'custom'
   parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
+  divisi?: 'admin' | 'ahli' | 'it' | 'umum'; // Sub-Divisi pengaju (Divisi Admin, Divisi Ahli, Divisi IT, Umum)
   dibuatPada: string; // ISO datetime
   diupdatePada: string; // ISO datetime
 }

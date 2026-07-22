@@ -297,13 +297,18 @@ export function TransactionDetailModal({
               <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">{transaction.deskripsi}</p>
 
               {transaction.tag && (
-                <div className="pt-2 flex items-center gap-2 text-xs">
+                <div className="pt-2 flex items-center gap-2 text-xs flex-wrap">
                   <span className="text-gray-400">Peruntukan:</span>
                   <span className={`px-2.5 py-0.5 rounded-full font-semibold ${
                     transaction.tag === 'operasional' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
                   }`}>
                     {transaction.tag === 'operasional' ? '🏢 Operasional' : '👤 Prive Owner'}
                   </span>
+                  {transaction.divisi && (
+                    <span className="px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                      {transaction.divisi === 'admin' ? '💼 Divisi Admin' : transaction.divisi === 'it' ? '💻 Divisi IT' : transaction.divisi === 'ahli' ? '🛠️ Divisi Ahli' : '🌐 Umum'}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

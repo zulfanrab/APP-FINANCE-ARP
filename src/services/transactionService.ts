@@ -34,6 +34,7 @@ function mapRowToTransaction(row: any): Transaction {
     jalurTransfer: row.jalur_transfer ?? undefined,
     adminNominalCustom: row.admin_nominal_custom ? Number(row.admin_nominal_custom) : undefined,
     parentTransactionId: row.parent_transaction_id ?? undefined,
+    divisi: row.divisi ?? undefined,
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -62,6 +63,9 @@ function mapTransactionToRow(t: Transaction): any {
 
   if (t.adminNominalCustom !== undefined && t.adminNominalCustom !== null) {
     row.admin_nominal_custom = t.adminNominalCustom;
+  }
+  if (t.divisi) {
+    row.divisi = t.divisi;
   }
 
   return row;

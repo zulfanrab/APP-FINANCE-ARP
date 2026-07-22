@@ -69,6 +69,7 @@ export function TransactionForm() {
     penerimaDetail: '',
     jalurTransfer: 'sesama_bca' as JalurTransfer,
     adminNominalCustomStr: '1.000',
+    divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
   });
 
   // Approval Flow Switch
@@ -248,6 +249,7 @@ export function TransactionForm() {
         penerimaDetail: form.jenis === 'keluar' ? (form.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
         adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
+        divisi: form.divisi || undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -644,6 +646,54 @@ export function TransactionForm() {
                 </select>
               </div>
             ) : null}
+
+            {/* Conditional Sub-Divisi Selector (Admin, IT, Ahli) */}
+            {(() => {
+              const selectedProject = projects.find(p => p.id === form.proyekId);
+              const isOperasionalPos = selectedProject?.tipe === 'operasional_kantor' ||
+                form.kategori.includes('Operasional') ||
+                form.kategori.includes('Drop Dana') ||
+                form.tag === 'operasional';
+
+              if (!isOperasionalPos) return null;
+
+              return (
+                <div className="sm:col-span-2 p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl space-y-2 animate-fade-in shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                      <span>🏛️</span> Sub-Divisi / Unit Pengaju (Opsional)
+                    </label>
+                    <span className="text-[10px] text-blue-700 font-semibold bg-blue-100 px-2 py-0.5 rounded-full">
+                      Terkait Pos Kantor
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'admin', label: '💼 Divisi Admin', desc: 'Wi-Fi, ATK, Listrik, Kantor' },
+                      { id: 'it', label: '💻 Divisi IT', desc: 'Server, Hardware, Tools' },
+                      { id: 'ahli', label: '🛠️ Divisi Ahli', desc: 'Honor & Biaya Spesialis' },
+                    ].map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setField('divisi', form.divisi === d.id ? undefined : d.id as any)}
+                        className={`p-2.5 rounded-xl border text-left font-bold text-xs transition-all active:scale-95 flex flex-col justify-between ${
+                          form.divisi === d.id
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20'
+                            : 'border-blue-200/80 bg-white text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <span className="truncate">{d.label}</span>
+                        <span className={`text-[9.5px] font-normal truncate mt-0.5 ${form.divisi === d.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                          {d.desc}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Smart Context Banner: Drop Dana / Uang Masuk Proyek info */}
             {form.jenis === 'masuk' && form.proyekId && (
