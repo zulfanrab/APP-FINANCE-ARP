@@ -40,16 +40,12 @@ export function isMutasiInternal(t: Transaction): boolean {
  * Check if a transaction belongs to KAS UTAMA (main company cash).
  * Kas Utama includes:
  * - All transactions WITHOUT proyekId
- * - Suntikan Modal transactions (they represent money leaving kas utama INTO a project)
- * Kas Utama excludes:
- * - All transactions WITH proyekId (those are internal project fund movements)
+ * - Internal Transfers & Capital Injection transactions (they represent money moving from/to kas utama)
  */
 export function isKasUtamaTransaction(t: Transaction): boolean {
-  // Suntikan Modal always affects kas utama (it's the act of moving money OUT)
-  if (isSuntikanModal(t)) return true;
-  // Transactions tied to a project do NOT affect kas utama
-  if (t.proyekId) return false;
-  return true;
+  if (isMutasiInternal(t)) return true;
+  if (!t.proyekId) return true;
+  return false;
 }
 
 /**
@@ -230,7 +226,7 @@ export function getProjectCategoryBreakdown(
     .sort((a, b) => b.nominal - a.nominal);
 }
 
-// ---- Project Financial Summary (P&L & CASH FLOW SEPARATION) ----
+// ---- Project Financial Summary (DYNAMIC CAPITAL INJECTION & P&L SEPARATION) ----
 export interface ProjectFinancialSummary {
   modalDisuntikkan: number;
   pemasukanKlien: number;
@@ -243,20 +239,28 @@ export interface ProjectFinancialSummary {
 
 export function getProjectFinancialSummary(
   transactions: Transaction[],
-  anggaranModal: number
+  anggaranModal: number = 0
 ): ProjectFinancialSummary {
-  let modalDisuntikkan = anggaranModal;
+  let modalDisuntikkanFromTx = 0;
   let pemasukanKlien = 0;
   let totalPengeluaran = 0;
   let totalRefundMasuk = 0;
 
+  const isClientIncomeCategory = (kat: string) => {
+    const lower = (kat || '').toLowerCase();
+    return (
+      lower.includes('pembayaran') ||
+      lower.includes('termijn') ||
+      lower.includes('termin') ||
+      lower.includes('pelunasan') ||
+      lower.includes('klien') ||
+      lower.includes('invoice') ||
+      lower.includes('dp')
+    );
+  };
+
   for (const t of transactions) {
     if (!isApproved(t)) continue;
-
-    if (isSuntikanModal(t)) {
-      modalDisuntikkan = Math.max(modalDisuntikkan, t.nominal);
-      continue;
-    }
 
     if (t.kategori === 'Refund Dana Proyek ke Kas Utama') {
       if (t.jenis === 'keluar') {
@@ -265,22 +269,27 @@ export function getProjectFinancialSummary(
       continue;
     }
 
-    if (isMutasiInternal(t)) {
-      continue;
-    }
-
-    // Real transactions
-    if (t.jenis === 'keluar') {
-      totalPengeluaran += t.nominal;
-    } else if (t.jenis === 'masuk') {
-      pemasukanKlien += t.nominal;
+    if (t.jenis === 'masuk') {
+      if (isMutasiInternal(t) || !isClientIncomeCategory(t.kategori)) {
+        // Capital injection into project
+        modalDisuntikkanFromTx += t.nominal;
+      } else {
+        // Real client revenue
+        pemasukanKlien += t.nominal;
+      }
+    } else if (t.jenis === 'keluar') {
+      if (!isMutasiInternal(t)) {
+        totalPengeluaran += t.nominal;
+      }
     }
   }
 
+  // Dynamic Capital Disuntikkan: Sum of all incoming injection transactions, or initial budget if higher/no transactions
+  const modalDisuntikkan = Math.max(anggaranModal, modalDisuntikkanFromTx);
   const realisasiBersih = totalPengeluaran - totalRefundMasuk;
-  // Saldo Kas Proyek (Liquidity)
+  // Saldo Kas Proyek (Liquidity Cash Flow) = Total Modal Disuntikkan + Total Invoice Klien - Total Pengeluaran - Refund
   const sisaDanaProyek = modalDisuntikkan + pemasukanKlien - totalPengeluaran - totalRefundMasuk;
-  // Laba-Rugi Proyek (P&L: Invoice Klien - Real Expenses)
+  // Laba-Rugi Proyek (P&L) = Invoice Klien - Pengeluaran Riil
   const labaRugiProyek = pemasukanKlien - totalPengeluaran;
 
   return {

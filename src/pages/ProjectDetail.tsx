@@ -156,7 +156,6 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   const usagePercentage = anggaranModal > 0 ? Math.min(Math.round((financials.realisasiBersih / anggaranModal) * 100), 100) : 0;
 
   const filteredTx = transactions.filter(t => {
-    if (t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
     if (filterType === 'masuk') return t.jenis === 'masuk';
     if (filterType === 'keluar') return t.jenis === 'keluar';
     return true;

@@ -71,7 +71,7 @@ export function PdfReportModal({
     modalAwal = project.anggaran || 0;
 
     const ptx = approvedTx.filter(
-      t => t.proyekId === project.id && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
+      t => t.proyekId === project.id
     );
 
     const sortedPtx = [...ptx].sort(
@@ -80,18 +80,23 @@ export function PdfReportModal({
 
     let currentBalance = modalAwal;
 
-    // Initial Capital Row
-    tableRows.push({
-      no: 1,
-      tanggal: formatDate(project.tanggalMulai),
-      deskripsi: 'Penerimaan Modal Proyek (Disuntikkan Pak Fatwa)',
-      kategori: 'Modal Disuntikkan',
-      debet: modalAwal,
-      kredit: 0,
-      saldo: currentBalance,
-    });
+    // Initial Capital Row if modalAwal > 0 and no explicit injection transaction exists
+    const hasInjectionTx = ptx.some(t => t.jenis === 'masuk' && (t.kategori.includes('Suntikan') || t.kategori.includes('Mutasi') || t.deskripsi.startsWith('Suntikan')));
 
-    totalDebet += modalAwal;
+    if (modalAwal > 0 && !hasInjectionTx) {
+      tableRows.push({
+        no: 1,
+        tanggal: formatDate(project.tanggalMulai),
+        deskripsi: 'Penerimaan Modal Proyek (Disuntikkan Pak Fatwa)',
+        kategori: 'Modal Disuntikkan',
+        debet: modalAwal,
+        kredit: 0,
+        saldo: currentBalance,
+      });
+      totalDebet += modalAwal;
+    } else {
+      currentBalance = 0;
+    }
 
     sortedPtx.forEach((t, idx) => {
       const isMasuk = t.jenis === 'masuk';
@@ -107,7 +112,7 @@ export function PdfReportModal({
       }
 
       tableRows.push({
-        no: idx + 2,
+        no: tableRows.length + 1,
         tanggal: formatDate(t.tanggal),
         deskripsi: t.deskripsi,
         kategori: t.kategori,
@@ -123,7 +128,7 @@ export function PdfReportModal({
     // KAS UTAMA JOURNAL MATH
     // ============================================================
     const mainTx = approvedTx.filter(
-      t => !t.proyekId || t.deskripsi.startsWith('Suntikan Modal Proyek:')
+      t => !t.proyekId || t.kategori === 'Suntikan Modal Proyek' || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama' || t.deskripsi.startsWith('Suntikan Modal Proyek:')
     );
 
     const sortedMain = [...mainTx].sort(

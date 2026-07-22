@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject } from '../services/transactionService';
+import { getProjectFinancialSummary } from '../services/analyticsService';
 import { type Project } from '../types';
 import { Card, Button, Badge, LoadingSpinner, EmptyState, formatRupiah, formatDate, ProjectsSkeleton } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
@@ -20,6 +21,7 @@ interface ProjectWithStats extends Project {
   totalPemasukan: number;
   totalPengeluaran: number;
   profit: number;
+  sisaKas?: number;
 }
 
 function formatRupiahInput(value: string): string {
@@ -60,10 +62,15 @@ export function Projects() {
       const withStats = await Promise.all(
         raw.map(async p => {
           const txns = await getTransactionsByProject(p.id);
-          const approved = txns.filter(t => (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:'));
-          const totalPemasukan = approved.filter(t => t.jenis === 'masuk').reduce((s, t) => s + t.nominal, 0);
-          const totalPengeluaran = approved.filter(t => t.jenis === 'keluar').reduce((s, t) => s + t.nominal, 0);
-          return { ...p, totalPemasukan, totalPengeluaran, profit: totalPemasukan - totalPengeluaran };
+          const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
+          return { 
+            ...p, 
+            anggaran: financials.modalDisuntikkan,
+            totalPemasukan: financials.pemasukanKlien, 
+            totalPengeluaran: financials.totalPengeluaran, 
+            profit: financials.labaRugiProyek,
+            sisaKas: financials.sisaDanaProyek
+          };
         })
       );
       setProjects(withStats);

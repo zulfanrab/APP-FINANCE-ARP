@@ -31,8 +31,14 @@ export function exportAccountingJournalExcel({
   const wb = XLSX.utils.book_new();
 
   // Filter approved Kas Utama transactions
+  const isMutasiInternal = (t: Transaction) =>
+    t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
+    t.kategori === 'Suntikan Modal Proyek' ||
+    t.kategori === 'Mutasi Internal / Transfer Kas' ||
+    t.kategori === 'Refund Dana Proyek ke Kas Utama';
+
   const mainTx = transactions.filter(
-    t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || t.deskripsi.startsWith('Suntikan Modal Proyek:'))
+    t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || isMutasiInternal(t))
   );
 
   const sorted = [...mainTx].sort(
@@ -153,7 +159,7 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
   const companyName = 'PT. AKSARA RIKSA PERDANA';
 
   const approvedPtx = transactions.filter(
-    t => t.proyekId === project.id && (t.status === 'disetujui' || t.status === 'selesai') && !t.deskripsi.startsWith('Suntikan Modal Proyek:')
+    t => (t.proyekId === project.id || t.deskripsi.includes(project.nama)) && (t.status === 'disetujui' || t.status === 'selesai')
   );
 
   const sortedPtx = [...approvedPtx].sort(

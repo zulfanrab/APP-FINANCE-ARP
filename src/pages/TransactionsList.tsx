@@ -58,11 +58,14 @@ export function TransactionsList() {
   const categories = Array.from(new Set(transactions.map(t => t.kategori)));
 
   const filtered = transactions.filter(t => {
-    const isSuntikan = t.deskripsi.startsWith('Suntikan Modal Proyek:');
-    const isKasUtama = !t.proyekId || isSuntikan;
+    const isSuntikan =
+      t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
+      t.kategori === 'Suntikan Modal Proyek' ||
+      t.kategori === 'Mutasi Internal / Transfer Kas' ||
+      t.kategori === 'Refund Dana Proyek ke Kas Utama';
 
-    if (scope === 'kas_utama' && !isKasUtama) return false;
-    if (scope === 'proyek' && isKasUtama) return false;
+    if (scope === 'kas_utama' && t.proyekId && !isSuntikan) return false;
+    if (scope === 'proyek' && !t.proyekId) return false;
 
     if (search) {
       const q = search.toLowerCase();
