@@ -63,6 +63,8 @@ function mapTransactionToRow(t: Transaction): any {
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
+  const localData = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase
@@ -71,17 +73,35 @@ export async function getTransactions(): Promise<Transaction[]> {
         .order('tanggal', { ascending: false });
 
       if (!error && data) {
-        const transactions = data.map(mapRowToTransaction);
-        setItem(KEYS.TRANSACTIONS, transactions);
-        return transactions;
+        const remoteTxs = data.map(mapRowToTransaction);
+        const remoteIds = new Set(remoteTxs.map(t => t.id));
+
+        // Smart Merge: Keep any local transactions that haven't synced to Supabase yet
+        const unsyncedLocal = localData.filter(t => !remoteIds.has(t.id));
+
+        if (unsyncedLocal.length > 0) {
+          console.info(`Found ${unsyncedLocal.length} unsynced local transactions. Resyncing to Supabase...`);
+          const rowsToInsert = unsyncedLocal.map(mapTransactionToRow);
+          supabase.from('transactions').insert(rowsToInsert).then(({ error: syncErr }) => {
+            if (syncErr) console.warn('Resync unsynced transactions error:', syncErr);
+          });
+        }
+
+        const merged = [...remoteTxs, ...unsyncedLocal].sort(
+          (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
+        );
+
+        setItem(KEYS.TRANSACTIONS, merged);
+        return merged;
+      } else if (error) {
+        console.warn('Supabase select transactions error:', error);
       }
     } catch (err) {
       console.warn('Supabase transactions fetch error, falling back to local storage:', err);
     }
   }
 
-  const data = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
-  return [...data].sort(
+  return [...localData].sort(
     (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
   );
 }
@@ -110,7 +130,7 @@ export async function addTransaction(
   };
 
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
-  transactions.push(newTransaction);
+  transactions.unshift(newTransaction);
 
   // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER REQUIRES FEE
   let adminFeeTx: Transaction | null = null;
@@ -155,7 +175,7 @@ export async function addTransaction(
         dibuatPada: now(),
         diupdatePada: now(),
       };
-      transactions.push(adminFeeTx);
+      transactions.unshift(adminFeeTx);
     }
   }
 
@@ -167,7 +187,10 @@ export async function addTransaction(
       if (adminFeeTx) {
         rowsToInsert.push(mapTransactionToRow(adminFeeTx));
       }
-      await supabase.from('transactions').insert(rowsToInsert);
+      const { error } = await supabase.from('transactions').insert(rowsToInsert);
+      if (error) {
+        console.error('Supabase add transaction error:', error);
+      }
     } catch (err) {
       console.warn('Supabase add transaction error:', err);
     }

@@ -100,6 +100,8 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
 }
 
 export async function getProjects(): Promise<Project[]> {
+  const localData = getItem<Project[]>(KEYS.PROJECTS, []);
+
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase
@@ -108,17 +110,23 @@ export async function getProjects(): Promise<Project[]> {
         .order('dibuat_pada', { ascending: false });
 
       if (!error && data) {
-        const projects = data.map(mapRowToProject);
-        setItem(KEYS.PROJECTS, projects);
-        return projects;
+        const remoteProjects = data.map(mapRowToProject);
+        const remoteIds = new Set(remoteProjects.map(p => p.id));
+        const unsyncedLocal = localData.filter(p => !remoteIds.has(p.id));
+
+        const merged = [...remoteProjects, ...unsyncedLocal].sort(
+          (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
+        );
+
+        setItem(KEYS.PROJECTS, merged);
+        return merged;
       }
     } catch (err) {
       console.warn('Supabase projects fetch error, falling back to local storage:', err);
     }
   }
 
-  const data = getItem<Project[]>(KEYS.PROJECTS, []);
-  return [...data].sort(
+  return [...localData].sort(
     (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
   );
 }
