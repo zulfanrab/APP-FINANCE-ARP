@@ -68,6 +68,7 @@ export function TransactionForm() {
     lampiran: [] as Attachment[],
     penerimaDetail: '',
     jalurTransfer: 'sesama_bca' as JalurTransfer,
+    adminNominalCustomStr: '1.000',
   });
 
   // Approval Flow Switch
@@ -232,6 +233,8 @@ export function TransactionForm() {
         }
       }
 
+      const adminNominalCustom = parseRupiahInput(form.adminNominalCustomStr || '0');
+
       await addTransaction({
         tanggal: form.tanggal,
         jenis: form.jenis,
@@ -244,6 +247,7 @@ export function TransactionForm() {
         status: autoApprove ? 'disetujui' : 'menunggu_approval',
         penerimaDetail: form.jenis === 'keluar' ? (form.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
+        adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'virtual_account' ? adminNominalCustom : undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -419,7 +423,7 @@ export function TransactionForm() {
             {form.jenis === 'keluar' && (
               <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-3">
                 <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={() => setField('jalurTransfer', 'sesama_bca')}
@@ -431,9 +435,9 @@ export function TransactionForm() {
                   >
                     <div className="flex items-center justify-between w-full mb-1">
                       <span className="font-bold text-xs">Sesama BCA / QRIS</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">Rp 0</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">Rp 0</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">QRIS / Tanpa Biaya Admin</p>
+                    <p className="text-[11px] text-gray-500">QRIS / Tanpa Admin</p>
                   </button>
 
                   <button
@@ -447,7 +451,7 @@ export function TransactionForm() {
                   >
                     <div className="flex items-center justify-between w-full mb-1">
                       <span className="font-bold text-xs">BI-FAST</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">Rp 2.500</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded-full">Rp 2.500</span>
                     </div>
                     <p className="text-[11px] text-gray-500">Transfer Beda Bank</p>
                   </button>
@@ -463,21 +467,67 @@ export function TransactionForm() {
                   >
                     <div className="flex items-center justify-between w-full mb-1">
                       <span className="font-bold text-xs">Online / RTGS</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full">Rp 6.500</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded-full">Rp 6.500</span>
                     </div>
-                    <p className="text-[11px] text-gray-500">Transfer Realtime / RTGS</p>
+                    <p className="text-[11px] text-gray-500">Transfer Online</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setField('jalurTransfer', 'virtual_account')}
+                    className={`p-3 rounded-xl border text-left font-medium transition-all active:scale-95 flex flex-col justify-between ${
+                      form.jalurTransfer === 'virtual_account'
+                        ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20 shadow-sm'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className="font-bold text-xs">Virtual Account</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded-full">Custom</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">Isi Nominal Admin VA</p>
                   </button>
                 </div>
+
+                {/* Input Nominal Custom Admin VA */}
+                {form.jalurTransfer === 'virtual_account' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 animate-fade-in">
+                    <label className="block text-xs font-bold text-amber-900">
+                      Nominal Biaya Admin Virtual Account / Merchant (Rp)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={form.adminNominalCustomStr}
+                        onChange={e => setField('adminNominalCustomStr', formatRupiahInput(e.target.value))}
+                        className="w-full border border-amber-300 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-950 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        placeholder="Contoh: 1.000 atau 2.500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-amber-800">
+                      Isi nominal biaya admin sesuai struk tagihan VA (misal Rp 1.000, Rp 2.000, dll).
+                    </p>
+                  </div>
+                )}
 
                 {/* Notification Banner */}
                 {form.jalurTransfer !== 'sesama_bca' && (
                   <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs text-blue-900 font-medium space-y-1 animate-fade-in">
                     <p className="font-bold text-blue-950 flex items-center gap-1.5">
                       <Zap size={14} className="text-blue-600" />
-                      Auto-Split Biaya Admin ({form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'})
+                      Auto-Split Biaya Admin ({
+                        form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
+                        form.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
+                        `Rp ${form.adminNominalCustomStr || '0'}`
+                      })
                     </p>
                     <p className="text-blue-800 leading-relaxed">
-                      Sistem akan membuat <strong>entri kedua "Biaya Admin Bank" ({form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'})</strong> secara otomatis yang <strong>terikat ke alokasi proyek yang sama ({form.proyekId ? projects.find(p => p.id === form.proyekId)?.nama : 'Kas Utama'})</strong>.
+                      Sistem akan membuat <strong>entri kedua "Biaya Admin Bank" ({
+                        form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
+                        form.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
+                        `Rp ${form.adminNominalCustomStr || '0'}`
+                      })</strong> secara otomatis yang <strong>terikat ke alokasi proyek yang sama ({form.proyekId ? projects.find(p => p.id === form.proyekId)?.nama : 'Kas Utama'})</strong>.
                     </p>
                   </div>
                 )}

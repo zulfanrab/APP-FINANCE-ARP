@@ -74,6 +74,7 @@ export function TransactionDetailModal({
     proyekId: '',
     penerimaDetail: '',
     jalurTransfer: 'sesama_bca' as JalurTransfer,
+    adminNominalCustomStr: '1.000',
   });
 
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
@@ -91,6 +92,7 @@ export function TransactionDetailModal({
         proyekId: transaction.proyekId || '',
         penerimaDetail: transaction.penerimaDetail || '',
         jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
+        adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
       });
       setStagedAttachments(
         (transaction.lampiran || []).map(att => ({
@@ -153,7 +155,6 @@ export function TransactionDetailModal({
 
     setSaving(true);
     try {
-      // Upload any new staged files to Google Drive
       const finalAttachments = [];
       for (const att of stagedAttachments) {
         if (att.fileObj) {
@@ -171,6 +172,8 @@ export function TransactionDetailModal({
         }
       }
 
+      const adminNominalCustom = parseRupiahInput(editForm.adminNominalCustomStr || '0');
+
       await updateTransaction(transaction.id, {
         tanggal: editForm.tanggal,
         jenis: editForm.jenis,
@@ -182,6 +185,7 @@ export function TransactionDetailModal({
         lampiran: finalAttachments,
         penerimaDetail: editForm.jenis === 'keluar' ? (editForm.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: editForm.jenis === 'keluar' ? editForm.jalurTransfer : undefined,
+        adminNominalCustom: editForm.jenis === 'keluar' && editForm.jalurTransfer === 'virtual_account' ? adminNominalCustom : undefined,
       });
 
       addToast('success', 'Transaksi berhasil diperbarui!');
@@ -269,7 +273,7 @@ export function TransactionDetailModal({
                   </span>
                   {transaction.jalurTransfer && (
                     <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ Sesama BCA' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : '⚡ Online/RTGS (Rp 6.500)'}
+                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ Sesama BCA / QRIS' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : transaction.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Virtual Account'}
                     </span>
                   )}
                 </div>
@@ -464,7 +468,7 @@ export function TransactionDetailModal({
               {editForm.jenis === 'keluar' && (
                 <div className="sm:col-span-2 space-y-2 border-t border-gray-100 pt-2">
                   <label className="block text-xs font-semibold text-gray-700">Jalur Transfer &amp; Biaya Admin Bank</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'sesama_bca' }))}
@@ -474,7 +478,7 @@ export function TransactionDetailModal({
                           : 'border-gray-200 text-gray-700 bg-white'
                       }`}
                     >
-                      Sesama BCA / QRIS (Rp 0)
+                      BCA / QRIS (Rp 0)
                     </button>
 
                     <button
@@ -500,11 +504,43 @@ export function TransactionDetailModal({
                     >
                       Online (Rp 6.500)
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'virtual_account' }))}
+                      className={`p-2 rounded-xl border text-center text-xs font-semibold transition-all ${
+                        editForm.jalurTransfer === 'virtual_account'
+                          ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20'
+                          : 'border-gray-200 text-gray-700 bg-white'
+                      }`}
+                    >
+                      Virtual Account
+                    </button>
                   </div>
+
+                  {editForm.jalurTransfer === 'virtual_account' && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl space-y-1 animate-fade-in">
+                      <label className="block text-[11px] font-bold text-amber-900">
+                        Nominal Biaya Admin VA / Merchant (Rp)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={editForm.adminNominalCustomStr}
+                        onChange={e => setEditForm(f => ({ ...f, adminNominalCustomStr: formatRupiahInput(e.target.value) }))}
+                        className="w-full border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-bold text-amber-950 bg-white"
+                        placeholder="Contoh: 1.000 atau 2.000"
+                      />
+                    </div>
+                  )}
 
                   {editForm.jalurTransfer !== 'sesama_bca' && (
                     <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 font-medium leading-tight">
-                      ℹ️ Entri biaya admin bank ({editForm.jalurTransfer === 'bi_fast' ? 'Rp 2.500' : 'Rp 6.500'}) akan otomatis disesuaikan dan <strong>tetap terikat ke alokasi proyek yang sama</strong>.
+                      ℹ️ Entri biaya admin bank ({
+                        editForm.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
+                        editForm.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
+                        `Rp ${editForm.adminNominalCustomStr || '0'}`
+                      }) akan otomatis disesuaikan dan <strong>tetap terikat ke alokasi proyek yang sama</strong>.
                     </div>
                   )}
                 </div>
