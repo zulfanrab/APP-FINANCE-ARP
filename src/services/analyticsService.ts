@@ -33,6 +33,8 @@ export function isMutasiInternal(t: Transaction): boolean {
   if (isSuntikanModal(t)) return true;
   if (t.kategori === 'Refund Dana Proyek ke Kas Utama') return true;
   if (t.kategori === 'Mutasi Internal / Transfer Kas') return true;
+  if (t.kategori === 'Drop Dana / Mutasi Kas Owner') return true;
+  if (t.kategori === 'Setoran Modal Owner') return true;
   return false;
 }
 

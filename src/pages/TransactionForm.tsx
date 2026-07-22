@@ -643,11 +643,15 @@ export function TransactionForm() {
               </div>
             ) : null}
 
-            {/* Smart Context Banner: Refund info */}
+            {/* Smart Context Banner: Drop Dana / Uang Masuk Proyek info */}
             {form.jenis === 'masuk' && form.proyekId && (
-              <div className="sm:col-span-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-medium space-y-1">
-                <p className="font-bold text-emerald-900">📥 Pencatatan Uang Masuk ke Dana Proyek</p>
-                <p>Transaksi ini akan menambah saldo dana proyek (contoh: pengembalian sisa dana dari pekerja lapangan, refund pembelian, dll). Dana ini <strong>TIDAK</strong> masuk ke kas utama perusahaan.</p>
+              <div className="sm:col-span-2 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-medium space-y-1 animate-fade-in shadow-sm">
+                <p className="font-bold text-emerald-950 flex items-center gap-1.5 text-sm">
+                  <span>💡</span> Drop Dana / Saldo Operasional Proyek
+                </p>
+                <p className="leading-relaxed text-emerald-800">
+                  Uang sebesar <strong>Rp {form.nominalStr || '0'}</strong> yang ditransfer dari Pak Fatwa/Owner ini akan <strong>otomatis mengisi Saldo Kas Operasional Proyek ({projects.find(p => p.id === form.proyekId)?.nama})</strong>. Saldo proyek akan menjadi positif dan otomatis berkurang seiring pengeluaran belanja lapangan.
+                </p>
               </div>
             )}
             {form.jenis === 'keluar' && form.proyekId && (

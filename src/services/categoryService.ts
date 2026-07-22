@@ -6,6 +6,7 @@ import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export const DEFAULT_INCOME_CATEGORIES = [
+  'Drop Dana / Mutasi Kas Owner',
   'Pembayaran Klien / Proyek',
   'DP / Termijn Proyek',
   'Pelunasan Proyek',

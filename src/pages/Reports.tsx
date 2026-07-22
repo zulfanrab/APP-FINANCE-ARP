@@ -15,7 +15,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import {
-  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation
+  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation, isMutasiInternal
 } from '../services/analyticsService';
 import { exportAccountingJournalExcel } from '../services/exportService';
 import { type Transaction, type Project } from '../types';
@@ -109,19 +109,24 @@ export function Reports() {
     const cats = getCategoryBreakdown(allTransactions, from, to);
     const cashflow = getCashflowTrend(allTransactions, from, to);
 
-    // Summary for period — KAS UTAMA ONLY (exclude project-internal transactions)
+    // Summary for period — KAS OPERASIONAL & PERTANGGUNGJAWABAN
     const periodTx = allTransactions.filter(t => {
       const d = new Date(t.tanggal);
       const approved = t.status === 'disetujui' || t.status === 'selesai';
       if (!approved || d < from || d > to) return false;
-      if (t.proyekId && !t.deskripsi.startsWith('Suntikan Modal Proyek:')) return false;
       return true;
     });
 
-    let totalMasuk = 0, totalKeluar = 0, opsBiaya = 0, privBiaya = 0;
+    let totalMasuk = 0, dropDanaOwner = 0, omzetKlien = 0, totalKeluar = 0, opsBiaya = 0, privBiaya = 0;
     for (const t of periodTx) {
-      if (t.jenis === 'masuk') totalMasuk += t.nominal;
-      else {
+      if (t.jenis === 'masuk') {
+        totalMasuk += t.nominal;
+        if (isMutasiInternal(t)) {
+          dropDanaOwner += t.nominal;
+        } else {
+          omzetKlien += t.nominal;
+        }
+      } else {
         totalKeluar += t.nominal;
         if (t.tag === 'operasional') opsBiaya += t.nominal;
         if (t.tag === 'pribadi') privBiaya += t.nominal;
@@ -130,7 +135,16 @@ export function Reports() {
 
     setCategoryData(cats);
     setCashflowData(cashflow);
-    setSummary({ totalMasuk, totalKeluar, opsBiaya, privBiaya, net: totalMasuk - totalKeluar, count: periodTx.length });
+    setSummary({
+      totalMasuk,
+      dropDanaOwner,
+      omzetKlien,
+      totalKeluar,
+      opsBiaya,
+      privBiaya,
+      net: totalMasuk - totalKeluar,
+      count: periodTx.length,
+    });
     setAiResult('');
   }, [allTransactions, period, customFrom, customTo, loading, getPeriodDates]);
 
@@ -280,9 +294,11 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pemasukan / Drop Dana</p>
             <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(summary.totalMasuk)}</p>
-            <p className="text-[11px] text-gray-400 mt-1">Periode {periodTextStr}</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-1">
+              Drop Owner: {formatRupiah(summary.dropDanaOwner)} | Omzet: {formatRupiah(summary.omzetKlien)}
+            </p>
           </Card>
 
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
