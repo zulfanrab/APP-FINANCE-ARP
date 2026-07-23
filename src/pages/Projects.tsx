@@ -350,7 +350,7 @@ export function Projects() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {form.tipe === 'operasional_kantor' ? 'Plafon / Drop Dana Kantor dari Pak Fatwa (Rp)' : 'Modal awal dari Pak Fatwa (Rp)'}
+              {form.tipe === 'operasional_kantor' ? 'Plafon / Drop Dana Kas Operasional Kantor (Rp)' : 'Modal Awal Operasional (Rp)'}
             </label>
             <input
               type="text"

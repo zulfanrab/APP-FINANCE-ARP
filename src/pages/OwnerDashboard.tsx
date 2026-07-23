@@ -195,7 +195,7 @@ export function OwnerDashboard() {
     }
   };
 
-  // Voice Recognition for Pak Fatwa
+  // Voice Recognition for Pimpinan / Direksi
   const [isListening, setIsListening] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const [voiceParsing, setVoiceParsing] = useState(false);
@@ -373,7 +373,7 @@ export function OwnerDashboard() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-amber-900 flex items-center gap-2">
-                <span>Perhatian Pak Fatwa: Terdapat {overdueApprovalList.length} Transaksi Menunggu Persetujuan &gt;2 Hari</span>
+                <span>Perhatian Manajemen: Terdapat {overdueApprovalList.length} Transaksi Menunggu Persetujuan &gt;2 Hari</span>
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" />
               </h3>
               <p className="text-xs text-amber-800/80 mt-0.5">Mohon tinjau pengajuan transaksi Admin di bawah untuk memperlancar arus kas.</p>
@@ -683,7 +683,7 @@ export function OwnerDashboard() {
 
           {isListening && (
               <div className="p-2 bg-red-500/20 border border-red-500/40 rounded-xl text-center animate-pulse">
-                <p className="text-xs font-extrabold text-red-300">🔴 Mendengarkan Suara Pak Fatwa...</p>
+                <p className="text-xs font-extrabold text-red-300">🔴 Mendengarkan Perintah Suara...</p>
                 <p className="text-[10px] text-red-200 mt-0.5">Ucapkan contoh: "Beli bensin dan tol 150 ribu operasional" atau "Tarik prive 5 juta"</p>
               </div>
             )}

@@ -193,7 +193,7 @@ export function TransactionsList() {
             {/* MOBILE CARD VIEW (Directly Clickable) */}
             <div className="md:hidden space-y-3.5">
               {filtered.map(tx => {
-                const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                 const isKas = !tx.proyekId || isSuntikan;
                 const prjName = getProjectName(tx.proyekId);
 
@@ -270,7 +270,7 @@ export function TransactionsList() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map(tx => {
-                    const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                    const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                     const isKas = !tx.proyekId || isSuntikan;
                     const prjName = getProjectName(tx.proyekId);
 

@@ -175,7 +175,7 @@ export function Login() {
                     👑
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900 text-sm">Owner (Pak Fatwa)</p>
+                    <p className="font-bold text-gray-900 text-sm">Direksi / Pimpinan</p>
                     <p className="text-xs text-gray-500 mt-0.5">Kontrol ringkasan, approval &amp; prive</p>
                   </div>
                 </button>

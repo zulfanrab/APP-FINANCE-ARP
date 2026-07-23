@@ -1,6 +1,6 @@
 // ============================================================
 // ARKA Finance — User Guide Modal (Buku Panduan Penggunaan)
-// Concise, clear manual for Pak Fatwa (Owner) & Admin
+// Concise, clear manual for Pimpinan & Admin
 // Includes step-by-step PWA app installation for Samsung & iPhone
 // ============================================================
 
@@ -33,7 +33,7 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Crown size={15} /> 👑 Pak Fatwa (Owner)
+            <Crown size={15} /> 👑 Direksi / Pimpinan
           </button>
           <button
             type="button"
@@ -66,7 +66,7 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
             <div className="space-y-4 animate-fade-in">
               <div className="p-3.5 bg-slate-900 text-white rounded-2xl space-y-1 shadow-md">
                 <h3 className="font-bold text-emerald-400 text-sm flex items-center gap-2">
-                  <ShieldCheck size={16} /> Tujuan Utama Untuk Pak Fatwa
+                  <ShieldCheck size={16} /> Tujuan Utama Pimpinan / Manajemen
                 </h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   Memberikan kontrol penuh 100% atas arus kas PT Aksara Riksa Perdana secara real-time dari HP Anda tanpa kerumitan teknis.
@@ -142,7 +142,7 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
                   <Smartphone size={16} /> Cara Mengubah Website Menjadi Aplikasi HP (PWA)
                 </h3>
                 <p className="text-xs text-purple-200 leading-relaxed">
-                  Aplikasi ARKA Finance dapat dipasang langsung di Layar Utama HP Pak Fatwa tanpa perlu melalui Play Store atau App Store!
+                  Aplikasi ARKA Finance dapat dipasang langsung di Layar Utama HP tanpa perlu melalui Play Store atau App Store!
                 </p>
               </div>
 

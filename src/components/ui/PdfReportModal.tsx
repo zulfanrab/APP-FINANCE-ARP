@@ -87,8 +87,8 @@ export function PdfReportModal({
       tableRows.push({
         no: 1,
         tanggal: formatDate(project.tanggalMulai),
-        deskripsi: 'Penerimaan Modal Proyek (Disuntikkan Pak Fatwa)',
-        kategori: 'Modal Disuntikkan',
+        deskripsi: 'Penerimaan Alokasi Modal Operasional Proyek',
+        kategori: 'Alokasi Modal Operasional',
         debet: modalAwal,
         kredit: 0,
         saldo: currentBalance,
@@ -387,7 +387,7 @@ export function PdfReportModal({
             {project ? (
               <div className="summary-box bg-slate-50 border border-slate-200 rounded-xl p-3 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center my-4">
                 <div>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Modal Disuntikkan</span>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Alokasi Modal Operasional</span>
                   <p className="summary-val text-sm font-black text-purple-800">{formatRupiah(modalAwal)}</p>
                 </div>
                 <div>

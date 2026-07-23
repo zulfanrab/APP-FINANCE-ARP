@@ -306,7 +306,7 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pemasukan / Drop Dana</p>
             <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(summary.totalMasuk)}</p>
             <p className="text-[11px] text-gray-500 font-medium mt-1">
-              Drop Owner: {formatRupiah(summary.dropDanaOwner)} | Omzet: {formatRupiah(summary.omzetKlien)}
+              Kas Utama: {formatRupiah(summary.dropDanaOwner)} | Omzet: {formatRupiah(summary.omzetKlien)}
             </p>
           </Card>
 

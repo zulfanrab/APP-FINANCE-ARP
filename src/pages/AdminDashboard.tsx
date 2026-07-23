@@ -78,6 +78,12 @@ export function AdminDashboard() {
 
   useEffect(() => { loadData(); }, [loadData, refreshKey]);
 
+  const getProjectName = (id?: string) => {
+    if (!id) return '';
+    const p = projectsList.find(item => item.id === id);
+    return p ? p.nama : 'Proyek';
+  };
+
   // Apply filters + search
   useEffect(() => {
     let result = [...allTransactions];
@@ -207,7 +213,7 @@ export function AdminDashboard() {
             >
               <option value="semua">Semua Tag</option>
               <option value="operasional">Operasional</option>
-              <option value="pribadi">Pribadi Owner</option>
+              <option value="pribadi">Non-Operasional / Prive</option>
             </select>
             <select
               value={filters.status}
@@ -218,7 +224,6 @@ export function AdminDashboard() {
               <option value="menunggu_approval">Menunggu Approval</option>
               <option value="disetujui">Disetujui</option>
               <option value="ditolak">Ditolak</option>
-              <option value="selesai">Selesai</option>
             </select>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -238,31 +243,31 @@ export function AdminDashboard() {
             <EmptyState
               icon={<FileText size={28} />}
               title="Tidak ada transaksi"
-              description="Belum ada transaksi yang sesuai dengan filter Anda"
+              description="Coba ubah filter atau pencarian Anda"
             />
           ) : (
             <>
               {/* Mobile Card List View (Clickable) */}
               <div className="md:hidden space-y-3 p-3">
                 {filtered.map(tx => {
-                  const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                  const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                   const isKas = !tx.proyekId || isSuntikan;
 
                   return (
                     <div
                       key={tx.id}
                       onClick={() => setSelectedTx(tx)}
-                      className="p-4 bg-gray-50/90 hover:bg-emerald-50/30 border border-gray-200/80 hover:border-emerald-300 rounded-2xl space-y-2 cursor-pointer transition-all active:scale-[0.99]"
+                      className="p-3.5 bg-gray-50 hover:bg-emerald-50/30 border border-gray-200/80 rounded-2xl space-y-2 cursor-pointer transition-all active:scale-[0.99]"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {isKas ? (
                             <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200">
                               🏢 Kas Utama
                             </span>
                           ) : (
-                            <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200">
-                              🏗️ Dana Proyek
+                            <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 truncate max-w-[140px]">
+                              🏗️ {getProjectName(tx.proyekId)}
                             </span>
                           )}
                           <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
@@ -270,19 +275,14 @@ export function AdminDashboard() {
                         <StatusBadge status={tx.status} />
                       </div>
 
-                      <div className="flex items-start justify-between gap-2 pt-1 min-w-0">
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <p className="text-sm font-bold text-gray-900 leading-snug break-words">
-                            {tx.deskripsi}
-                          </p>
-                          <p className="text-xs text-gray-500 font-medium mt-0.5">{tx.kategori}</p>
+                      <div className="flex items-center justify-between pt-1">
+                        <div>
+                          <p className="font-bold text-gray-900 text-xs line-clamp-1">{tx.deskripsi}</p>
+                          <p className="text-[11px] text-gray-500">{tx.kategori}</p>
                         </div>
-                        <div className="text-right flex-shrink-0 flex items-center gap-1 min-w-max ml-1">
-                          <p className={`font-extrabold text-xs sm:text-sm md:text-base whitespace-nowrap tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                          </p>
-                          <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
-                        </div>
+                        <p className={`font-extrabold text-sm whitespace-nowrap tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                        </p>
                       </div>
                     </div>
                   );
@@ -312,7 +312,7 @@ export function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filtered.map(tx => {
-                      const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:');
+                      const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                       const isKas = !tx.proyekId || isSuntikan;
 
                       return (

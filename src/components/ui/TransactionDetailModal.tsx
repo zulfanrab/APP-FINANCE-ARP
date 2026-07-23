@@ -267,12 +267,12 @@ export function TransactionDetailModal({
               </div>
             </div>
 
-            {/* Rejection Note from Pak Fatwa */}
+            {/* Rejection Note from Management */}
             {transaction.status === 'ditolak' && transaction.catatanPenolakan && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-2xl space-y-1.5 text-xs text-red-900 shadow-sm animate-fade-in">
                 <div className="flex items-center gap-1.5 font-bold text-red-700">
                   <AlertTriangle size={15} />
-                  <span>Komentar / Alasan Penolakan dari Pak Fatwa (Owner):</span>
+                  <span>Komentar / Alasan Penolakan Manajemen:</span>
                 </div>
                 <p className="font-semibold text-slate-800 bg-white p-3 rounded-xl border border-red-200 italic leading-relaxed break-words">
                   "{transaction.catatanPenolakan}"
@@ -318,7 +318,7 @@ export function TransactionDetailModal({
                   <span className={`px-2.5 py-0.5 rounded-full font-semibold ${
                     transaction.tag === 'operasional' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
                   }`}>
-                    {transaction.tag === 'operasional' ? '🏢 Operasional' : '👤 Prive Owner'}
+                    {transaction.tag === 'operasional' ? '🏢 Operasional' : '👤 Non-Operasional / Prive'}
                   </span>
                   {transaction.divisi && (
                     <span className="px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">

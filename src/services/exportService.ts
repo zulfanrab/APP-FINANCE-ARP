@@ -91,7 +91,7 @@ export function exportAccountingJournalExcel({
       t.deskripsi,
       t.kategori,
       projectName,
-      t.tag === 'operasional' ? 'Operasional' : t.tag === 'pribadi' ? 'Pribadi Owner' : '-',
+      t.tag === 'operasional' ? 'Operasional' : t.tag === 'pribadi' ? 'Non-Operasional / Prive' : '-',
       debet || '',
       kredit || '',
       runningBalance,
@@ -181,7 +181,7 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     [`DITERBITKAN: ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}`],
     [],
     ['--- KARTU DANA PROYEK ---'],
-    ['Anggaran Modal Disuntikkan (Pak Fatwa)', modalDisuntikkan],
+    ['Anggaran Modal Operasional Proyek', modalDisuntikkan],
     ['Total Belanja Lapangan (Kredit)', 0], // calculated later
     ['Total Refund Uang Kembali (Debet)', 0], // calculated later
     ['REALISASI BERSIH PROYEK', 0],
@@ -195,8 +195,8 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
   rows.push([
     1,
     formatDate(project.tanggalMulai),
-    'Penerimaan Modal Proyek (Disuntikkan Pak Fatwa)',
-    'Modal Disuntikkan',
+    'Penerimaan Alokasi Modal Operasional Proyek',
+    'Alokasi Modal Operasional',
     modalDisuntikkan,
     '',
     currentBalance,

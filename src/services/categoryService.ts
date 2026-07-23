@@ -6,11 +6,11 @@ import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export const DEFAULT_INCOME_CATEGORIES = [
-  'Drop Dana / Mutasi Kas Owner',
+  'Drop Dana Kas Utama / Holding',
   'Pembayaran Klien / Proyek',
   'DP / Termijn Proyek',
   'Pelunasan Proyek',
-  'Setoran Modal Owner',
+  'Setoran Modal Direksi / Kas Utama',
   'Refund Sisa Dana Proyek ke Kas Utama',
   'Mutasi Internal / Transfer Kas',
   'Pengembalian Dana (Refund)',
@@ -26,9 +26,9 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'Konsumsi & Akomodasi',
   'Peralatan & Sewa Alat',
   'Operasional Kantor',
-  'Suntikan Modal Proyek',
+  'Alokasi Modal Operasional Proyek',
   'Mutasi Internal / Transfer Kas',
-  'Prive Owner',
+  'Penarikan Prive / Non-Operasional',
   'Pengeluaran Lainnya',
 ];
 

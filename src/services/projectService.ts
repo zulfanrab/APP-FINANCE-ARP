@@ -58,7 +58,7 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
     id: `txn_modal_${project.id}`,
     tanggal: project.tanggalMulai || new Date().toISOString().split('T')[0],
     jenis: 'keluar',
-    deskripsi: `Suntikan Modal Proyek: ${project.nama}`,
+    deskripsi: `Alokasi Modal Proyek: ${project.nama}`,
     nominal: project.anggaran,
     kategori: 'Biaya Proyek',
     tag: 'operasional',
@@ -70,13 +70,16 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
   };
 
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
-  const idx = transactions.findIndex(t => t.id === newTx.id || (t.proyekId === project.id && t.deskripsi.startsWith('Suntikan Modal Proyek:')));
+  const idx = transactions.findIndex(
+    t => t.id === newTx.id ||
+      (t.proyekId === project.id && (t.deskripsi.startsWith('Suntikan Modal Proyek:') || t.deskripsi.startsWith('Alokasi Modal Proyek:')))
+  );
 
   if (idx !== -1) {
     transactions[idx] = {
       ...transactions[idx],
       nominal: project.anggaran,
-      deskripsi: `Suntikan Modal Proyek: ${project.nama}`,
+      deskripsi: `Alokasi Modal Proyek: ${project.nama}`,
       diupdatePada: now(),
     };
   } else {

@@ -71,15 +71,15 @@ export async function parseVoiceSentenceWithAI(transcript: string): Promise<Pars
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       const promptText = `
 Anda adalah AI Pengolah Suara Transaksi Keuangan Perusahaan PT Aksara Riksa Perdana.
-User (Owner Pak Fatwa) mengucapkan kalimat perintah suara berikut:
+Pimpinan/Direksi mengucapkan kalimat perintah suara berikut:
 "${transcript}"
 
 Ekstrak informasi berikut dalam format JSON MURNI (tanpa markdown/tanpa backticks):
 {
   "nominal": ANGKA_BULAT (contoh: 150000 untuk 150 ribu, 5000000 untuk 5 juta, 20000000 untuk 20 juta),
   "deskripsi": "Deskripsi singkat yang rapi & profesional untuk transaksi ini",
-  "jenisQuick": "prive" (jika tentang penarikan pribadi/prive), "operasional" (jika pengeluaran operasional/bensin/makan/proyek), atau "setoran" (jika setoran/suntikan modal),
-  "kategori": "Kategori paling cocok: Prive Owner / Transport & Bensin / Konsumsi & Akomodasi / Operasional Kantor / Biaya Proyek / Setoran Modal / Lain-lain"
+  "jenisQuick": "prive" (jika tentang penarikan pribadi/prive), "operasional" (jika pengeluaran operasional/bensin/makan/proyek), atau "setoran" (jika setoran/alokasi modal),
+  "kategori": "Kategori paling cocok: Penarikan Prive / Transport & Bensin / Konsumsi & Akomodasi / Operasional Kantor / Biaya Proyek / Setoran Modal / Lain-lain"
 }
 `;
 

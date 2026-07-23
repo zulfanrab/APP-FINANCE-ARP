@@ -23,17 +23,25 @@ function isApproved(t: Transaction): boolean {
   return t.status === 'disetujui' || t.status === 'selesai';
 }
 
-/** Check if a transaction is a "Suntikan Modal Proyek" (capital injection into project) */
+/** Check if a transaction is an "Alokasi Modal Operasional Proyek" (capital allocation into project) */
 export function isSuntikanModal(t: Transaction): boolean {
-  return t.deskripsi.startsWith('Suntikan Modal Proyek:') || t.kategori === 'Suntikan Modal Proyek';
+  return (
+    t.deskripsi.startsWith('Alokasi Modal Proyek:') ||
+    t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
+    t.kategori === 'Alokasi Modal Operasional Proyek' ||
+    t.kategori === 'Suntikan Modal Proyek'
+  );
 }
 
 /** Check if a transaction is an internal cash transfer (Mutasi Internal) */
 export function isMutasiInternal(t: Transaction): boolean {
   if (isSuntikanModal(t)) return true;
   if (t.kategori === 'Refund Dana Proyek ke Kas Utama') return true;
+  if (t.kategori === 'Refund Sisa Dana Proyek ke Kas Utama') return true;
   if (t.kategori === 'Mutasi Internal / Transfer Kas') return true;
+  if (t.kategori === 'Drop Dana Kas Utama / Holding') return true;
   if (t.kategori === 'Drop Dana / Mutasi Kas Owner') return true;
+  if (t.kategori === 'Setoran Modal Direksi / Kas Utama') return true;
   if (t.kategori === 'Setoran Modal Owner') return true;
   return false;
 }
@@ -494,7 +502,7 @@ export function buildProjectAISummaryContext(
   return `Laporan Analisis Realisasi Anggaran Proyek PT Aksara Riksa Perdana:
 - Nama Proyek: ${projectNama}
 - Klien: ${klien}
-- Modal Anggaran Disuntikkan: ${fmt(anggaran)}
+- Alokasi Modal Operasional: ${fmt(anggaran)}
 - Total Pengeluaran Lapangan: ${fmt(totalBelanja)}
 - Total Refund / Pengembalian: ${fmt(totalRefund)}
 - Realisasi Bersih Terpakai: ${fmt(realisasiBersih)} (${persentaseTerpakai}% dari anggaran)

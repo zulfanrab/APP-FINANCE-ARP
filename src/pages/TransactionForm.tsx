@@ -713,7 +713,7 @@ export function TransactionForm() {
                   <span>💡</span> Drop Dana / Saldo Operasional Proyek
                 </p>
                 <p className="leading-relaxed text-emerald-800">
-                  Uang sebesar <strong>Rp {form.nominalStr || '0'}</strong> yang ditransfer dari Pak Fatwa/Owner ini akan <strong>otomatis mengisi Saldo Kas Operasional Proyek ({projects.find(p => p.id === form.proyekId)?.nama})</strong>. Saldo proyek akan menjadi positif dan otomatis berkurang seiring pengeluaran belanja lapangan.
+                  Uang sebesar <strong>Rp {form.nominalStr || '0'}</strong> yang dialokasikan dari Kas Utama ini akan <strong>otomatis mengisi Saldo Kas Operasional Proyek ({projects.find(p => p.id === form.proyekId)?.nama})</strong>. Saldo proyek akan menjadi positif dan otomatis berkurang seiring pengeluaran belanja lapangan.
                 </p>
               </div>
             )}
@@ -757,7 +757,7 @@ export function TransactionForm() {
                     <Clock size={16} className={!autoApprove ? 'text-amber-600' : 'text-gray-400'} />
                     <span className="font-extrabold text-xs">⏰ Perlu Approval</span>
                   </div>
-                  <p className="text-[11px] opacity-80 leading-snug">Masuk ke antrean approval Pak Fatwa terlebih dahulu.</p>
+                  <p className="text-[11px] opacity-80 leading-snug">Masuk ke antrean approval manajemen terlebih dahulu.</p>
                 </button>
               </div>
             </div>

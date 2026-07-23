@@ -87,14 +87,14 @@ export function ProjectDetail() {
       const fallbackText = `Analisis Kesehatan Keuangan Proyek ${project.nama}
 
 1. Status Modal & Realisasi Lapangan:
-- Modal Disuntikkan: ${formatRupiah(summary.modalDisuntikkan)}
+- Alokasi Modal Operasional: ${formatRupiah(summary.modalDisuntikkan)}
 - Total Pengeluaran Lapangan: ${formatRupiah(summary.totalPengeluaran)}
 - Pengembalian / Refund Uang: ${formatRupiah(summary.totalRefundMasuk)}
 - Realisasi Bersih Terpakai: ${formatRupiah(summary.realisasiBersih)} (${percent}% dari anggaran)
 - Sisa Dana Proyek: ${formatRupiah(summary.sisaDanaProyek)}
 
 2. Evaluasi & Rekomendasi:
-${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efisien dan masih dalam batas modal disuntikkan. Pertahankan pencatatan bukti nota secara konsisten.' : 'Pengeluaran proyek telah melebihi modal awal yang disuntikkan. Disarankan untuk mengevaluasi kembali pos belanja lapangan bersama tim.'}`;
+${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efisien dan masih dalam batas alokasi modal operasional. Pertahankan pencatatan bukti nota secara konsisten.' : 'Pengeluaran proyek telah melebihi alokasi modal awal. Disarankan untuk mengevaluasi kembali pos belanja lapangan bersama tim.'}`;
 
       setAiResult(cleanTextPunctuation(fallbackText));
       addToast('success', 'Analisis Kesehatan Proyek berhasil dibuat!');
@@ -365,9 +365,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               <p className="text-[10px] text-blue-600 truncate mt-0.5">Omzet Riil Klien</p>
             </div>
 
-            {/* 4. Modal Disuntikkan (Transfer Internal) */}
+            {/* 4. Alokasi Modal Operasional (Transfer Internal) */}
             <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1 truncate">Modal Disuntikkan</p>
+              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1 truncate">Alokasi Modal Operasional</p>
               <p className="text-sm sm:text-base lg:text-lg font-extrabold text-purple-800 truncate tabular-nums">{formatRupiah(financials.modalDisuntikkan)}</p>
               <p className="text-[10px] text-purple-600 truncate mt-0.5">Transfer Internal</p>
             </div>
@@ -578,7 +578,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Anggaran Modal dari Pak Fatwa (Rp)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Anggaran Modal Operasional (Rp)</label>
             <input
               type="text"
               inputMode="numeric"
