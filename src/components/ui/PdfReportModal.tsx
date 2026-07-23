@@ -273,21 +273,51 @@ export function PdfReportModal({
               margin-top: 4px;
             }
             .summary-box {
-              display: table;
+              display: flex !important;
+              flex-direction: row !important;
+              justify-content: space-between !important;
+              align-items: stretch !important;
+              gap: 12px;
               width: 100%;
               border: 1px solid #CBD5E1;
               border-radius: 10px;
               background-color: #F8FAFC;
-              margin-bottom: 18px;
-              padding: 10px 6px;
-              page-break-inside: avoid;
-              break-inside: avoid;
+              margin-bottom: 20px;
+              padding: 12px;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
-            .summary-cell {
-              display: table-cell;
+            .summary-card {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              border-radius: 8px;
+              padding: 10px 8px;
               text-align: center;
-              vertical-align: middle;
-              padding: 4px 6px;
+              border: 1px solid #E2E8F0;
+              background-color: #FFFFFF;
+            }
+            .card-green {
+              background-color: #ECFDF5 !important;
+              border-color: #D1FAE5 !important;
+            }
+            .card-green .summary-val {
+              color: #059669 !important;
+            }
+            .card-red {
+              background-color: #FEF2F2 !important;
+              border-color: #FEE2E2 !important;
+            }
+            .card-red .summary-val {
+              color: #DC2626 !important;
+            }
+            .card-navy {
+              background-color: #F8FAFC !important;
+              border-color: #E2E8F0 !important;
+            }
+            .card-navy .summary-val {
+              color: #1E3A8A !important;
             }
             .summary-label {
               font-size: 8.5px;
@@ -295,15 +325,13 @@ export function PdfReportModal({
               text-transform: uppercase;
               font-weight: 700;
               letter-spacing: 0.3px;
+              margin-bottom: 4px;
             }
             .summary-val {
               font-size: 13.5px;
               font-weight: 800;
-              margin-top: 3px;
+              margin: 0;
             }
-            .val-masuk { color: #047857; }
-            .val-keluar { color: #BE123C; }
-            .val-net { color: #1E40AF; }
 
             table.journal-table {
               width: 100%;
@@ -444,45 +472,45 @@ export function PdfReportModal({
 
             {/* EXECUTIVE FINANCIAL SUMMARY */}
             {project ? (
-              <div className="summary-box bg-[#F8FAFC] border border-slate-300 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center my-4 shadow-sm">
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Alokasi Modal Operasional</span>
-                  <p className="summary-val text-sm font-black text-purple-800 tabular-nums mt-1">{formatRupiah(modalAwal)}</p>
+              <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalAwal)}</p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Invoice Klien</span>
-                  <p className="summary-val text-sm font-black text-emerald-700 tabular-nums mt-1">{formatRupiah(totalDebet > modalAwal ? totalDebet - modalAwal : 0)}</p>
+                <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalDebet > modalAwal ? totalDebet - modalAwal : 0)}</p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Pengeluaran Riil</span>
-                  <p className="summary-val text-sm font-black text-rose-700 tabular-nums mt-1">{formatRupiah(totalKredit)}</p>
+                <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Laba - Rugi (P&L)</span>
-                  <p className={`summary-val text-sm font-black tabular-nums mt-1 ${((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit) >= 0 ? 'card-green' : 'card-red'}`}>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
+                  <p className="summary-val text-sm font-black tabular-nums">
                     {formatSaldoRupiah((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit)}
                   </p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Saldo Kas Proyek</span>
-                  <p className={`summary-val text-sm font-black tabular-nums mt-1 ${sisaDana >= 0 ? 'text-blue-800' : 'text-rose-700'}`}>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Proyek</span>
+                  <p className="summary-val text-sm font-black tabular-nums">
                     {formatSaldoRupiah(sisaDana)}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="summary-box bg-[#F8FAFC] border border-slate-300 rounded-2xl p-4 grid grid-cols-3 gap-3 text-center my-4 shadow-sm">
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Total Debet (Pemasukan)</span>
-                  <p className="summary-val text-sm font-black text-emerald-700 tabular-nums mt-1">{formatRupiah(totalDebet)}</p>
+              <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Debet (Pemasukan)</span>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalDebet)}</p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Total Kredit (Pengeluaran)</span>
-                  <p className="summary-val text-sm font-black text-rose-700 tabular-nums mt-1">{formatRupiah(totalKredit)}</p>
+                <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
                 </div>
-                <div className="p-2 bg-white rounded-xl border border-slate-100">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Saldo Akhir Periode</span>
-                  <p className={`summary-val text-sm font-black tabular-nums mt-1 ${sisaDana >= 0 ? 'text-blue-800' : 'text-rose-700'}`}>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Akhir Periode</span>
+                  <p className="summary-val text-sm font-black tabular-nums">
                     {formatSaldoRupiah(sisaDana)}
                   </p>
                 </div>
