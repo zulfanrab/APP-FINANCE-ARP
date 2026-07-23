@@ -171,5 +171,6 @@ export { AttachmentViewer } from './AttachmentViewer';
 export { Skeleton, DashboardSkeleton, TransactionListSkeleton, ProjectsSkeleton, ReportsSkeleton } from './Skeleton';
 export { TransactionDetailModal } from './TransactionDetailModal';
 export { PdfReportModal } from './PdfReportModal';
+export { AutoUpdateBanner } from './AutoUpdateBanner';
 
 

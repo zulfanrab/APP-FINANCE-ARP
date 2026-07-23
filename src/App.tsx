@@ -17,7 +17,8 @@ import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Reports } from './pages/Reports';
 import { hasPin } from './services/authService';
-import { LoadingSpinner } from './components/ui';
+import { initAutoUpdateEngine } from './services/autoUpdateService';
+import { LoadingSpinner, AutoUpdateBanner } from './components/ui';
 import { ToastContainer } from './components/ui/Toast';
 
 // ---- Protected Route ----
@@ -54,6 +55,11 @@ function AppInner() {
     hasPin().then(exists => setPinExists(exists));
   }, [setupDone]);
 
+  useEffect(() => {
+    const cleanup = initAutoUpdateEngine();
+    return cleanup;
+  }, []);
+
   if (pinExists === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -73,6 +79,7 @@ function AppInner() {
   }
 
   return (
+    <>
     <Routes>
       {/* Public */}
       <Route
@@ -150,6 +157,8 @@ function AppInner() {
         }
       />
     </Routes>
+    <AutoUpdateBanner />
+    </>
   );
 }
 
