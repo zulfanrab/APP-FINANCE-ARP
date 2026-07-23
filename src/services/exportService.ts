@@ -203,13 +203,28 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     'Selesai',
   ]);
 
+  const isCapitalInjectionTx = (t: Transaction) => {
+    const d = (t.deskripsi || '').toLowerCase();
+    const k = (t.kategori || '').toLowerCase();
+    return (
+      d.startsWith('alokasi modal proyek:') ||
+      d.startsWith('suntikan modal proyek:') ||
+      d.includes('penerimaan alokasi modal') ||
+      d.includes('penerimaan modal proyek') ||
+      k === 'alokasi modal operasional proyek' ||
+      k === 'suntikan modal proyek' ||
+      k === 'alokasi modal proyek'
+    );
+  };
+
   sortedPtx.forEach((t, idx) => {
-    const isMasuk = t.jenis === 'masuk';
+    const isInjection = isCapitalInjectionTx(t);
+    const isMasuk = t.jenis === 'masuk' || isInjection;
     const debet = isMasuk ? t.nominal : 0;
     const kredit = !isMasuk ? t.nominal : 0;
 
     if (isMasuk) {
-      totalRefund += t.nominal;
+      if (!isInjection) totalRefund += t.nominal;
       currentBalance += t.nominal;
     } else {
       totalBelanja += t.nominal;

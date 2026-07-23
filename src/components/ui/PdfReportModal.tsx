@@ -21,6 +21,30 @@ interface PdfReportModalProps {
   project?: Project | null;
 }
 
+/** Explicit Saldo Currency Formatter with Safe Negative Support */
+export function formatSaldoRupiah(amount: number): string {
+  if (isNaN(amount) || amount === 0) return 'Rp 0';
+  if (amount < 0) {
+    return `-Rp ${Math.abs(amount).toLocaleString('id-ID')}`;
+  }
+  return `Rp ${amount.toLocaleString('id-ID')}`;
+}
+
+/** Check if a transaction is a Capital Allocation / Injection (Alokasi Modal Operasional) */
+export function isCapitalInjectionTx(t: Transaction): boolean {
+  const d = (t.deskripsi || '').toLowerCase();
+  const k = (t.kategori || '').toLowerCase();
+  return (
+    d.startsWith('alokasi modal proyek:') ||
+    d.startsWith('suntikan modal proyek:') ||
+    d.includes('penerimaan alokasi modal') ||
+    d.includes('penerimaan modal proyek') ||
+    k === 'alokasi modal operasional proyek' ||
+    k === 'suntikan modal proyek' ||
+    k === 'alokasi modal proyek'
+  );
+}
+
 export function PdfReportModal({
   isOpen,
   onClose,
@@ -39,12 +63,6 @@ export function PdfReportModal({
   const companyPhone = '+62 821-2984-9515';
   const companyEmail = 'aksara.riksa.perdana@gmail.com';
   const companyWebsite = 'aksarariksapjk3.com';
-
-  const printDate = new Date().toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
 
   // Filter approved transactions
   const approvedTx = transactions.filter(t => t.status === 'disetujui' || t.status === 'selesai');
@@ -70,20 +88,18 @@ export function PdfReportModal({
     // ============================================================
     modalAwal = project.anggaran || 0;
 
-    const ptx = approvedTx.filter(
-      t => t.proyekId === project.id
-    );
-
+    const ptx = approvedTx.filter(t => t.proyekId === project.id);
     const sortedPtx = [...ptx].sort(
       (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
     );
 
-    let currentBalance = modalAwal;
+    let currentBalance = 0;
 
-    // Initial Capital Row if modalAwal > 0 and no explicit injection transaction exists
-    const hasInjectionTx = ptx.some(t => t.jenis === 'masuk' && (t.kategori.includes('Suntikan') || t.kategori.includes('Mutasi') || t.deskripsi.startsWith('Suntikan')));
+    // Initial Capital Row if modalAwal > 0 and no explicit injection transaction exists in sortedPtx
+    const hasInjectionTx = sortedPtx.some(t => isCapitalInjectionTx(t));
 
     if (modalAwal > 0 && !hasInjectionTx) {
+      currentBalance = modalAwal;
       tableRows.push({
         no: 1,
         tanggal: formatDate(project.tanggalMulai),
@@ -94,12 +110,12 @@ export function PdfReportModal({
         saldo: currentBalance,
       });
       totalDebet += modalAwal;
-    } else {
-      currentBalance = 0;
     }
 
-    sortedPtx.forEach((t, idx) => {
-      const isMasuk = t.jenis === 'masuk';
+    sortedPtx.forEach((t) => {
+      const isInjection = isCapitalInjectionTx(t);
+      const isMasuk = t.jenis === 'masuk' || isInjection; // CAPITAL INJECTION IS ALWAYS DEBET (MASUK)!
+
       const debet = isMasuk ? t.nominal : 0;
       const kredit = !isMasuk ? t.nominal : 0;
 
@@ -128,7 +144,7 @@ export function PdfReportModal({
     // KAS UTAMA JOURNAL MATH
     // ============================================================
     const mainTx = approvedTx.filter(
-      t => !t.proyekId || t.kategori === 'Suntikan Modal Proyek' || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama' || t.deskripsi.startsWith('Suntikan Modal Proyek:')
+      t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
     );
 
     const sortedMain = [...mainTx].sort(
@@ -193,8 +209,11 @@ export function PdfReportModal({
           <title>${title} - ${companyName}</title>
           <style>
             @page {
-              size: A4;
-              margin: 12mm;
+              size: A4 portrait;
+              margin: 12mm 10mm 12mm 10mm;
+            }
+            * {
+              box-sizing: border-box;
             }
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -204,6 +223,8 @@ export function PdfReportModal({
               margin: 0;
               padding: 0;
               background: #fff;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
             .kop-container {
               text-align: center;
@@ -252,10 +273,12 @@ export function PdfReportModal({
               background-color: #F8FAFC;
               margin-bottom: 16px;
               padding: 10px;
+              page-break-inside: avoid;
+              break-inside: avoid;
             }
             .summary-cell {
               display: table-cell;
-              width: 25%;
+              width: 20%;
               text-align: center;
               vertical-align: middle;
             }
@@ -273,10 +296,22 @@ export function PdfReportModal({
             .val-masuk { color: #166534; }
             .val-keluar { color: #991B1B; }
             .val-net { color: #0284C7; }
+
             table.journal-table {
               width: 100%;
               border-collapse: collapse;
               margin-bottom: 25px;
+              page-break-inside: auto;
+            }
+            table.journal-table thead {
+              display: table-header-group;
+            }
+            table.journal-table tbody {
+              display: table-row-group;
+            }
+            table.journal-table tr {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             table.journal-table th {
               background-color: #0F172A;
@@ -286,23 +321,33 @@ export function PdfReportModal({
               text-transform: uppercase;
               padding: 8px 6px;
               border: 1px solid #0F172A;
+              line-height: 1.3;
+              vertical-align: middle;
             }
             table.journal-table td {
               padding: 7px 6px;
               border: 1px solid #CBD5E1;
               font-size: 10px;
+              line-height: 1.4;
+              vertical-align: top;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             table.journal-table tr:nth-child(even) {
               background-color: #F8FAFC;
             }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
+            .text-right { text-align: right !important; }
+            .text-center { text-align: center !important; }
+            .text-left { text-align: left !important; }
             .font-bold { font-weight: 700; }
             .signature-container {
               display: table;
               width: 100%;
               margin-top: 35px;
               page-break-inside: avoid;
+              break-inside: avoid;
             }
             .signature-box {
               display: table-cell;
@@ -401,13 +446,13 @@ export function PdfReportModal({
                 <div>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Laba - Rugi (P&L)</span>
                   <p className={`summary-val text-sm font-black ${((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {formatRupiah((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit)}
+                    {formatSaldoRupiah((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit)}
                   </p>
                 </div>
                 <div>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Saldo Kas Proyek</span>
                   <p className={`summary-val val-net text-sm font-black ${sisaDana >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                    {formatRupiah(sisaDana)}
+                    {formatSaldoRupiah(sisaDana)}
                   </p>
                 </div>
               </div>
@@ -424,7 +469,7 @@ export function PdfReportModal({
                 <div>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase">Saldo Akhir Periode</span>
                   <p className={`summary-val val-net text-sm font-black ${sisaDana >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {formatRupiah(sisaDana)}
+                    {formatSaldoRupiah(sisaDana)}
                   </p>
                 </div>
               </div>
@@ -436,7 +481,7 @@ export function PdfReportModal({
                 <thead>
                   <tr className="bg-slate-900 text-white text-[10px] uppercase">
                     <th className="p-2 border border-slate-900 text-center w-8">No</th>
-                    <th className="p-2 border border-slate-900 text-left w-20">Tanggal</th>
+                    <th className="p-2 border border-slate-900 text-center w-20">Tanggal</th>
                     <th className="p-2 border border-slate-900 text-left">Uraian / Deskripsi Transaksi</th>
                     <th className="p-2 border border-slate-900 text-left w-28">Kategori</th>
                     <th className="p-2 border border-slate-900 text-right w-24">Debet (+)</th>
@@ -447,18 +492,18 @@ export function PdfReportModal({
                 <tbody>
                   {tableRows.map((row, idx) => (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                      <td className="p-2 border border-slate-200 text-center text-slate-500">{row.no}</td>
-                      <td className="p-2 border border-slate-200 font-medium whitespace-nowrap">{row.tanggal}</td>
-                      <td className="p-2 border border-slate-200 font-bold text-slate-800">{row.deskripsi}</td>
-                      <td className="p-2 border border-slate-200 text-slate-600">{row.kategori}</td>
+                      <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium">{row.no}</td>
+                      <td className="p-2 border border-slate-200 text-center font-medium whitespace-nowrap">{row.tanggal}</td>
+                      <td className="p-2 border border-slate-200 text-left font-bold text-slate-800 break-words">{row.deskripsi}</td>
+                      <td className="p-2 border border-slate-200 text-left text-slate-600">{row.kategori}</td>
                       <td className="p-2 border border-slate-200 text-right font-semibold text-emerald-700">
                         {row.debet > 0 ? formatRupiah(row.debet) : '-'}
                       </td>
                       <td className="p-2 border border-slate-200 text-right font-semibold text-red-700">
                         {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
                       </td>
-                      <td className="p-2 border border-slate-200 text-right font-black text-slate-900">
-                        {formatRupiah(row.saldo)}
+                      <td className={`p-2 border border-slate-200 text-right font-black ${row.saldo >= 0 ? 'text-slate-900' : 'text-red-700'}`}>
+                        {formatSaldoRupiah(row.saldo)}
                       </td>
                     </tr>
                   ))}
@@ -468,12 +513,32 @@ export function PdfReportModal({
                     <td colSpan={4} className="p-2.5 border border-slate-300 text-right uppercase text-slate-700">
                       TOTAL &amp; POSISI SISA DANA
                     </td>
-                    <td className="p-2.5 border border-slate-300 text-right text-emerald-700">{formatRupiah(totalDebet)}</td>
-                    <td className="p-2.5 border border-slate-300 text-right text-red-700">{formatRupiah(totalKredit)}</td>
-                    <td className="p-2.5 border border-slate-300 text-right text-blue-700">{formatRupiah(sisaDana)}</td>
+                    <td className="p-2.5 border border-slate-300 text-right text-emerald-700 font-bold">{formatRupiah(totalDebet)}</td>
+                    <td className="p-2.5 border border-slate-300 text-right text-red-700 font-bold">{formatRupiah(totalKredit)}</td>
+                    <td className={`p-2.5 border border-slate-300 text-right font-black ${sisaDana >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                      {formatSaldoRupiah(sisaDana)}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
+            </div>
+
+            {/* FORMAL SIGNATURE BOX AT BOTTOM */}
+            <div className="signature-container my-6">
+              <div className="signature-box">
+                <p className="text-xs text-slate-600 font-medium mb-1">Disiapkan Oleh:</p>
+                <div className="signature-space"></div>
+                <div className="signature-line text-xs font-bold text-slate-900">
+                  Admin Keuangan PT ARP
+                </div>
+              </div>
+              <div className="signature-box">
+                <p className="text-xs text-slate-600 font-medium mb-1">Disetujui Oleh:</p>
+                <div className="signature-space"></div>
+                <div className="signature-line text-xs font-bold text-slate-900">
+                  Manajemen / Direksi
+                </div>
+              </div>
             </div>
 
           </div>
