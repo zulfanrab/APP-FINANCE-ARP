@@ -55,7 +55,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`hidden md:flex h-screen sticky top-0 flex-col bg-[#0F172A] text-white transition-all duration-300
+      className={`hidden md:flex h-full flex-col bg-[#0F172A] text-white transition-all duration-300
         ${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 z-30 border-r border-white/10`}
     >
       {/* Brand Header */}
