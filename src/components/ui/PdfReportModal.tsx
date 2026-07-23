@@ -10,6 +10,7 @@ import { Printer, FileText } from 'lucide-react';
 import { Modal } from './Modal';
 import { type Transaction, type Project } from '../../types';
 import { formatDate, formatRupiah } from './index';
+import { groupAndSortTransactions } from '../../services/transactionService';
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -89,9 +90,7 @@ export function PdfReportModal({
     modalAwal = project.anggaran || 0;
 
     const ptx = approvedTx.filter(t => t.proyekId === project.id);
-    const sortedPtx = [...ptx].sort(
-      (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-    );
+    const sortedPtx = groupAndSortTransactions(ptx, 'asc');
 
     let currentBalance = 0;
 
@@ -147,9 +146,7 @@ export function PdfReportModal({
       t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
     );
 
-    const sortedMain = [...mainTx].sort(
-      (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-    );
+    const sortedMain = groupAndSortTransactions(mainTx, 'asc');
 
     let currentBalance = 0;
 

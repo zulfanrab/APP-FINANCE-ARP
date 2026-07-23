@@ -469,3 +469,73 @@ export async function filterTransactions(
     return true;
   });
 }
+
+/**
+ * Display Sorting & Grouping for Parent-Child Transactions (e.g. Main Transaction & its Auto-Split Admin Fee).
+ * - Parent transactions (where parentTransactionId is null/undefined) are sorted by date & created_at.
+ * - Each Child transaction (where parentTransactionId === parent.id) is attached IMMEDIATELY below its parent.
+ * - Preserves running balance calculation order.
+ */
+export function groupAndSortTransactions(
+  transactions: Transaction[],
+  order: 'asc' | 'desc' = 'asc'
+): Transaction[] {
+  if (!transactions || transactions.length === 0) return [];
+
+  const parentTxs: Transaction[] = [];
+  const childrenMap = new Map<string, Transaction[]>();
+  const processedChildIds = new Set<string>();
+
+  // 1. Index children by parentTransactionId
+  for (const t of transactions) {
+    if (t.parentTransactionId) {
+      const existing = childrenMap.get(t.parentTransactionId) || [];
+      existing.push(t);
+      childrenMap.set(t.parentTransactionId, existing);
+    } else {
+      parentTxs.push(t);
+    }
+  }
+
+  // 2. Sort parent transactions by date & created_at
+  const sortedParents = [...parentTxs].sort((a, b) => {
+    const timeA = new Date(a.tanggal).getTime();
+    const timeB = new Date(b.tanggal).getTime();
+    if (timeA !== timeB) {
+      return order === 'asc' ? timeA - timeB : timeB - timeA;
+    }
+    const createdA = new Date(a.dibuatPada || a.tanggal).getTime();
+    const createdB = new Date(b.dibuatPada || b.tanggal).getTime();
+    return order === 'asc' ? createdA - createdB : createdB - createdA;
+  });
+
+  // 3. Glue children immediately below their parent
+  const result: Transaction[] = [];
+
+  for (const parent of sortedParents) {
+    result.push(parent);
+
+    const children = childrenMap.get(parent.id);
+    if (children && children.length > 0) {
+      const sortedChildren = [...children].sort((a, b) => {
+        const createdA = new Date(a.dibuatPada || a.tanggal).getTime();
+        const createdB = new Date(b.dibuatPada || b.tanggal).getTime();
+        return createdA - createdB;
+      });
+
+      for (const child of sortedChildren) {
+        result.push(child);
+        processedChildIds.add(child.id);
+      }
+    }
+  }
+
+  // 4. Preserve orphan children whose parent is not present in the current array
+  for (const t of transactions) {
+    if (t.parentTransactionId && !processedChildIds.has(t.id)) {
+      result.push(t);
+    }
+  }
+
+  return result;
+}

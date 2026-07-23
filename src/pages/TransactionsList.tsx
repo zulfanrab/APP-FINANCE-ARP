@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban, ChevronRight } from 'lucide-react';
-import { getTransactions, deleteTransaction } from '../services/transactionService';
+import { getTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { type Transaction, type TransactionType, type TransactionStatus, type Project } from '../types';
 import {
@@ -80,6 +80,8 @@ export function TransactionsList() {
     if (filterStatus !== 'semua' && t.status !== filterStatus) return false;
     return true;
   });
+
+  const displaySorted = groupAndSortTransactions(filtered, 'desc');
 
   if (loading) return <TransactionListSkeleton />;
 
@@ -192,7 +194,7 @@ export function TransactionsList() {
           <>
             {/* MOBILE CARD VIEW (Directly Clickable) */}
             <div className="md:hidden space-y-3.5">
-              {filtered.map(tx => {
+              {displaySorted.map(tx => {
                 const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                 const isKas = !tx.proyekId || isSuntikan;
                 const prjName = getProjectName(tx.proyekId);
@@ -269,7 +271,7 @@ export function TransactionsList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filtered.map(tx => {
+                  {displaySorted.map(tx => {
                     const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                     const isKas = !tx.proyekId || isSuntikan;
                     const prjName = getProjectName(tx.proyekId);

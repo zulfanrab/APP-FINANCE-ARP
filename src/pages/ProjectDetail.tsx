@@ -13,7 +13,7 @@ import {
   Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
-import { getTransactionsByProject, addTransaction, deleteTransaction } from '../services/transactionService';
+import { getTransactionsByProject, addTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjectFinancialSummary, getProjectCategoryBreakdown, buildProjectAISummaryContext, cleanTextPunctuation } from '../services/analyticsService';
 import { exportProjectRealisasiExcel } from '../services/exportService';
 import { type Project, type Transaction } from '../types';
@@ -501,11 +501,15 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </div>
         </div>
 
-        {filteredTx.length === 0 ? (
-          <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />
-        ) : (
-          <div className="space-y-3">
-            {filteredTx.map(tx => (
+        {(() => {
+          const displaySortedTx = groupAndSortTransactions(filteredTx, 'desc');
+          if (displaySortedTx.length === 0) {
+            return <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />;
+          }
+
+          return (
+            <div className="space-y-3">
+              {displaySortedTx.map(tx => (
               <div
                 key={tx.id}
                 onClick={() => setSelectedTx(tx)}
@@ -553,7 +557,8 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
       </Card>
 
       {/* Edit Budget Modal */}

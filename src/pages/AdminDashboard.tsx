@@ -9,7 +9,7 @@ import {
   ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { getTransactions, filterTransactions, deleteTransaction } from '../services/transactionService';
+import { getTransactions, filterTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
 import {
@@ -106,13 +106,16 @@ export function AdminDashboard() {
     }
 
     // Sort
-    result.sort((a, b) => {
-      let cmp = 0;
-      if (sortField === 'tanggal') cmp = new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime();
-      if (sortField === 'nominal') cmp = a.nominal - b.nominal;
-      if (sortField === 'deskripsi') cmp = a.deskripsi.localeCompare(b.deskripsi);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
+    if (sortField === 'tanggal') {
+      result = groupAndSortTransactions(result, sortDir);
+    } else {
+      result.sort((a, b) => {
+        let cmp = 0;
+        if (sortField === 'nominal') cmp = a.nominal - b.nominal;
+        if (sortField === 'deskripsi') cmp = a.deskripsi.localeCompare(b.deskripsi);
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
 
     setFiltered(result);
   }, [allTransactions, filters, search, dateFrom, dateTo, sortField, sortDir]);

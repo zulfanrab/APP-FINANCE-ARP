@@ -7,6 +7,7 @@
 import * as XLSX from 'xlsx';
 import { type Transaction, type Project } from '../types';
 import { formatDate, formatRupiah } from '../components/ui';
+import { groupAndSortTransactions } from './transactionService';
 
 interface ExportJournalOptions {
   title: string;
@@ -41,9 +42,7 @@ export function exportAccountingJournalExcel({
     t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || isMutasiInternal(t))
   );
 
-  const sorted = [...mainTx].sort(
-    (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-  );
+  const sorted = groupAndSortTransactions(mainTx, 'asc');
 
   let runningBalance = 0;
   let totalDebet = 0;
@@ -162,9 +161,7 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     t => (t.proyekId === project.id || t.deskripsi.includes(project.nama)) && (t.status === 'disetujui' || t.status === 'selesai')
   );
 
-  const sortedPtx = [...approvedPtx].sort(
-    (a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime()
-  );
+  const sortedPtx = groupAndSortTransactions(approvedPtx, 'asc');
 
   const modalDisuntikkan = project.anggaran || 0;
   let totalBelanja = 0;
