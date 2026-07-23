@@ -15,7 +15,7 @@ import { type Transaction, type Project, type JalurTransfer } from '../../types'
 import { updateTransaction, deleteTransaction, getTransactions } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
-import { uploadAttachmentFile } from '../../services/storageService';
+import { uploadAttachmentFile, compressFileToAttachment } from '../../services/storageService';
 import { formatRupiah, formatDate, StatusBadge } from './index';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -118,26 +118,28 @@ export function TransactionDetailModal({
   const projectObj = projects.find(p => p.id === transaction.proyekId);
   const isKasUtama = !transaction.proyekId;
 
-  const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
+    for (const file of files) {
+      try {
+        const attachment = await compressFileToAttachment(file);
         setStagedAttachments(prev => [
           ...prev,
           {
-            nama: file.name,
-            tipe: file.type || 'image/png',
-            dataUrl: reader.result as string,
+            nama: attachment.nama,
+            tipe: attachment.tipe,
+            dataUrl: attachment.dataUrl,
             fileObj: file,
           },
         ]);
-      };
-      reader.readAsDataURL(file);
-    });
-    addToast('info', `${files.length} foto dipilih (diunggah ke Drive saat Anda klik Simpan).`);
+      } catch (err) {
+        console.error('Gagal memproses lampiran:', err);
+      }
+    }
+    addToast('info', `${files.length} foto/berkas dipilih.`);
+    e.target.value = '';
   };
 
   const handleRemoveStagedAttachment = (idx: number) => {
@@ -158,13 +160,24 @@ export function TransactionDetailModal({
     setSaving(true);
     try {
       const finalAttachments = [];
+      const currentProject = projects.find(p => p.id === editForm.proyekId);
+
       for (const att of stagedAttachments) {
         if (att.fileObj) {
-          const uploaded = await uploadAttachmentFile(att.fileObj, {
-            tanggal: editForm.tanggal,
-            tag: editForm.tag,
-          });
-          finalAttachments.push(uploaded);
+          try {
+            const uploaded = await uploadAttachmentFile(att.fileObj, {
+              tanggal: editForm.tanggal,
+              tag: editForm.tag,
+              proyekNama: currentProject?.nama,
+            });
+            finalAttachments.push(uploaded);
+          } catch {
+            finalAttachments.push({
+              nama: att.nama,
+              tipe: att.tipe,
+              dataUrl: att.dataUrl,
+            });
+          }
         } else {
           finalAttachments.push({
             nama: att.nama,
@@ -638,9 +651,9 @@ export function TransactionDetailModal({
                   onClick={() => fileInputRef.current?.click()}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
                 >
-                  <Plus size={14} /> Tambah Foto
+                  <Plus size={14} /> Tambah Foto / PDF
                 </button>
-                <input type="file" ref={fileInputRef} accept="image/*,application/pdf" multiple onChange={handleSelectFiles} className="hidden" />
+                <input type="file" ref={fileInputRef} accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleSelectFiles} className="hidden" />
               </div>
 
               {stagedAttachments.length === 0 ? (

@@ -14,7 +14,7 @@ import Tesseract from 'tesseract.js';
 import { addTransaction, getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getCategories, addCategory, deleteCategory } from '../services/categoryService';
-import { uploadAttachmentFile } from '../services/storageService';
+import { uploadAttachmentFile, compressFileToAttachment } from '../services/storageService';
 import { type Project, type Attachment, type JalurTransfer } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
@@ -157,50 +157,50 @@ export function TransactionForm() {
         setField('tanggal', aiResult.tanggal);
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        setStagedFiles(prev => [
-          ...prev,
-          {
-            nama: file.name,
-            tipe: file.type || 'image/png',
-            dataUrl: reader.result as string,
-            fileObj: file,
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
+      const attachment = await compressFileToAttachment(file);
+      setStagedFiles(prev => [
+        ...prev,
+        {
+          nama: attachment.nama,
+          tipe: attachment.tipe,
+          dataUrl: attachment.dataUrl,
+          fileObj: file,
+        },
+      ]);
 
       addToast('success', `✨ AI Gemini membaca struk: ${formatRupiah(aiResult.nominal)} (${aiResult.deskripsi})`);
     } catch {
       addToast('error', 'Gagal membaca struk dengan Gemini AI. Silakan isi nominal manual.');
     } finally {
       setOcrLoading(false);
+      e.target.value = '';
     }
   };
 
   // Manual File Selection (Staged Locally)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = () => {
+    for (const file of files) {
+      try {
+        const attachment = await compressFileToAttachment(file);
         setStagedFiles(prev => [
           ...prev,
           {
-            nama: file.name,
-            tipe: file.type || 'image/png',
-            dataUrl: reader.result as string,
+            nama: attachment.nama,
+            tipe: attachment.tipe,
+            dataUrl: attachment.dataUrl,
             fileObj: file,
           },
         ]);
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('Gagal memproses file:', err);
+      }
+    }
 
-    addToast('info', `${files.length} berkas dipilih (akan diunggah ke Drive saat disimpan).`);
+    addToast('info', `${files.length} berkas dipilih.`);
+    e.target.value = '';
   };
 
   const removeAttachment = (idx: number) => {
@@ -218,13 +218,24 @@ export function TransactionForm() {
     setLoading(true);
     try {
       const uploadedAttachments: Attachment[] = [];
+      const currentProject = projects.find(p => p.id === (form.proyekId || urlProyekId));
+
       for (const staged of stagedFiles) {
         if (staged.fileObj) {
-          const uploaded = await uploadAttachmentFile(staged.fileObj, {
-            tanggal: form.tanggal,
-            tag: form.tag,
-          });
-          uploadedAttachments.push(uploaded);
+          try {
+            const uploaded = await uploadAttachmentFile(staged.fileObj, {
+              tanggal: form.tanggal,
+              tag: form.tag,
+              proyekNama: currentProject?.nama,
+            });
+            uploadedAttachments.push(uploaded);
+          } catch {
+            uploadedAttachments.push({
+              nama: staged.nama,
+              tipe: staged.tipe,
+              dataUrl: staged.dataUrl,
+            });
+          }
         } else {
           uploadedAttachments.push({
             nama: staged.nama,
@@ -769,7 +780,7 @@ export function TransactionForm() {
               {ocrLoading ? <Loader2 size={15} className="animate-spin" /> : <ScanLine size={15} />}
               {ocrLoading ? 'Membaca Struk...' : '✨ Scan Struk (AI)'}
             </button>
-            <input type="file" ref={ocrInputRef} accept="image/*" onChange={handleOcrFile} className="hidden" />
+            <input type="file" ref={ocrInputRef} accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" onChange={handleOcrFile} className="hidden" />
           </div>
 
           {/* Staged File List */}
@@ -779,17 +790,21 @@ export function TransactionForm() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition-all"
               >
-                <Plus size={14} /> Pilih Foto/Berkas
+                <Plus size={14} /> Pilih Foto / Berkas PDF
               </button>
-              <input type="file" ref={fileInputRef} accept="image/*,application/pdf" multiple onChange={handleFileUpload} className="hidden" />
+              <input type="file" ref={fileInputRef} accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleFileUpload} className="hidden" />
             </div>
 
             {stagedFiles.length === 0 ? (
-              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center text-gray-400 space-y-2">
-                <Upload size={28} className="mx-auto text-gray-300" />
-                <p className="text-xs">Belum ada lampiran. Pilih foto struk atau gunakan AI Scan Struk.</p>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-2xl p-6 text-center text-gray-400 space-y-2 cursor-pointer transition-all active:scale-[0.99]"
+              >
+                <Upload size={28} className="mx-auto text-gray-400" />
+                <p className="text-xs font-semibold text-gray-600">Belum ada lampiran. Klik di sini untuk memilih foto resi / PDF.</p>
+                <p className="text-[10px] text-gray-400">Mendukung kamera HP, Galeri Foto &amp; Berkas PDF</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

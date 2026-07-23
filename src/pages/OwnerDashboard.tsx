@@ -152,11 +152,12 @@ export function OwnerDashboard() {
         tag: 'Bukti_Transfer',
       });
       setTransferFile(att.dataUrl);
-      addToast('success', 'Bukti transfer berhasil diunggah ke Google Drive');
+      addToast('success', 'Bukti transfer berhasil terlampir');
     } catch {
       addToast('error', 'Gagal mengunggah bukti transfer');
     } finally {
       setTransferLoading(false);
+      e.target.value = '';
     }
   };
 
@@ -185,11 +186,12 @@ export function OwnerDashboard() {
         tag: quickForm.mode === 'prive' ? 'pribadi' : 'operasional',
       });
       setQuickAttachments(prev => [...prev, att]);
-      addToast('success', 'Lampiran berhasil diunggah ke Google Drive');
+      addToast('success', 'Lampiran berhasil ditambahkan');
     } catch {
       addToast('error', 'Gagal mengunggah lampiran');
     } finally {
       setQuickFileLoading(false);
+      e.target.value = '';
     }
   };
 
