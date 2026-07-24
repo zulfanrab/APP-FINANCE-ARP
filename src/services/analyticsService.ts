@@ -57,9 +57,7 @@ export function isMutasiInternal(t: Transaction): boolean {
  * - Internal Transfers & Capital Injection transactions (they represent money moving from/to kas utama)
  */
 export function isKasUtamaTransaction(t: Transaction): boolean {
-  if (isMutasiInternal(t)) return true;
-  if (!t.proyekId) return true;
-  return false;
+  return !t.proyekId;
 }
 
 /**

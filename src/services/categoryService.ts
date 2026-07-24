@@ -6,15 +6,14 @@ import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 export const DEFAULT_INCOME_CATEGORIES = [
-  'Drop Dana Kas Utama / Holding',
   'Pembayaran Klien / Proyek',
   'DP / Termijn Proyek',
   'Pelunasan Proyek',
-  'Setoran Modal Direksi / Kas Utama',
-  'Refund Sisa Dana Proyek ke Kas Utama',
+  'Drop Dana Kas Utama / Holding',
+  'Setoran Modal Owner / Direksi',
+  'Saldo Awal',
   'Mutasi Internal / Transfer Kas',
-  'Pengembalian Dana (Refund)',
-  'Pemasukan Lainnya',
+  'Refund Sisa Dana Proyek ke Kas Utama',
 ];
 
 export const DEFAULT_EXPENSE_CATEGORIES = [

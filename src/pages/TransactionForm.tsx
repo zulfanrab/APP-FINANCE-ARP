@@ -595,7 +595,41 @@ export function TransactionForm() {
                 required
               >
                 <option value="">-- Pilih Kategori --</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {form.jenis === 'keluar' ? (
+                  categories.map(c => <option key={c} value={c}>{c}</option>)
+                ) : (
+                  <>
+                    <optgroup label="💰 PENDAPATAN / OMZET KLIEN (Laba-Rugi P&L)">
+                      <option value="Pembayaran Klien / Proyek">Pembayaran Klien / Proyek</option>
+                      <option value="DP / Termijn Proyek">DP / Termijn Proyek</option>
+                      <option value="Pelunasan Proyek">Pelunasan Proyek</option>
+                    </optgroup>
+                    <optgroup label="📥 MODAL & DROP DANA (Menambah Kas)">
+                      <option value="Drop Dana Kas Utama / Holding">Drop Dana Kas Utama / Holding</option>
+                      <option value="Setoran Modal Owner / Direksi">Setoran Modal Owner / Direksi</option>
+                      <option value="Saldo Awal">Saldo Awal</option>
+                    </optgroup>
+                    <optgroup label="🔄 MUTASI INTERNAL & REFUND">
+                      <option value="Mutasi Internal / Transfer Kas">Mutasi Internal / Transfer Kas</option>
+                      <option value="Refund Sisa Dana Proyek ke Kas Utama">Refund Sisa Dana Proyek ke Kas Utama</option>
+                    </optgroup>
+                    
+                    {/* Render any custom/extra categories not in the standard list */}
+                    {categories.filter(c => ![
+                      'Pembayaran Klien / Proyek', 'DP / Termijn Proyek', 'Pelunasan Proyek',
+                      'Drop Dana Kas Utama / Holding', 'Setoran Modal Owner / Direksi', 'Saldo Awal',
+                      'Mutasi Internal / Transfer Kas', 'Refund Sisa Dana Proyek ke Kas Utama'
+                    ].includes(c)).length > 0 && (
+                      <optgroup label="KATEGORI TAMBAHAN">
+                        {categories.filter(c => ![
+                          'Pembayaran Klien / Proyek', 'DP / Termijn Proyek', 'Pelunasan Proyek',
+                          'Drop Dana Kas Utama / Holding', 'Setoran Modal Owner / Direksi', 'Saldo Awal',
+                          'Mutasi Internal / Transfer Kas', 'Refund Sisa Dana Proyek ke Kas Utama'
+                        ].includes(c)).map(c => <option key={c} value={c}>{c}</option>)}
+                      </optgroup>
+                    )}
+                  </>
+                )}
               </select>
             </div>
 
