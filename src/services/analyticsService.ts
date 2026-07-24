@@ -259,6 +259,7 @@ export function getProjectFinancialSummary(
   let pemasukanKlien = 0;
   let totalPengeluaran = 0;
   let totalRefundMasuk = 0;
+  let mutasiKeluarLainnya = 0;
 
   const isClientIncomeCategory = (kat: string) => {
     const lower = (kat || '').toLowerCase();
@@ -276,8 +277,19 @@ export function getProjectFinancialSummary(
   for (const t of transactions) {
     if (!isApproved(t)) continue;
 
-    if (t.kategori === 'Refund Dana Proyek ke Kas Utama' || (t.kategori || '').toLowerCase().includes('refund')) {
+    const k = (t.kategori || '').toLowerCase();
+
+    // 1. Uang dikembalikan dari Proyek ke Kas Utama (Keluar dari Proyek)
+    if (k.includes('refund dana proyek') || k.includes('refund sisa dana')) {
       if (t.jenis === 'keluar') {
+        mutasiKeluarLainnya += t.nominal;
+      }
+      continue;
+    }
+
+    // 2. Uang dikembalikan dari Vendor ke Proyek (Masuk ke Proyek)
+    if (k.includes('refund') || k.includes('pengembalian dana')) {
+      if (t.jenis === 'masuk') {
         totalRefundMasuk += t.nominal;
       }
       continue;
@@ -299,6 +311,9 @@ export function getProjectFinancialSummary(
     } else if (t.jenis === 'keluar') {
       if (!isMutasiInternal(t)) {
         totalPengeluaran += t.nominal;
+      } else {
+        // Mutasi Internal keluar lainnya (misal: ditarik kembali ke pusat tapi pakai kategori lain)
+        mutasiKeluarLainnya += t.nominal;
       }
     }
   }
@@ -309,11 +324,14 @@ export function getProjectFinancialSummary(
   const implicitBudget = hasExplicitInitialFunding ? 0 : anggaranModal;
   const modalDisuntikkan = implicitBudget + modalDisuntikkanFromTx;
   
+  // Realisasi bersih adalah pengeluaran kotor dikurangi refund dari vendor
   const realisasiBersih = totalPengeluaran - totalRefundMasuk;
-  // Saldo Kas Proyek (Liquidity Cash Flow) = Total Modal Disuntikkan + Total Invoice Klien - Total Pengeluaran - Refund
-  const sisaDanaProyek = modalDisuntikkan + pemasukanKlien - totalPengeluaran - totalRefundMasuk;
-  // Laba-Rugi Proyek (P&L) = Invoice Klien - Pengeluaran Riil
-  const labaRugiProyek = pemasukanKlien - totalPengeluaran;
+  
+  // Saldo Kas Proyek (Liquidity Cash Flow) = Total Modal Disuntikkan + Total Invoice Klien + Refund Vendor - Pengeluaran kotor - Mutasi Keluar
+  const sisaDanaProyek = modalDisuntikkan + pemasukanKlien + totalRefundMasuk - totalPengeluaran - mutasiKeluarLainnya;
+  
+  // Laba-Rugi Proyek (P&L) = Invoice Klien - Pengeluaran Riil (setelah dipotong refund vendor)
+  const labaRugiProyek = pemasukanKlien - realisasiBersih;
 
   return {
     modalDisuntikkan,
