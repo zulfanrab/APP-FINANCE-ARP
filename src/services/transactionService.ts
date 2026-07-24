@@ -17,6 +17,50 @@ function now(): string {
   return new Date().toISOString();
 }
 
+async function safeSupabaseInsert(table: string, payload: any[]) {
+  if (!supabase) return { error: null };
+  let retryRows = [...payload];
+  let { error } = await supabase.from(table).insert(retryRows);
+  
+  while (error && error.message?.includes('does not exist')) {
+    const match = error.message.match(/column "(.*?)"/);
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`Supabase missing "${missingCol}" column. Retrying insert without it...`);
+      retryRows = retryRows.map(r => {
+        const copy = { ...r };
+        delete copy[missingCol];
+        return copy;
+      });
+      const retryRes = await supabase.from(table).insert(retryRows);
+      error = retryRes.error;
+    } else {
+      break;
+    }
+  }
+  return { error };
+}
+
+async function safeSupabaseUpdate(table: string, payload: any, id: string) {
+  if (!supabase) return { error: null };
+  let retryRow = { ...payload };
+  let { error } = await supabase.from(table).update(retryRow).eq('id', id);
+
+  while (error && error.message?.includes('does not exist')) {
+    const match = error.message.match(/column "(.*?)"/);
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
+      delete retryRow[missingCol];
+      const retryRes = await supabase.from(table).update(retryRow).eq('id', id);
+      error = retryRes.error;
+    } else {
+      break;
+    }
+  }
+  return { error };
+}
+
 function mapRowToTransaction(row: any): Transaction {
   return {
     id: row.id,
@@ -250,19 +294,8 @@ export async function addTransaction(
       if (adminFeeTx) {
         rowsToInsert.push(mapTransactionToRow(adminFeeTx));
       }
-      let { error } = await supabase.from('transactions').insert(rowsToInsert);
       
-      // Auto-fallback: if Supabase fails because 'divisi' column doesn't exist yet, retry without 'divisi' key in payload
-      if (error && (error.message?.includes('divisi') || error.details?.includes('divisi'))) {
-        console.warn('Supabase missing "divisi" column in DB schema cache. Retrying insert without "divisi" column...');
-        const retryRows = rowsToInsert.map(r => {
-          const copy = { ...r };
-          delete copy.divisi;
-          return copy;
-        });
-        const retryRes = await supabase.from('transactions').insert(retryRows);
-        error = retryRes.error;
-      }
+      const { error } = await safeSupabaseInsert('transactions', rowsToInsert);
 
       if (error) {
         console.error('Supabase add transaction error:', error);
@@ -383,21 +416,14 @@ export async function updateTransaction(
   if (isSupabaseConfigured && supabase) {
     try {
       const row = mapTransactionToRow(updated);
-      let { error } = await supabase.from('transactions').update(row).eq('id', id);
-
-      if (error && (error.message?.includes('divisi') || error.details?.includes('divisi'))) {
-        const copy = { ...row };
-        delete copy.divisi;
-        const retryRes = await supabase.from('transactions').update(copy).eq('id', id);
-        error = retryRes.error;
-      }
+      const { error } = await safeSupabaseUpdate('transactions', row, id);
 
       if (error) throw new Error(`Supabase update error: ${error.message}`);
 
       if (childToUpdate) {
-        await supabase.from('transactions').update(mapTransactionToRow(childToUpdate)).eq('id', childToUpdate.id);
+        await safeSupabaseUpdate('transactions', mapTransactionToRow(childToUpdate), childToUpdate.id);
       } else if (childToCreate) {
-        await supabase.from('transactions').insert(mapTransactionToRow(childToCreate));
+        await safeSupabaseInsert('transactions', [mapTransactionToRow(childToCreate)]);
       } else if (childToDeleteId) {
         await supabase.from('transactions').delete().eq('id', childToDeleteId);
       }

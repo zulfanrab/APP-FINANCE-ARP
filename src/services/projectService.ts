@@ -14,6 +14,46 @@ function now(): string {
   return new Date().toISOString();
 }
 
+async function safeSupabaseInsert(table: string, payload: any) {
+  if (!supabase) return { error: null };
+  let retryRow = { ...payload };
+  let { error } = await supabase.from(table).insert([retryRow]);
+  
+  while (error && error.message?.includes('does not exist')) {
+    const match = error.message.match(/column "(.*?)"/);
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`Supabase missing "${missingCol}" column. Retrying insert without it...`);
+      delete retryRow[missingCol];
+      const retryRes = await supabase.from(table).insert([retryRow]);
+      error = retryRes.error;
+    } else {
+      break;
+    }
+  }
+  return { error };
+}
+
+async function safeSupabaseUpdate(table: string, payload: any, id: string) {
+  if (!supabase) return { error: null };
+  let retryRow = { ...payload };
+  let { error } = await supabase.from(table).update(retryRow).eq('id', id);
+
+  while (error && error.message?.includes('does not exist')) {
+    const match = error.message.match(/column "(.*?)"/);
+    if (match && match[1]) {
+      const missingCol = match[1];
+      console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
+      delete retryRow[missingCol];
+      const retryRes = await supabase.from(table).update(retryRow).eq('id', id);
+      error = retryRes.error;
+    } else {
+      break;
+    }
+  }
+  return { error };
+}
+
 function mapRowToProject(row: any): Project {
   return {
     id: row.id,
@@ -168,7 +208,7 @@ export async function addProject(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('projects').insert(mapProjectToRow(newProject));
+      await safeSupabaseInsert('projects', mapProjectToRow(newProject));
     } catch (err) {
       console.warn('Supabase add project error:', err);
     }
@@ -200,7 +240,7 @@ export async function updateProject(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      await supabase.from('projects').update(mapProjectToRow(updated)).eq('id', id);
+      await safeSupabaseUpdate('projects', mapProjectToRow(updated), id);
     } catch (err) {
       console.warn('Supabase update project error:', err);
     }
