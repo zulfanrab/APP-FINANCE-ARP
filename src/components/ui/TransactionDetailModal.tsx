@@ -79,6 +79,7 @@ export function TransactionDetailModal({
   });
 
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     if (transaction && isOpen) {
@@ -140,6 +141,43 @@ export function TransactionDetailModal({
     }
     addToast('info', `${files.length} foto/berkas dipilih.`);
     e.target.value = '';
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      for (const file of files) {
+        try {
+          const attachment = await compressFileToAttachment(file);
+          setStagedAttachments(prev => [
+            ...prev,
+            {
+              nama: attachment.nama,
+              tipe: attachment.tipe,
+              dataUrl: attachment.dataUrl,
+              fileObj: file,
+            },
+          ]);
+        } catch (err) {
+          console.error('Gagal memproses lampiran drop:', err);
+        }
+      }
+      addToast('info', `${files.length} berkas ditambahkan dari Drop.`);
+    }
   };
 
   const handleRemoveStagedAttachment = (idx: number) => {
@@ -643,7 +681,15 @@ export function TransactionDetailModal({
             </div>
 
             {/* Staged Attachment Manager */}
-            <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+            <div 
+              className={`p-4 transition-colors border-2 ${
+                dragActive ? 'border-emerald-500 bg-emerald-50/50 border-dashed' : 'border-gray-200 bg-gray-50 border-solid'
+              } rounded-2xl space-y-3`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Kelola Lampiran Foto / Nota</label>
                 <button
@@ -653,7 +699,7 @@ export function TransactionDetailModal({
                 >
                   <Plus size={14} /> Tambah Foto / PDF
                 </button>
-                <input type="file" ref={fileInputRef} accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleSelectFiles} className="hidden" />
+                <input type="file" ref={fileInputRef} accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleSelectFiles} className="hidden" />
               </div>
 
               {stagedAttachments.length === 0 ? (

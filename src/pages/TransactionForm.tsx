@@ -794,7 +794,7 @@ export function TransactionForm() {
               >
                 <Plus size={14} /> Pilih Foto / Berkas PDF
               </button>
-              <input type="file" ref={fileInputRef} accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleFileUpload} className="hidden" />
+              <input type="file" ref={fileInputRef} accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleFileUpload} className="hidden" />
             </div>
 
             {stagedFiles.length === 0 ? (
