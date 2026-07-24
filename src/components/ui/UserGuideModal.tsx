@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { Modal } from './Modal';
 import {
   Crown, Briefcase, CheckCircle2, ShieldCheck, Wallet, FileSpreadsheet,
-  ScanLine, ArrowRight, Smartphone, Share, MoreVertical, PlusSquare
+  ScanLine, ArrowRight, Smartphone, Share, MoreVertical, PlusSquare, BookOpen
 } from 'lucide-react';
 
 interface UserGuideModalProps {
@@ -17,7 +17,7 @@ interface UserGuideModalProps {
 }
 
 export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
-  const [activeTab, setActiveTab] = useState<'owner' | 'admin' | 'install'>('owner');
+  const [activeTab, setActiveTab] = useState<'owner' | 'admin' | 'konsep' | 'install'>('owner');
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📖 Buku Panduan & Cara Install Aplikasi" size="xl">
@@ -45,6 +45,17 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
             }`}
           >
             <Briefcase size={15} /> 💼 Admin Keuangan
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('konsep')}
+            className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'konsep'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <BookOpen size={15} /> 📘 Konsep Aplikasi
           </button>
           <button
             type="button"
@@ -130,6 +141,56 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
                   </h4>
                   <p className="text-xs text-gray-600">
                     Gunakan tombol <strong>"Scan Struk (AI OCR)"</strong> untuk membaca total nominal fisik resi secara otomatis. Hasil rekap bulanan dapat diunduh dalam format Excel & PDF di halaman Laporan/Proyek.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'konsep' ? (
+            /* KONSEP GUIDE */
+            <div className="space-y-4 animate-fade-in text-xs leading-relaxed">
+              <div className="p-3.5 bg-blue-900 text-white rounded-2xl space-y-1 shadow-md">
+                <h3 className="font-bold text-blue-300 text-sm flex items-center gap-2">
+                  <BookOpen size={16} /> Konsep Pencatatan Activity-Based Cash Ledger
+                </h3>
+                <p className="text-xs text-blue-100 leading-relaxed">
+                  Aplikasi ini mengakomodasi alokasi dana secara presisi, membedakan mana yang merupakan "Beban Murni" dan mana yang sekadar "Pindah Dompet".
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {/* 1. Dompet */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                  <h4 className="font-bold text-gray-900 text-sm">1. Kas Utama vs Kas Proyek</h4>
+                  <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                    <li><strong>Kas Utama:</strong> Transaksi tanpa alokasi (Proyek kosong). Contoh: Biaya operasional kantor, Gaji.</li>
+                    <li><strong>Kas Proyek:</strong> Dompet cabang yang dialokasikan khusus untuk satu proyek.</li>
+                    <li><strong>Total Kas Perusahaan</strong> = Sisa Kas Utama + Sisa Seluruh Kas Proyek. Uang yang dipindah ke proyek tidak dianggap hilang.</li>
+                  </ul>
+                </div>
+
+                {/* 2. Pemasukan */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                  <h4 className="font-bold text-gray-900 text-sm">2. Pendapatan vs Mutasi Internal</h4>
+                  <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                    <li><strong>Pendapatan Klien (Laba-Rugi):</strong> Uang hasil proyek (Termin/Pelunasan) yang menambah Laba perusahaan.</li>
+                    <li><strong>Modal & Drop Dana:</strong> Setoran modal atau saldo awal yang menambah kas tapi BUKAN Laba.</li>
+                    <li><strong>Mutasi Internal & Refund:</strong> Sekadar memindahkan dompet dari kiri ke kanan. Tidak mempengaruhi P&L.</li>
+                  </ul>
+                </div>
+
+                {/* 3. Auto Split */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                  <h4 className="font-bold text-gray-900 text-sm">3. Biaya Admin Bank Auto-Split</h4>
+                  <p className="text-gray-700">
+                    Saat transfer menggunakan jalur berbayar (BI-FAST, RTGS), sistem otomatis membelah transaksi menjadi dua: Transaksi Utama dan Transaksi Biaya Admin. Transaksi anak ini akan otomatis dihapus jika transaksi induk dibatalkan, dan selalu mewarisi Proyek/Divisi yang sama.
+                  </p>
+                </div>
+                
+                {/* 4. Divisi */}
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                  <h4 className="font-bold text-gray-900 text-sm">4. Sub-Divisi Kantor</h4>
+                  <p className="text-gray-700">
+                    Tombol Divisi (Admin, IT, Ahli) HANYA muncul untuk transaksi di Kas Utama atau Proyek Operasional Kantor. Proyek lapangan akan menyembunyikan opsi ini agar pengeluaran dicatat secara <i>gelondongan</i> (langsung ke proyek).
                   </p>
                 </div>
               </div>
