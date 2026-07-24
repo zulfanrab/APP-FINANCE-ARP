@@ -768,8 +768,8 @@ export function TransactionForm() {
         <Card>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base font-bold text-gray-900">Foto Struk &amp; AI Scan Struk</h2>
-              <p className="text-xs text-gray-500">Gunakan Gemini AI untuk membaca total nominal &amp; deskripsi struk secara otomatis</p>
+              <h2 className="text-base font-bold text-gray-900">Foto Struk & AI Scan Struk</h2>
+              <p className="text-xs text-gray-500">Gunakan Gemini AI untuk membaca total nominal & deskripsi struk secara otomatis</p>
             </div>
             <button
               type="button"
@@ -833,8 +833,8 @@ export function TransactionForm() {
           <Button type="button" variant="secondary" onClick={handleCancelOrBack} disabled={loading}>
             Batal
           </Button>
-          <Button type="submit" variant="primary" disabled={loading} icon={loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}>
-            {loading ? 'Menyimpan &amp; Uploading Drive...' : 'Simpan Transaksi'}
+          <Button type="submit" variant="primary" loading={loading} icon={<Save size={16} />}>
+            {loading ? 'Menyimpan & Uploading Drive...' : 'Simpan Transaksi'}
           </Button>
         </div>
       </form>
