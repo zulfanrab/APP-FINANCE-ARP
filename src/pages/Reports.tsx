@@ -129,13 +129,20 @@ export function Reports() {
           omzetKlien += t.nominal;
         }
       } else {
-        totalKeluar += t.nominal;
-        if (t.tag === 'operasional') opsBiaya += t.nominal;
-        if (t.tag === 'pribadi') privBiaya += t.nominal;
+        if (!isMutasiInternal(t)) {
+          totalKeluar += t.nominal;
+          if (t.tag === 'operasional') opsBiaya += t.nominal;
+          if (t.tag === 'pribadi') privBiaya += t.nominal;
+        }
 
-        if (t.divisi === 'admin') adminDivisiBiaya += t.nominal;
-        else if (t.divisi === 'it') itDivisiBiaya += t.nominal;
-        else if (t.divisi === 'ahli') ahliDivisiBiaya += t.nominal;
+        const proj = projects.find(p => p.id === t.proyekId);
+        const isKasUtamaOrOps = !t.proyekId || proj?.tipe === 'operasional_kantor';
+        
+        if (isKasUtamaOrOps && t.divisi) {
+          if (t.divisi === 'admin') adminDivisiBiaya += t.nominal;
+          else if (t.divisi === 'it') itDivisiBiaya += t.nominal;
+          else if (t.divisi === 'ahli') ahliDivisiBiaya += t.nominal;
+        }
       }
     }
 

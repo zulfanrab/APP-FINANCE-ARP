@@ -645,7 +645,16 @@ export function TransactionForm() {
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek / Pos Operasional (Opsional)</label>
                 <select
                   value={form.proyekId}
-                  onChange={e => setField('proyekId', e.target.value)}
+                  onChange={e => {
+                    const selectedId = e.target.value;
+                    const proj = projects.find(p => p.id === selectedId);
+                    const isOps = !selectedId || proj?.tipe === 'operasional_kantor';
+                    setForm(f => ({
+                      ...f,
+                      proyekId: selectedId,
+                      divisi: isOps ? f.divisi : undefined // Auto-reset ghost data
+                    }));
+                  }}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 >
                   <option value="">-- Tanpa Alokasi (Kas Utama) --</option>
@@ -661,10 +670,8 @@ export function TransactionForm() {
             {/* Conditional Sub-Divisi Selector (Admin, IT, Ahli) */}
             {(() => {
               const selectedProject = projects.find(p => p.id === form.proyekId);
-              const isOperasionalPos = selectedProject?.tipe === 'operasional_kantor' ||
-                form.kategori.includes('Operasional') ||
-                form.kategori.includes('Drop Dana') ||
-                form.tag === 'operasional';
+              // HANYA muncul jika Kas Utama (kosong) ATAU tipe proyek operasional_kantor
+              const isOperasionalPos = !form.proyekId || selectedProject?.tipe === 'operasional_kantor';
 
               if (!isOperasionalPos) return null;
 

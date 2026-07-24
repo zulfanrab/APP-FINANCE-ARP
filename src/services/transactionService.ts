@@ -274,6 +274,7 @@ export async function addTransaction(
         kategori: 'Biaya Admin Bank',
         tag: newTransaction.tag,
         proyekId: newTransaction.proyekId, // CRITICAL: Bound to the SAME project allocation!
+        divisi: newTransaction.divisi, // CRITICAL: Inherit the SAME division
         lampiran: [], // Admin fee entry does not require separate attachments
         status: newTransaction.status,
         penerimaDetail: newTransaction.penerimaDetail,

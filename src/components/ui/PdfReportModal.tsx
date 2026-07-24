@@ -76,6 +76,7 @@ export function PdfReportModal({
   let modalDisuntikkan = 0;
   let pemasukanKlien = 0;
   let totalRefundMasuk = 0;
+  let totalPengeluaranRiil = 0;
 
   if (project) {
     // ============================================================
@@ -142,6 +143,9 @@ export function PdfReportModal({
         if ((t.kategori || '').toLowerCase().includes('refund')) {
            totalRefundMasuk += t.nominal;
         }
+        if (!isMutasiInternal(t)) {
+          totalPengeluaranRiil += t.nominal;
+        }
       }
 
       tableRows.push({
@@ -179,6 +183,9 @@ export function PdfReportModal({
       } else {
         currentBalance -= t.nominal;
         totalKredit += t.nominal;
+        if (!isMutasiInternal(t)) {
+          totalPengeluaranRiil += t.nominal;
+        }
       }
 
       tableRows.push({
@@ -501,12 +508,12 @@ export function PdfReportModal({
                 </div>
                 <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit - totalRefundMasuk)}</p>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
                 </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalKredit - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
                   <p className="summary-val text-sm font-black tabular-nums">
-                    {formatSaldoRupiah(pemasukanKlien - (totalKredit - totalRefundMasuk))}
+                    {formatSaldoRupiah(pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk))}
                   </p>
                 </div>
                 <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
