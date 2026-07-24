@@ -11,6 +11,7 @@ import { Modal } from './Modal';
 import { type Transaction, type Project } from '../../types';
 import { formatDate, formatRupiah } from './index';
 import { groupAndSortTransactions } from '../../services/transactionService';
+import { isMutasiInternal } from '../../services/analyticsService';
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -33,17 +34,7 @@ export function formatSaldoRupiah(amount: number): string {
 
 /** Check if a transaction is a Capital Allocation / Injection (Alokasi Modal Operasional) */
 export function isCapitalInjectionTx(t: Transaction): boolean {
-  const d = (t.deskripsi || '').toLowerCase();
-  const k = (t.kategori || '').toLowerCase();
-  return (
-    d.startsWith('alokasi modal proyek:') ||
-    d.startsWith('suntikan modal proyek:') ||
-    d.includes('penerimaan alokasi modal') ||
-    d.includes('penerimaan modal proyek') ||
-    k === 'alokasi modal operasional proyek' ||
-    k === 'suntikan modal proyek' ||
-    k === 'alokasi modal proyek'
-  );
+  return t.jenis === 'masuk' && isMutasiInternal(t);
 }
 
 export function PdfReportModal({
@@ -82,6 +73,9 @@ export function PdfReportModal({
   let totalDebet = 0;
   let totalKredit = 0;
   let sisaDana = 0;
+  let modalDisuntikkan = 0;
+  let pemasukanKlien = 0;
+  let totalRefundMasuk = 0;
 
   if (project) {
     // ============================================================
@@ -94,10 +88,12 @@ export function PdfReportModal({
 
     let currentBalance = 0;
 
-    // Initial Capital Row if modalAwal > 0 and no explicit injection transaction exists in sortedPtx
-    const hasInjectionTx = sortedPtx.some(t => isCapitalInjectionTx(t));
+    // Initial Capital Row if modalAwal > 0 and no explicit initial injection transaction exists in sortedPtx
+    const hasExplicitInitialFunding = sortedPtx.some(t => 
+      isCapitalInjectionTx(t) && (t.nominal === modalAwal || (t.deskripsi || '').toLowerCase().includes('alokasi modal proyek'))
+    );
 
-    if (modalAwal > 0 && !hasInjectionTx) {
+    if (modalAwal > 0 && !hasExplicitInitialFunding) {
       currentBalance = modalAwal;
       tableRows.push({
         no: 1,
@@ -109,7 +105,21 @@ export function PdfReportModal({
         saldo: currentBalance,
       });
       totalDebet += modalAwal;
+      modalDisuntikkan += modalAwal;
     }
+
+    const isClientIncomeCategory = (kat: string) => {
+      const lower = (kat || '').toLowerCase();
+      return (
+        lower.includes('pembayaran') ||
+        lower.includes('termijn') ||
+        lower.includes('termin') ||
+        lower.includes('pelunasan') ||
+        lower.includes('klien') ||
+        lower.includes('invoice') ||
+        lower.includes('dp')
+      );
+    };
 
     sortedPtx.forEach((t) => {
       const isInjection = isCapitalInjectionTx(t);
@@ -121,9 +131,17 @@ export function PdfReportModal({
       if (isMasuk) {
         currentBalance += t.nominal;
         totalDebet += t.nominal;
+        if (isInjection || !isClientIncomeCategory(t.kategori)) {
+          modalDisuntikkan += t.nominal;
+        } else {
+          pemasukanKlien += t.nominal;
+        }
       } else {
         currentBalance -= t.nominal;
         totalKredit += t.nominal;
+        if ((t.kategori || '').toLowerCase().includes('refund')) {
+           totalRefundMasuk += t.nominal;
+        }
       }
 
       tableRows.push({
@@ -475,20 +493,20 @@ export function PdfReportModal({
               <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
                 <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalAwal)}</p>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
                 </div>
                 <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalDebet > modalAwal ? totalDebet - modalAwal : 0)}</p>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(pemasukanKlien)}</p>
                 </div>
                 <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
+                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit - totalRefundMasuk)}</p>
                 </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit) >= 0 ? 'card-green' : 'card-red'}`}>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalKredit - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
                   <p className="summary-val text-sm font-black tabular-nums">
-                    {formatSaldoRupiah((totalDebet > modalAwal ? totalDebet - modalAwal : 0) - totalKredit)}
+                    {formatSaldoRupiah(pemasukanKlien - (totalKredit - totalRefundMasuk))}
                   </p>
                 </div>
                 <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>

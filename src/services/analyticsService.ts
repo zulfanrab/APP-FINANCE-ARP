@@ -36,13 +36,17 @@ export function isSuntikanModal(t: Transaction): boolean {
 /** Check if a transaction is an internal cash transfer (Mutasi Internal) */
 export function isMutasiInternal(t: Transaction): boolean {
   if (isSuntikanModal(t)) return true;
-  if (t.kategori === 'Refund Dana Proyek ke Kas Utama') return true;
-  if (t.kategori === 'Refund Sisa Dana Proyek ke Kas Utama') return true;
-  if (t.kategori === 'Mutasi Internal / Transfer Kas') return true;
-  if (t.kategori === 'Drop Dana Kas Utama / Holding') return true;
-  if (t.kategori === 'Drop Dana / Mutasi Kas Owner') return true;
-  if (t.kategori === 'Setoran Modal Direksi / Kas Utama') return true;
-  if (t.kategori === 'Setoran Modal Owner') return true;
+  
+  const k = (t.kategori || '').toLowerCase();
+  const d = (t.deskripsi || '').toLowerCase();
+
+  if (k.includes('mutasi internal') || k.includes('transfer kas')) return true;
+  if (k.includes('drop dana') || d.includes('drop dana')) return true;
+  if (k.includes('suntikan modal') || d.includes('suntikan modal')) return true;
+  if (k.includes('alokasi modal') || d.includes('alokasi modal')) return true;
+  if (k.includes('refund dana proyek') || k.includes('refund sisa dana')) return true;
+  if (k.includes('setoran modal')) return true;
+  
   return false;
 }
 
@@ -252,6 +256,7 @@ export function getProjectFinancialSummary(
   anggaranModal: number = 0
 ): ProjectFinancialSummary {
   let modalDisuntikkanFromTx = 0;
+  let hasExplicitInitialFunding = false;
   let pemasukanKlien = 0;
   let totalPengeluaran = 0;
   let totalRefundMasuk = 0;
@@ -272,7 +277,7 @@ export function getProjectFinancialSummary(
   for (const t of transactions) {
     if (!isApproved(t)) continue;
 
-    if (t.kategori === 'Refund Dana Proyek ke Kas Utama') {
+    if (t.kategori === 'Refund Dana Proyek ke Kas Utama' || (t.kategori || '').toLowerCase().includes('refund')) {
       if (t.jenis === 'keluar') {
         totalRefundMasuk += t.nominal;
       }
@@ -283,6 +288,11 @@ export function getProjectFinancialSummary(
       if (isMutasiInternal(t) || !isClientIncomeCategory(t.kategori)) {
         // Capital injection into project
         modalDisuntikkanFromTx += t.nominal;
+        
+        // Detect if this is the initial funding
+        if (t.nominal === anggaranModal || (t.deskripsi || '').toLowerCase().includes('alokasi modal proyek')) {
+          hasExplicitInitialFunding = true;
+        }
       } else {
         // Real client revenue
         pemasukanKlien += t.nominal;
@@ -294,8 +304,12 @@ export function getProjectFinancialSummary(
     }
   }
 
-  // Dynamic Capital Disuntikkan: Sum of all incoming injection transactions, or initial budget if higher/no transactions
-  const modalDisuntikkan = Math.max(anggaranModal, modalDisuntikkanFromTx);
+  // Dynamic Capital Disuntikkan: 
+  // If there's an explicit initial funding, we don't add the implicit budget.
+  // Otherwise, we assume the implicit budget was given off-books, and any explicit tx is an EXTRA drop.
+  const implicitBudget = hasExplicitInitialFunding ? 0 : anggaranModal;
+  const modalDisuntikkan = implicitBudget + modalDisuntikkanFromTx;
+  
   const realisasiBersih = totalPengeluaran - totalRefundMasuk;
   // Saldo Kas Proyek (Liquidity Cash Flow) = Total Modal Disuntikkan + Total Invoice Klien - Total Pengeluaran - Refund
   const sisaDanaProyek = modalDisuntikkan + pemasukanKlien - totalPengeluaran - totalRefundMasuk;

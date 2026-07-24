@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { type Transaction, type Project } from '../types';
 import { formatDate, formatRupiah } from '../components/ui';
 import { groupAndSortTransactions } from './transactionService';
+import { isMutasiInternal } from './analyticsService';
 
 interface ExportJournalOptions {
   title: string;
@@ -32,12 +33,6 @@ export function exportAccountingJournalExcel({
   const wb = XLSX.utils.book_new();
 
   // Filter approved Kas Utama transactions
-  const isMutasiInternal = (t: Transaction) =>
-    t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
-    t.kategori === 'Suntikan Modal Proyek' ||
-    t.kategori === 'Mutasi Internal / Transfer Kas' ||
-    t.kategori === 'Refund Dana Proyek ke Kas Utama';
-
   const mainTx = transactions.filter(
     t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || isMutasiInternal(t))
   );
@@ -163,11 +158,26 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
 
   const sortedPtx = groupAndSortTransactions(approvedPtx, 'asc');
 
-  const modalDisuntikkan = project.anggaran || 0;
+  const isCapitalInjectionTx = (t: Transaction) => {
+    return t.jenis === 'masuk' && isMutasiInternal(t);
+  };
+
+  let modalDisuntikkan = project.anggaran || 0;
   let totalBelanja = 0;
   let totalRefund = 0;
 
-  let currentBalance = modalDisuntikkan;
+  // Check if there is an explicit initial funding transaction
+  const hasExplicitInitialFunding = sortedPtx.some(t => 
+    isCapitalInjectionTx(t) && (t.nominal === project.anggaran || (t.deskripsi || '').toLowerCase().includes('alokasi modal proyek'))
+  );
+
+  let currentBalance = 0;
+  if (modalDisuntikkan > 0 && !hasExplicitInitialFunding) {
+    currentBalance = modalDisuntikkan;
+  } else {
+    // If we have an explicit initial transaction, the implicit budget is 0
+    modalDisuntikkan = 0;
+  }
 
   // Sheet 1: LAPORAN REALISASI PROYEK
   const rows: any[][] = [
@@ -188,31 +198,21 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     ['NO', 'TANGGAL', 'URAIAN / DESKRIPSI TRANSAKSI', 'KATEGORI', 'DEBET (REFUND/MODAL - RP)', 'KREDIT (BELANJA - RP)', 'SALDO SISA DANA (RP)', 'STATUS'],
   ];
 
-  // Row 1: Modal Awal Row
-  rows.push([
-    1,
-    formatDate(project.tanggalMulai),
-    'Penerimaan Alokasi Modal Operasional Proyek',
-    'Alokasi Modal Operasional',
-    modalDisuntikkan,
-    '',
-    currentBalance,
-    'Selesai',
-  ]);
+  // Only push dummy row if we are using the implicit budget
+  if (modalDisuntikkan > 0 && !hasExplicitInitialFunding) {
+    rows.push([
+      1,
+      formatDate(project.tanggalMulai),
+      'Penerimaan Alokasi Modal Operasional Proyek',
+      'Alokasi Modal Operasional',
+      modalDisuntikkan,
+      '',
+      currentBalance,
+      'Selesai',
+    ]);
+  }
 
-  const isCapitalInjectionTx = (t: Transaction) => {
-    const d = (t.deskripsi || '').toLowerCase();
-    const k = (t.kategori || '').toLowerCase();
-    return (
-      d.startsWith('alokasi modal proyek:') ||
-      d.startsWith('suntikan modal proyek:') ||
-      d.includes('penerimaan alokasi modal') ||
-      d.includes('penerimaan modal proyek') ||
-      k === 'alokasi modal operasional proyek' ||
-      k === 'suntikan modal proyek' ||
-      k === 'alokasi modal proyek'
-    );
-  };
+  const offset = (modalDisuntikkan > 0 && !hasExplicitInitialFunding) ? 2 : 1;
 
   sortedPtx.forEach((t, idx) => {
     const isInjection = isCapitalInjectionTx(t);
@@ -229,7 +229,7 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
     }
 
     rows.push([
-      idx + 2,
+      idx + offset,
       formatDate(t.tanggal),
       t.deskripsi,
       t.kategori,
