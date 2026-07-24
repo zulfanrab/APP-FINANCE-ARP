@@ -138,7 +138,7 @@ export async function getTransactions(): Promise<Transaction[]> {
         if (unsyncedLocal.length > 0) {
           console.info(`Found ${unsyncedLocal.length} unsynced local transactions. Resyncing to Supabase...`);
           const rowsToInsert = unsyncedLocal.map(mapTransactionToRow);
-          supabase.from('transactions').insert(rowsToInsert).then(({ error: syncErr }) => {
+          safeSupabaseInsert('transactions', rowsToInsert).then(({ error: syncErr }) => {
             if (!syncErr) {
               unsyncedLocal.forEach(ut => delete (ut as any).isLocalUnsynced);
               setItem(KEYS.TRANSACTIONS, [...remoteTxs, ...unsyncedLocal]);
