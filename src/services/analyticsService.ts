@@ -44,8 +44,9 @@ export function isMutasiInternal(t: Transaction): boolean {
   if (k.includes('drop dana') || d.includes('drop dana')) return true;
   if (k.includes('suntikan modal') || d.includes('suntikan modal')) return true;
   if (k.includes('alokasi modal') || d.includes('alokasi modal')) return true;
-  if (k.includes('refund dana proyek') || k.includes('refund sisa dana')) return true;
+  if (k.includes('refund') || k.includes('pengembalian dana')) return true;
   if (k.includes('setoran modal')) return true;
+  if (k.includes('saldo awal') || d.includes('saldo awal')) return true;
   
   return false;
 }

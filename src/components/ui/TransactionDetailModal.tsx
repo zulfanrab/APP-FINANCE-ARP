@@ -652,19 +652,24 @@ export function TransactionDetailModal({
                       </optgroup>
                       
                       {/* Render any custom/extra categories not in the standard list */}
-                      {categories.filter(c => ![
-                        'Pembayaran Klien / Proyek', 'DP / Termijn Proyek', 'Pelunasan Proyek',
-                        'Drop Dana Kas Utama / Holding', 'Setoran Modal Owner / Direksi', 'Saldo Awal',
-                        'Mutasi Internal / Transfer Kas', 'Refund Sisa Dana Proyek ke Kas Utama'
-                      ].includes(c)).length > 0 && (
-                        <optgroup label="KATEGORI TAMBAHAN">
-                          {categories.filter(c => ![
-                            'Pembayaran Klien / Proyek', 'DP / Termijn Proyek', 'Pelunasan Proyek',
-                            'Drop Dana Kas Utama / Holding', 'Setoran Modal Owner / Direksi', 'Saldo Awal',
-                            'Mutasi Internal / Transfer Kas', 'Refund Sisa Dana Proyek ke Kas Utama'
-                          ].includes(c)).map(c => <option key={c} value={c}>{c}</option>)}
-                        </optgroup>
-                      )}
+                      {(() => {
+                        const isStandardCategory = (cat: string) => {
+                          const name = cat.toLowerCase().trim();
+                          if (name.includes('setoran modal')) return true; // Matches both old and new variations
+                          return [
+                            'pembayaran klien / proyek', 'dp / termijn proyek', 'pelunasan proyek',
+                            'drop dana kas utama / holding', 'saldo awal',
+                            'mutasi internal / transfer kas', 'refund sisa dana proyek ke kas utama'
+                          ].includes(name);
+                        };
+                        const extraCats = categories.filter(c => !isStandardCategory(c));
+                        if (extraCats.length === 0) return null;
+                        return (
+                          <optgroup label="KATEGORI TAMBAHAN">
+                            {extraCats.map(c => <option key={c} value={c}>{c}</option>)}
+                          </optgroup>
+                        );
+                      })()}
                     </>
                   )}
                 </select>
