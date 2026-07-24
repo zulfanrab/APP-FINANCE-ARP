@@ -153,7 +153,8 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     .filter(t => t.jenis === 'masuk' && t.status !== 'ditolak')
     .reduce((sum, t) => sum + t.nominal, 0);
   const profitNetto = pemasukanKlien - financials.realisasiBersih;
-  const usagePercentage = anggaranModal > 0 ? Math.min(Math.round((financials.realisasiBersih / anggaranModal) * 100), 100) : 0;
+  const totalModalDinamis = financials.modalDisuntikkan || project.anggaran || 0;
+  const usagePercentage = totalModalDinamis > 0 ? Math.min(Math.round((financials.realisasiBersih / totalModalDinamis) * 100), 100) : 0;
 
   const filteredTx = transactions.filter(t => {
     if (filterType === 'masuk') return t.jenis === 'masuk';
@@ -385,7 +386,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-gray-700">Pemakaian Dana ({usagePercentage}%)</span>
               <span className="text-xs font-semibold text-gray-500">
-                {formatRupiah(financials.realisasiBersih)} / {formatRupiah(anggaranModal)}
+                {formatRupiah(financials.realisasiBersih)} / {formatRupiah(totalModalDinamis)}
               </span>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden p-0.5">
