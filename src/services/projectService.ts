@@ -19,8 +19,8 @@ async function safeSupabaseInsert(table: string, payload: any) {
   let retryRow = { ...payload };
   let { error } = await supabase.from(table).insert([retryRow]);
   
-  while (error && error.message?.includes('does not exist')) {
-    const match = error.message.match(/column "(.*?)"/);
+  while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
+    const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
     if (match && match[1]) {
       const missingCol = match[1];
       console.warn(`Supabase missing "${missingCol}" column. Retrying insert without it...`);
@@ -39,8 +39,8 @@ async function safeSupabaseUpdate(table: string, payload: any, id: string) {
   let retryRow = { ...payload };
   let { error } = await supabase.from(table).update(retryRow).eq('id', id);
 
-  while (error && error.message?.includes('does not exist')) {
-    const match = error.message.match(/column "(.*?)"/);
+  while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
+    const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
     if (match && match[1]) {
       const missingCol = match[1];
       console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
