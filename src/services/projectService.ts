@@ -164,6 +164,15 @@ export async function getProjects(): Promise<Project[]> {
         const remoteIds = new Set(remoteProjects.map(p => p.id));
         const unsyncedLocal = localData.filter(p => !remoteIds.has(p.id));
 
+        if (unsyncedLocal.length > 0) {
+          console.info(`Found ${unsyncedLocal.length} unsynced local projects. Resyncing to Supabase...`);
+          for (const p of unsyncedLocal) {
+            safeSupabaseInsert('projects', mapProjectToRow(p)).catch(err => 
+              console.warn(`Failed to resync project ${p.id}:`, err)
+            );
+          }
+        }
+
         const merged = [...remoteProjects, ...unsyncedLocal].sort(
           (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
         );
