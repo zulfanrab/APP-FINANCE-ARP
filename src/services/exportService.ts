@@ -171,7 +171,7 @@ export function exportProjectRealisasiExcel(project: Project, transactions: Tran
   const sortedPtx = groupAndSortTransactions(approvedPtx, 'asc');
 
   const isCapitalInjectionTx = (t: Transaction) => {
-    return t.jenis === 'masuk' && isMutasiInternal(t);
+    return classifyTransaction(t).isCapitalInjectionToProject;
   };
 
   let modalDisuntikkan = project.anggaran || 0;

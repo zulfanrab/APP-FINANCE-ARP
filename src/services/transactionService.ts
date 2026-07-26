@@ -8,7 +8,7 @@ import { type Transaction, type TransactionStatus, type FilterOptions } from '..
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
-import { calculateCompanyLedger, type UnifiedCompanyLedger } from './financialEngine';
+import { calculateCompanyLedger, classifyTransaction, type UnifiedCompanyLedger } from './financialEngine';
 
 function generateId(): string {
   return `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -238,6 +238,39 @@ export async function addTransaction(
   };
 
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+
+  // HARD GUARDRAIL: Validate balance before allowing outflow/mutasi
+  const currentLedger = calculateCompanyLedger(transactions);
+  const classification = classifyTransaction(newTransaction);
+
+  let feeNominalPreview = 0;
+  if (
+    newTransaction.jenis === 'keluar' &&
+    newTransaction.jalurTransfer &&
+    newTransaction.jalurTransfer !== 'sesama_bca'
+  ) {
+    if (newTransaction.jalurTransfer === 'ewallet') feeNominalPreview = 1000;
+    else if (newTransaction.jalurTransfer === 'bi_fast') feeNominalPreview = 2500;
+    else if (newTransaction.jalurTransfer === 'online_rtgs') feeNominalPreview = 6500;
+    else if (newTransaction.jalurTransfer === 'custom') feeNominalPreview = newTransaction.adminNominalCustom || 0;
+  }
+  const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
+
+  if (!newTransaction.proyekId && newTransaction.jenis === 'keluar') {
+    if (totalOutflowRequired > currentLedger.sisaKasUtama) {
+      throw new Error('Saldo Kas Utama Tidak Mencukupi!');
+    }
+  } else if (classification.isCapitalInjectionToProject) {
+    if (totalOutflowRequired > currentLedger.sisaKasUtama) {
+      throw new Error('Saldo Kas Utama Tidak Mencukupi!');
+    }
+  } else if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
+    const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
+    if (totalOutflowRequired > projectBalance) {
+      throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+    }
+  }
+
   transactions.unshift(newTransaction);
 
   // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER REQUIRES FEE

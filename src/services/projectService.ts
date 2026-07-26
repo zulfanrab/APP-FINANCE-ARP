@@ -97,10 +97,10 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
   const newTx: Transaction = {
     id: `txn_modal_${project.id}`,
     tanggal: project.tanggalMulai || new Date().toISOString().split('T')[0],
-    jenis: 'keluar',
+    jenis: 'masuk',
     deskripsi: `Alokasi Modal Proyek: ${project.nama}`,
     nominal: project.anggaran,
-    kategori: 'Biaya Proyek',
+    kategori: 'Alokasi Modal Operasional Proyek',
     tag: 'operasional',
     proyekId: project.id,
     lampiran: [],
@@ -118,6 +118,8 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
   if (idx !== -1) {
     transactions[idx] = {
       ...transactions[idx],
+      jenis: 'masuk',
+      kategori: 'Alokasi Modal Operasional Proyek',
       nominal: project.anggaran,
       deskripsi: `Alokasi Modal Proyek: ${project.nama}`,
       diupdatePada: now(),
