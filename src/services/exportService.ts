@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { type Transaction, type Project } from '../types';
 import { formatDate, formatRupiah } from '../components/ui';
 import { groupAndSortTransactions } from './transactionService';
+import { classifyTransaction } from './financialEngine';
 import { isMutasiInternal } from './analyticsService';
 
 interface ExportJournalOptions {
@@ -66,9 +67,20 @@ export function exportAccountingJournalExcel({
   ];
 
   sorted.forEach((t, idx) => {
-    const isMasuk = t.jenis === 'masuk';
-    const debet = isMasuk ? t.nominal : 0;
-    const kredit = !isMasuk ? t.nominal : 0;
+    const classification = classifyTransaction(t);
+    let debet = 0;
+    let kredit = 0;
+
+    if (!t.proyekId) {
+      if (t.jenis === 'masuk') debet = t.nominal;
+      else kredit = t.nominal;
+    } else {
+      if (classification.isCapitalInjectionToProject) {
+        kredit = t.nominal; // Money transferred from Kas Utama to Kas Proyek
+      } else if (classification.isRefundToKasUtama) {
+        debet = t.nominal; // Money returned from Kas Proyek to Kas Utama
+      }
+    }
 
     totalDebet += debet;
     totalKredit += kredit;

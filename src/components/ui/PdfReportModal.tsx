@@ -12,6 +12,7 @@ import { type Transaction, type Project } from '../../types';
 import { formatDate, formatRupiah } from './index';
 import { groupAndSortTransactions } from '../../services/transactionService';
 import { isMutasiInternal } from '../../services/analyticsService';
+import { classifyTransaction } from '../../services/financialEngine';
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -173,19 +174,26 @@ export function PdfReportModal({
     let currentBalance = 0;
 
     sortedMain.forEach((t, idx) => {
-      const isMasuk = t.jenis === 'masuk';
-      const debet = isMasuk ? t.nominal : 0;
-      const kredit = !isMasuk ? t.nominal : 0;
+      const classification = classifyTransaction(t);
+      let debet = 0;
+      let kredit = 0;
 
-      if (isMasuk) {
-        currentBalance += t.nominal;
-        totalDebet += t.nominal;
+      if (!t.proyekId) {
+        if (t.jenis === 'masuk') debet = t.nominal;
+        else kredit = t.nominal;
       } else {
-        currentBalance -= t.nominal;
-        totalKredit += t.nominal;
-        if (!isMutasiInternal(t)) {
-          totalPengeluaranRiil += t.nominal;
+        if (classification.isCapitalInjectionToProject) {
+          kredit = t.nominal; // Money out of Kas Utama
+        } else if (classification.isRefundToKasUtama) {
+          debet = t.nominal; // Money in to Kas Utama
         }
+      }
+
+      currentBalance += debet - kredit;
+      totalDebet += debet;
+      totalKredit += kredit;
+      if (!classification.isMutasiInternal && kredit > 0) {
+        totalPengeluaranRiil += kredit;
       }
 
       tableRows.push({

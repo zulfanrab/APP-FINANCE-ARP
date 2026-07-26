@@ -8,6 +8,7 @@ import { type Transaction, type TransactionStatus, type FilterOptions } from '..
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
+import { calculateCompanyLedger, type UnifiedCompanyLedger } from './financialEngine';
 
 function generateId(): string {
   return `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

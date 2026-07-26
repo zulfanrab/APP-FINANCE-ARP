@@ -12,6 +12,11 @@ import {
   type CategoryBreakdown,
   type CashflowTrend,
 } from '../types';
+import {
+  calculateCompanyLedger,
+  classifyTransaction,
+  isApproved,
+} from './financialEngine';
 
 // ---- Helper ----
 function isInMonth(dateStr: string, year: number, month: number): boolean {
@@ -19,53 +24,24 @@ function isInMonth(dateStr: string, year: number, month: number): boolean {
   return d.getFullYear() === year && d.getMonth() === month;
 }
 
-function isApproved(t: Transaction): boolean {
-  return t.status === 'disetujui' || t.status === 'selesai';
-}
-
 /** Check if a transaction is an "Alokasi Modal Operasional Proyek" (capital allocation into project) */
 export function isSuntikanModal(t: Transaction): boolean {
-  return (
-    t.deskripsi.startsWith('Alokasi Modal Proyek:') ||
-    t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
-    t.kategori === 'Alokasi Modal Operasional Proyek' ||
-    t.kategori === 'Suntikan Modal Proyek'
-  );
+  return classifyTransaction(t).isCapitalInjectionToProject;
 }
 
 /** Check if a transaction is an internal cash transfer (Mutasi Internal) */
 export function isMutasiInternal(t: Transaction): boolean {
-  if (isSuntikanModal(t)) return true;
-  
-  const k = (t.kategori || '').toLowerCase();
-  const d = (t.deskripsi || '').toLowerCase();
-
-  if (k.includes('mutasi internal') || k.includes('transfer kas')) return true;
-  if (k.includes('drop dana') || d.includes('drop dana')) return true;
-  if (k.includes('suntikan modal') || d.includes('suntikan modal')) return true;
-  if (k.includes('alokasi modal') || d.includes('alokasi modal')) return true;
-  if (k.includes('refund') || k.includes('pengembalian dana')) return true;
-  if (k.includes('setoran modal')) return true;
-  if (k.includes('saldo awal') || d.includes('saldo awal')) return true;
-  
-  return false;
+  return classifyTransaction(t).isMutasiInternal;
 }
 
-/**
- * Check if a transaction belongs to KAS UTAMA (main company cash).
- * Kas Utama includes:
- * - All transactions WITHOUT proyekId
- * - Internal Transfers & Capital Injection transactions (they represent money moving from/to kas utama)
- */
+/** Check if a transaction belongs to KAS UTAMA (main company cash) */
 export function isKasUtamaTransaction(t: Transaction): boolean {
-  return !t.proyekId;
+  return classifyTransaction(t).isKasUtamaTransaction;
 }
 
-/**
- * Check if transaction is a "Refund Sisa Dana ke Kas Utama" from a completed project.
- */
+/** Check if transaction is a "Refund Sisa Dana ke Kas Utama" from a completed project */
 export function isRefundToKasUtama(t: Transaction): boolean {
-  return t.kategori === 'Refund Dana Proyek ke Kas Utama' && t.jenis === 'masuk' && !t.proyekId;
+  return classifyTransaction(t).isRefundToKasUtama;
 }
 
 // ---- Dashboard Summary (COMBINED COMPANY CASH & REAL P&L) ----
@@ -77,29 +53,19 @@ export function getDashboardSummary(
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  let sisaKasUtama = 0;
-  let totalKasProyek = 0;
+  const ledger = calculateCompanyLedger(transactions);
 
   let pemasukanBulanIni = 0;
   let pengeluaranOperasionalBulanIni = 0;
   let pribadiOwnerBulanIni = 0;
 
-  // Calculate Kas Utama balance
   for (const t of transactions) {
     if (!isApproved(t)) continue;
-
-    // Kas Utama Balance Calculation
-    if (isKasUtamaTransaction(t)) {
-      if (t.jenis === 'masuk') {
-        sisaKasUtama += t.nominal;
-      } else {
-        sisaKasUtama -= t.nominal;
-      }
-    }
+    const classification = classifyTransaction(t);
 
     // P&L Real Omzet & Expenses in current month (Excluding Internal Transfers)
     if (isInMonth(t.tanggal, year, month)) {
-      if (!isMutasiInternal(t)) {
+      if (!classification.isMutasiInternal) {
         if (t.jenis === 'masuk') {
           pemasukanBulanIni += t.nominal;
         } else {
@@ -112,32 +78,11 @@ export function getDashboardSummary(
     }
   }
 
-  // Calculate total cash in all project pools
-  const projectCashMap: Record<string, number> = {};
-  for (const t of transactions) {
-    if (!isApproved(t)) continue;
-    if (!t.proyekId) continue; // Only project-bound transactions
-
-    if (!projectCashMap[t.proyekId]) projectCashMap[t.proyekId] = 0;
-
-    if (t.jenis === 'masuk') {
-      projectCashMap[t.proyekId] += t.nominal;
-    } else {
-      projectCashMap[t.proyekId] -= t.nominal;
-    }
-  }
-
-  for (const cash of Object.values(projectCashMap)) {
-    totalKasProyek += cash;
-  }
-
-  const sisaKasTotal = sisaKasUtama + totalKasProyek;
-
   return {
-    sisaKasTotal,
-    sisaKasUtama,
-    totalKasProyek,
-    sisaKas: sisaKasTotal, // legacy compatibility
+    sisaKasTotal: ledger.sisaKasTotal,
+    sisaKasUtama: ledger.sisaKasUtama,
+    totalKasProyek: ledger.totalKasProyek,
+    sisaKas: ledger.sisaKasTotal, // legacy compatibility
     totalPemasukanBulanIni: pemasukanBulanIni,
     totalPengeluaranOperasionalBulanIni: pengeluaranOperasionalBulanIni,
     totalPribadiOwnerBulanIni: pribadiOwnerBulanIni,
