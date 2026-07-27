@@ -46,6 +46,7 @@ export interface ProcurementItem {
   satuan?: string; // Unit like pcs, sak, roll, m2, unit, etc.
   hargaRencana?: number; // Total harga rencana untuk kuantitas ini
   hargaAktual?: number;  // Total harga aktual pembelian
+  kategori?: string;     // Operational Cost, Utilities, Overhead Cost, Biaya Lain-Lain
   isPurchased: boolean;
 }
 

@@ -122,6 +122,7 @@ export function ProjectDetail() {
   const [newChecklistKuantitas, setNewChecklistKuantitas] = useState('1');
   const [newChecklistSatuan, setNewChecklistSatuan] = useState('');
   const [newChecklistHargaRencana, setNewChecklistHargaRencana] = useState('');
+  const [newChecklistKategori, setNewChecklistKategori] = useState('Operational Cost');
   
   const [editingHargaAktual, setEditingHargaAktual] = useState<string | null>(null);
   const [aktualHargaValue, setAktualHargaValue] = useState('');
@@ -279,6 +280,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         kuantitas: parseInt(newChecklistKuantitas) || 1,
         satuan: newChecklistSatuan.trim() || undefined,
         hargaRencana: newChecklistHargaRencana ? parseInt(newChecklistHargaRencana.replace(/\D/g, '')) : undefined,
+        kategori: newChecklistKategori || 'Operational Cost',
         isPurchased: false
       };
       await updateProject(project.id, {
@@ -562,7 +564,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </div>
   
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col lg:flex-row gap-2">
               <input
                 type="text"
                 value={newChecklistItem}
@@ -571,7 +573,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                 className="flex-[2] border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="Nama Barang (Cth: Semen)"
               />
-              <div className="flex gap-1.5 flex-1">
+              <div className="flex gap-1.5 flex-1 flex-wrap sm:flex-nowrap">
                 <input
                   type="number"
                   min="1"
@@ -591,89 +593,148 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                   placeholder="Satuan"
                   title="Satuan (Pcs, Sak, Unit, Roll, dll)"
                 />
+                <select
+                  value={newChecklistKategori}
+                  onChange={e => setNewChecklistKategori(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-700 font-medium"
+                >
+                  <option value="Operational Cost">Operational Cost</option>
+                  <option value="Utilities">Utilities</option>
+                  <option value="Overhead Cost">Overhead Cost</option>
+                  <option value="Biaya Lain-Lain">Biaya Lain-Lain</option>
+                </select>
                 <input
                   type="text"
                   value={newChecklistHargaRencana}
                   onChange={e => setNewChecklistHargaRencana(formatRupiahInput(e.target.value))}
                   onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-w-[120px]"
                   placeholder="Harga Rencana (Rp)"
                 />
               </div>
               <Button variant="primary" size="sm" onClick={handleAddChecklist} icon={<PlusCircle size={16} />} className="whitespace-nowrap">Tambah</Button>
             </div>
   
-            {project.procurementItems && project.procurementItems.length > 0 ? (
-              <div className="grid grid-cols-1 gap-2 mt-3">
-                {project.procurementItems.map(item => (
-                  <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
-                    <div 
-                      className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
-                      onClick={() => handleToggleChecklist(item.id, item.isPurchased)}
-                    >
-                      {item.isPurchased ? (
-                        <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
-                      ) : (
-                        <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
-                      )}
-                      <div className="flex flex-col">
-                        <span className={`text-sm font-medium ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                          {item.kuantitas} {item.satuan ? item.satuan : 'x'} {item.nama}
-                        </span>
-                        {item.hargaRencana !== undefined && (
-                          <span className={`text-[10px] ${item.isPurchased ? 'text-gray-400' : 'text-gray-500'}`}>
-                            Rencana: {formatRupiah(item.hargaRencana)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:ml-4 self-end sm:self-auto">
-                      {editingHargaAktual === item.id ? (
-                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-200 shadow-sm animate-fade-in">
-                          <span className="text-xs text-gray-500 ml-1">Rp</span>
-                          <input
-                            type="text"
-                            autoFocus
-                            value={aktualHargaValue}
-                            onChange={e => setAktualHargaValue(formatRupiahInput(e.target.value))}
-                            onKeyDown={e => e.key === 'Enter' && handleSaveHargaAktual(item.id)}
-                            className="w-24 text-sm border-none focus:outline-none focus:ring-0 py-0.5"
-                            placeholder="Aktual"
-                          />
-                          <button onClick={() => handleSaveHargaAktual(item.id)} className="p-1 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200">
-                            <CheckSquare size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        item.isPurchased && item.hargaAktual !== undefined && (
-                          <div className="flex items-center gap-2 mr-2">
-                            <span className="text-xs font-semibold text-gray-700">Aktual: {formatRupiah(item.hargaAktual)}</span>
-                            {item.hargaRencana !== undefined && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                item.hargaAktual < item.hargaRencana ? 'bg-emerald-100 text-emerald-700' :
-                                item.hargaAktual > item.hargaRencana ? 'bg-red-100 text-red-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
-                                {item.hargaAktual < item.hargaRencana ? `Hemat ${formatRupiah(item.hargaRencana - item.hargaAktual)}` :
-                                 item.hargaAktual > item.hargaRencana ? `Over ${formatRupiah(item.hargaAktual - item.hargaRencana)}` :
-                                 'Sesuai'}
-                              </span>
-                            )}
-                          </div>
-                        )
-                      )}
-                      
-                      <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md transition-colors border border-transparent hover:bg-red-50">
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+            {(() => {
+              const items = project.procurementItems || [];
+              if (items.length === 0) {
+                return (
+                  <div className="text-center py-6 text-sm text-gray-500 italic">
+                    Belum ada item checklist. Tambahkan item di atas atau gunakan tombol Import Teks Praktis.
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-sm text-gray-500 italic">Belum ada item checklist. Tambahkan item di atas.</div>
-            )}
+                );
+              }
+
+              // Group items by Category Segment
+              const grouped = items.reduce((acc, item) => {
+                const cat = item.kategori || 'Operational Cost';
+                if (!acc[cat]) acc[cat] = [];
+                acc[cat].push(item);
+                return acc;
+              }, {} as Record<string, ProcurementItem[]>);
+
+              const categories = Object.keys(grouped);
+
+              return (
+                <div className="space-y-5 mt-4">
+                  {categories.map(catName => {
+                    const catItems = grouped[catName];
+                    const catTotal = catItems.length;
+                    const catPurchased = catItems.filter(i => i.isPurchased).length;
+                    const catRencana = catItems.reduce((s, i) => s + (i.hargaRencana || 0), 0);
+                    const catAktual = catItems.reduce((s, i) => s + (i.hargaAktual || 0), 0);
+
+                    return (
+                      <div key={catName} className="space-y-2 border border-gray-200/80 rounded-2xl p-4 bg-slate-50/50">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-gray-200 gap-1">
+                          <div className="flex items-center gap-2">
+                            <Layers size={16} className="text-blue-600" />
+                            <h3 className="text-sm font-bold text-gray-800 tracking-tight">{catName}</h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100/70 text-blue-700 rounded-full border border-blue-200/60">
+                              {catPurchased}/{catTotal} Item
+                            </span>
+                          </div>
+                          {catRencana > 0 && (
+                            <span className="text-[11px] font-medium text-gray-500">
+                              Est: <strong className="text-gray-700">{formatRupiah(catRencana)}</strong>
+                              {catAktual > 0 && <> · Realisasi: <strong className="text-emerald-700">{formatRupiah(catAktual)}</strong></>}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 pt-1">
+                          {catItems.map(item => (
+                            <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                              <div 
+                                className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
+                                onClick={() => handleToggleChecklist(item.id, item.isPurchased)}
+                              >
+                                {item.isPurchased ? (
+                                  <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                ) : (
+                                  <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                )}
+                                <div className="flex flex-col">
+                                  <span className={`text-sm font-medium ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                    {item.kuantitas} {item.satuan ? item.satuan : 'x'} {item.nama}
+                                  </span>
+                                  {item.hargaRencana !== undefined && (
+                                    <span className={`text-[10px] ${item.isPurchased ? 'text-gray-400' : 'text-gray-500'}`}>
+                                      Rencana: {formatRupiah(item.hargaRencana)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:ml-4 self-end sm:self-auto">
+                                {editingHargaAktual === item.id ? (
+                                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-200 shadow-sm animate-fade-in">
+                                    <span className="text-xs text-gray-500 ml-1">Rp</span>
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      value={aktualHargaValue}
+                                      onChange={e => setAktualHargaValue(formatRupiahInput(e.target.value))}
+                                      onKeyDown={e => e.key === 'Enter' && handleSaveHargaAktual(item.id)}
+                                      className="w-24 text-sm border-none focus:outline-none focus:ring-0 py-0.5"
+                                      placeholder="Aktual"
+                                    />
+                                    <button onClick={() => handleSaveHargaAktual(item.id)} className="p-1 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200">
+                                      <CheckSquare size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  item.isPurchased && item.hargaAktual !== undefined && (
+                                    <div className="flex items-center gap-2 mr-2">
+                                      <span className="text-xs font-semibold text-gray-700">Aktual: {formatRupiah(item.hargaAktual)}</span>
+                                      {item.hargaRencana !== undefined && (
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                          item.hargaAktual < item.hargaRencana ? 'bg-emerald-100 text-emerald-700' :
+                                          item.hargaAktual > item.hargaRencana ? 'bg-red-100 text-red-700' :
+                                          'bg-gray-100 text-gray-600'
+                                        }`}>
+                                          {item.hargaAktual < item.hargaRencana ? `Hemat ${formatRupiah(item.hargaRencana - item.hargaAktual)}` :
+                                           item.hargaAktual > item.hargaRencana ? `Over ${formatRupiah(item.hargaAktual - item.hargaRencana)}` :
+                                           'Sesuai'}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )
+                                )}
+                                
+                                <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md transition-colors border border-transparent hover:bg-red-50">
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </Card>
 
