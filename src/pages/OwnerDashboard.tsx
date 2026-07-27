@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, Clock, CheckCircle,
   XCircle, Upload, X, ChevronRight, AlertTriangle, PlusCircle, Paperclip, ExternalLink, Sparkles,
-  Mic, MicOff, Loader2
+  Mic, MicOff, Loader2, CheckSquare, Square, CheckCheck
 } from 'lucide-react';
 import { parseVoiceSentenceWithAI } from '../services/aiVoiceService';
 import {
@@ -87,6 +87,11 @@ export function OwnerDashboard() {
   const [transferFileName, setTransferFileName] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
 
+  // Bulk Selection States
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
+  const [selectedTransferIds, setSelectedTransferIds] = useState<string[]>([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
   // Owner Quick Entry Modal
   const [quickModalOpen, setQuickModalOpen] = useState(false);
   const [quickForm, setQuickForm] = useState({
@@ -122,9 +127,70 @@ export function OwnerDashboard() {
     try {
       await updateTransactionStatus(txId, 'disetujui');
       addToast('success', 'Transaksi disetujui');
+      setSelectedApprovalIds(prev => prev.filter(id => id !== txId));
       loadData();
     } catch {
       addToast('error', 'Gagal memproses persetujuan');
+    }
+  };
+
+  // Bulk Approve Handler
+  const toggleSelectApproval = (id: string) => {
+    setSelectedApprovalIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllApproval = () => {
+    if (selectedApprovalIds.length === pendingApproval.length) {
+      setSelectedApprovalIds([]);
+    } else {
+      setSelectedApprovalIds(pendingApproval.map(t => t.id));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedApprovalIds.length === 0) return;
+    setBulkProcessing(true);
+    try {
+      await Promise.all(selectedApprovalIds.map(id => updateTransactionStatus(id, 'disetujui')));
+      addToast('success', `✨ ${selectedApprovalIds.length} transaksi berhasil disetujui sekaligus!`);
+      setSelectedApprovalIds([]);
+      loadData();
+    } catch {
+      addToast('error', 'Gagal memproses persetujuan masal');
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  // Bulk Transfer Handler
+  const toggleSelectTransfer = (id: string) => {
+    setSelectedTransferIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllTransfer = () => {
+    if (selectedTransferIds.length === pendingTransfer.length) {
+      setSelectedTransferIds([]);
+    } else {
+      setSelectedTransferIds(pendingTransfer.map(t => t.id));
+    }
+  };
+
+  const handleBulkTransfer = async () => {
+    if (selectedTransferIds.length === 0) return;
+    setBulkProcessing(true);
+    try {
+      await Promise.all(selectedTransferIds.map(id => updateTransactionStatus(id, 'selesai')));
+      addToast('success', `✨ ${selectedTransferIds.length} transaksi berhasil ditandai sudah transfer!`);
+      setSelectedTransferIds([]);
+      loadData();
+    } catch {
+      addToast('error', 'Gagal memproses status transfer masal');
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -465,15 +531,46 @@ export function OwnerDashboard() {
 
       {/* Pending Approval Section */}
       <Card>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Clock size={18} className="text-amber-500" />
-            <h2 className="text-base font-semibold text-gray-800">Menunggu Persetujuan ({pendingApproval.length})</h2>
+            <h2 className="text-base font-bold text-gray-800">Menunggu Persetujuan ({pendingApproval.length})</h2>
           </div>
+          
           {pendingApproval.length > 0 && (
-            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium">
-              Membutuhkan tindakan Anda
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={toggleSelectAllApproval}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 hover:border-gray-300 bg-white text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              >
+                {selectedApprovalIds.length === pendingApproval.length ? (
+                  <>
+                    <CheckSquare size={15} className="text-emerald-600" /> Sembunyikan Semua
+                  </>
+                ) : (
+                  <>
+                    <Square size={15} className="text-gray-400" /> Pilih Semua ({selectedApprovalIds.length}/{pendingApproval.length})
+                  </>
+                )}
+              </button>
+
+              {selectedApprovalIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkApprove}
+                  disabled={bulkProcessing}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                >
+                  {bulkProcessing ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <CheckCheck size={16} />
+                  )}
+                  Setujui ({selectedApprovalIds.length}) Transaksi Masal
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -485,66 +582,119 @@ export function OwnerDashboard() {
           />
         ) : (
           <div className="divide-y divide-gray-100">
-            {pendingApproval.map(tx => (
-              <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                      tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {tx.jenis === 'masuk' ? '📥 Konfirmasi Uang Masuk Bank' : 'Pengeluaran Operasional'}
-                    </span>
-                    <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
-                    {getDaysPending(tx.tanggal) >= 2 && (
-                      <span className="px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-700 text-[10px] font-extrabold flex items-center gap-1 animate-pulse">
-                        <AlertTriangle size={11} /> Pending {getDaysPending(tx.tanggal)} Hari
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-bold text-gray-900 truncate">{tx.deskripsi}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 font-medium">Kategori: {tx.kategori}</p>
-                  {tx.lampiran && tx.lampiran.length > 0 && (
-                    <AttachmentViewer attachments={tx.lampiran} />
-                  )}
-                </div>
+            {pendingApproval.map(tx => {
+              const isSelected = selectedApprovalIds.includes(tx.id);
+              return (
+                <div key={tx.id} className={`py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2 rounded-xl transition-colors ${isSelected ? 'bg-emerald-50/50 border border-emerald-200/60' : ''}`}>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectApproval(tx.id)}
+                      className="mt-1 flex-shrink-0 text-gray-400 hover:text-emerald-600 transition-colors"
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={18} className="text-emerald-600" />
+                      ) : (
+                        <Square size={18} />
+                      )}
+                    </button>
 
-                <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
-                  <div className="text-right">
-                    <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
-                    </p>
-                    {tx.jenis === 'masuk' && (
-                      <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">Memerlukan Konfirmasi Masuk Rekening Bank</p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                          tx.jenis === 'masuk' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {tx.jenis === 'masuk' ? '📥 Konfirmasi Uang Masuk Bank' : 'Pengeluaran Operasional'}
+                        </span>
+                        <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
+                        {getDaysPending(tx.tanggal) >= 2 && (
+                          <span className="px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-700 text-[10px] font-extrabold flex items-center gap-1 animate-pulse">
+                            <AlertTriangle size={11} /> Pending {getDaysPending(tx.tanggal)} Hari
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-bold text-gray-900 truncate">{tx.deskripsi}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 font-medium">Kategori: {tx.kategori}</p>
+                      {tx.lampiran && tx.lampiran.length > 0 && (
+                        <AttachmentViewer attachments={tx.lampiran} />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setRejectModal({ open: true, txId: tx.id })}
-                      className="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <XCircle size={14} /> {tx.jenis === 'masuk' ? 'Belum Masuk' : 'Tolak'}
-                    </button>
-                    <button
-                      onClick={() => handleApprove(tx.id)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
-                    >
-                      <CheckCircle size={14} /> {tx.jenis === 'masuk' ? 'Konfirmasi Uang Masuk' : 'Setujui'}
-                    </button>
+
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3">
+                    <div className="text-right">
+                      <p className={`font-extrabold text-base ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                      </p>
+                      {tx.jenis === 'masuk' && (
+                        <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">Memerlukan Konfirmasi Masuk Rekening Bank</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setRejectModal({ open: true, txId: tx.id })}
+                        className="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <XCircle size={14} /> {tx.jenis === 'masuk' ? 'Belum Masuk' : 'Tolak'}
+                      </button>
+                      <button
+                        onClick={() => handleApprove(tx.id)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                      >
+                        <CheckCircle size={14} /> {tx.jenis === 'masuk' ? 'Konfirmasi Uang Masuk' : 'Setujui'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
 
       {/* Pending Transfer Section */}
       <Card>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-blue-500" />
-            <h2 className="text-base font-semibold text-gray-800">Menunggu Transfer Selesai ({pendingTransfer.length})</h2>
+            <h2 className="text-base font-bold text-gray-800">Menunggu Transfer Selesai ({pendingTransfer.length})</h2>
           </div>
+
+          {pendingTransfer.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={toggleSelectAllTransfer}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 hover:border-gray-300 bg-white text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all"
+              >
+                {selectedTransferIds.length === pendingTransfer.length ? (
+                  <>
+                    <CheckSquare size={15} className="text-blue-600" /> Sembunyikan Semua
+                  </>
+                ) : (
+                  <>
+                    <Square size={15} className="text-gray-400" /> Pilih Semua ({selectedTransferIds.length}/{pendingTransfer.length})
+                  </>
+                )}
+              </button>
+
+              {selectedTransferIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkTransfer}
+                  disabled={bulkProcessing}
+                  className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                >
+                  {bulkProcessing ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <CheckCheck size={16} />
+                  )}
+                  Tandai ({selectedTransferIds.length}) Sudah Transfer
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {pendingTransfer.length === 0 ? (
@@ -555,31 +705,48 @@ export function OwnerDashboard() {
           />
         ) : (
           <div className="divide-y divide-gray-100">
-            {pendingTransfer.map(tx => (
-              <div key={tx.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <StatusBadge status={tx.status} />
-                    <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
-                  </div>
-                  <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
-                  {tx.lampiran && tx.lampiran.length > 0 && (
-                    <AttachmentViewer attachments={tx.lampiran} />
-                  )}
-                </div>
+            {pendingTransfer.map(tx => {
+              const isSelected = selectedTransferIds.includes(tx.id);
+              return (
+                <div key={tx.id} className={`py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2 rounded-xl transition-colors ${isSelected ? 'bg-blue-50/50 border border-blue-200/60' : ''}`}>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleSelectTransfer(tx.id)}
+                      className="mt-1 flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors"
+                    >
+                      {isSelected ? (
+                        <CheckSquare size={18} className="text-blue-600" />
+                      ) : (
+                        <Square size={18} />
+                      )}
+                    </button>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4">
-                  <p className="font-bold text-base text-red-600">-{formatRupiah(tx.nominal)}</p>
-                  <button
-                    onClick={() => setTransferModal({ open: true, txId: tx.id })}
-                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                  >
-                    <Upload size={14} /> Tandai Sudah Transfer
-                  </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <StatusBadge status={tx.status} />
+                        <span className="text-xs text-gray-400">{formatDate(tx.tanggal)}</span>
+                      </div>
+                      <p className="font-semibold text-gray-800 truncate">{tx.deskripsi}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{tx.kategori}</p>
+                      {tx.lampiran && tx.lampiran.length > 0 && (
+                        <AttachmentViewer attachments={tx.lampiran} />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
+                    <p className="font-bold text-base text-red-600">-{formatRupiah(tx.nominal)}</p>
+                    <button
+                      onClick={() => setTransferModal({ open: true, txId: tx.id })}
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                    >
+                      <Upload size={14} /> Tandai Sudah Transfer
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
