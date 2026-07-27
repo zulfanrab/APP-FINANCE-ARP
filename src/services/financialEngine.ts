@@ -10,12 +10,12 @@ export const EXTERNAL_CAPITAL_CATEGORIES_SET = new Set<string>([
   'Setoran Modal Owner / Direksi',
   'Saldo Awal',
   'Modal Awal',
+  'Alokasi Modal Operasional Proyek',
+  'Suntikan Modal Proyek',
 ]);
 
 export const INTERNAL_TRANSFER_CATEGORIES_SET = new Set<string>([
   'Mutasi Internal / Transfer Kas',
-  'Alokasi Modal Operasional Proyek',
-  'Suntikan Modal Proyek',
 ]);
 
 export const REFUND_TO_KAS_UTAMA_CATEGORIES_SET = new Set<string>([
@@ -50,14 +50,14 @@ export function isApproved(t: Transaction): boolean {
 
 /**
  * Single Source of Truth for Transaction Classification.
- * Eliminates keyword conflicts and resolves missing project bindings automatically.
+ * Guarantees External Capital Injections (like modal angkur 20M) never deduct from Kas Utama!
  */
 export function classifyTransaction(t: Transaction, projects: Project[] = []): TransactionClassification {
   const approved = isApproved(t);
   const categoryNormalized = (t.kategori || '').trim();
   const descNormalized = (t.deskripsi || '').toLowerCase().trim();
 
-  // Smart Routing: If proyekId is missing but description explicitly mentions a project name (e.g., 'modal angkur')
+  // Smart Routing: Resolve missing project binding from explicit names in description
   let resolvedProjectId = t.proyekId;
   if (!resolvedProjectId && projects.length > 0) {
     for (const p of projects) {
@@ -71,30 +71,24 @@ export function classifyTransaction(t: Transaction, projects: Project[] = []): T
 
   const hasProject = Boolean(resolvedProjectId);
 
-  // 1. External Capital Check (ALWAYS adds to total company liquidity)
-  // NEVER blocked by hasProject!
+  // 1. External Capital Check (ALWAYS adds to total liquidity, NEVER subtracts from Kas Utama!)
+  // Any keyword representing capital injection from owner/holding is locked as external capital.
   const isExternalCapital =
     EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized) ||
-    descNormalized.startsWith('setoran modal') ||
-    descNormalized.startsWith('drop dana') ||
-    descNormalized.startsWith('saldo awal') ||
-    descNormalized.startsWith('tambah modal');
+    descNormalized.includes('modal') ||
+    descNormalized.includes('drop') ||
+    descNormalized.includes('setoran') ||
+    descNormalized.includes('saldo awal') ||
+    descNormalized.includes('suntikan') ||
+    descNormalized.includes('alokasi') ||
+    descNormalized.includes('tambah');
 
-  // 2. Internal Capital Transfer (Kas Utama -> Kas Proyek)
-  // MUST NOT be external capital
-  const isCapitalKeyword =
-    categoryNormalized === 'Alokasi Modal Operasional Proyek' ||
-    categoryNormalized === 'Suntikan Modal Proyek' ||
-    categoryNormalized === 'Mutasi Internal / Transfer Kas' ||
-    descNormalized.includes('modal angkur') ||
-    descNormalized.includes('alokasi modal') ||
-    descNormalized.includes('suntikan modal') ||
-    descNormalized.includes('transfer modal');
-
+  // 2. Internal Transfer (Kas Utama -> Kas Proyek)
+  // MUST NOT be external capital! Only true internal movements between existing pools.
   const isInternalTransfer =
     !isExternalCapital &&
     hasProject &&
-    (isCapitalKeyword || (t.jenis === 'masuk' && INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized))) &&
+    (t.jenis === 'masuk' && INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized)) &&
     categoryNormalized !== 'Pengembalian Dana (Refund)' &&
     !descNormalized.includes('refund');
 
@@ -147,7 +141,6 @@ export function calculateCompanyLedger(
   let sisaKasUtama = 0;
   const projectCashMap: Record<string, number> = {};
 
-  // Initialize project pools
   for (const p of projects) {
     projectCashMap[p.id] = 0;
   }
@@ -164,7 +157,7 @@ export function calculateCompanyLedger(
         // External Capital dropped directly into Kas Utama standby
         sisaKasUtama += t.nominal;
       }
-      // If external capital has targetProjId, it routes directly into Project Pool in Section B without hitting Kas Utama
+      // If external capital has targetProjId, it routes directly into Project Pool in Section B without deducting Kas Utama!
     } else if (classification.isCapitalInjectionToProject) {
       // Internal Transfer (Kas Utama -> Kas Proyek) -> DEDUCTS from Kas Utama
       sisaKasUtama -= t.nominal;
