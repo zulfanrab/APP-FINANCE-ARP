@@ -65,6 +65,8 @@ function mapRowToProject(row: any): Project {
     tanggalSelesai: row.tanggal_selesai ?? undefined,
     status: row.status,
     deskripsi: row.deskripsi ?? undefined,
+    suratPengajuanPdf: row.surat_pengajuan_pdf ?? undefined,
+    procurementItems: row.procurement_items ? (typeof row.procurement_items === 'string' ? JSON.parse(row.procurement_items) : row.procurement_items) : [],
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -80,6 +82,8 @@ function mapProjectToRow(p: Project): any {
     tanggal_selesai: p.tanggalSelesai ?? null,
     status: p.status,
     deskripsi: p.deskripsi ?? null,
+    surat_pengajuan_pdf: p.suratPengajuanPdf ?? null,
+    procurement_items: p.procurementItems ? JSON.stringify(p.procurementItems) : null,
     dibuat_pada: p.dibuatPada,
     diupdate_pada: p.diupdatePada,
   };
@@ -225,9 +229,9 @@ export async function addProject(
     }
   }
 
-  if (newProject.anggaran && newProject.anggaran > 0) {
-    await syncProjectBudgetTransaction(newProject);
-  }
+  // if (newProject.anggaran && newProject.anggaran > 0) {
+  //   await syncProjectBudgetTransaction(newProject);
+  // }
 
   return newProject;
 }
@@ -257,9 +261,9 @@ export async function updateProject(
     }
   }
 
-  if (updated.anggaran && updated.anggaran > 0) {
-    await syncProjectBudgetTransaction(updated);
-  }
+  // if (updated.anggaran && updated.anggaran > 0) {
+  //   await syncProjectBudgetTransaction(updated);
+  // }
 
   return updated;
 }

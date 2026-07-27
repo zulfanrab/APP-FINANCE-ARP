@@ -10,13 +10,14 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjectFinancialSummary, getProjectCategoryBreakdown, buildProjectAISummaryContext, cleanTextPunctuation } from '../services/analyticsService';
 import { exportProjectRealisasiExcel } from '../services/exportService';
-import { type Project, type Transaction } from '../types';
+import { uploadAttachmentFile } from '../services/storageService';
+import { type Project, type Transaction, type ProcurementItem } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState,
   formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal, PdfReportModal
@@ -43,11 +44,14 @@ export function ProjectDetail() {
   const [filterType, setFilterType] = useState<'semua' | 'masuk' | 'keluar'>('semua');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
-  // Edit Budget Modal
+  // Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editBudgetStr, setEditBudgetStr] = useState('');
   const [editNama, setEditNama] = useState('');
   const [editKlien, setEditKlien] = useState('');
+  const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
+
+  // Procurement Checklist
+  const [newChecklistItem, setNewChecklistItem] = useState('');
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -116,7 +120,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       if (prj) {
         setEditNama(prj.nama);
         setEditKlien(prj.klien);
-        setEditBudgetStr(prj.anggaran ? new Intl.NumberFormat('id-ID').format(prj.anggaran) : '0');
+        setEditPdfFile(null);
       }
     } catch {
       addToast('error', 'Gagal memuat data proyek');
@@ -163,18 +167,71 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   });
 
   const handleSaveEdit = async () => {
-    const numericBudget = Number(editBudgetStr.replace(/\D/g, ''));
+    if (!project) return;
     try {
+      let pdfUrl = project.suratPengajuanPdf;
+      if (editPdfFile) {
+        const result = await uploadAttachmentFile(editPdfFile, {
+          tanggal: project.tanggalMulai,
+          proyekNama: editNama.trim(),
+        });
+        pdfUrl = result.dataUrl;
+      }
       await updateProject(project.id, {
         nama: editNama.trim(),
         klien: editKlien.trim(),
-        anggaran: numericBudget,
+        anggaran: 0,
+        suratPengajuanPdf: pdfUrl,
       });
-      addToast('success', 'Detail proyek & anggaran berhasil diperbarui');
+      addToast('success', 'Detail proyek berhasil diperbarui');
       setEditModalOpen(false);
       loadProjectData();
     } catch {
       addToast('error', 'Gagal mengupdate proyek');
+    }
+  };
+
+  const handleAddChecklist = async () => {
+    if (!newChecklistItem.trim() || !project) return;
+    try {
+      const items = project.procurementItems || [];
+      const newItem: ProcurementItem = {
+        id: Date.now().toString(),
+        nama: newChecklistItem.trim(),
+        isPurchased: false
+      };
+      await updateProject(project.id, {
+        procurementItems: [...items, newItem]
+      });
+      setNewChecklistItem('');
+      loadProjectData();
+      addToast('success', 'Item berhasil ditambahkan');
+    } catch {
+      addToast('error', 'Gagal menambahkan checklist');
+    }
+  };
+
+  const handleToggleChecklist = async (itemId: string) => {
+    if (!project) return;
+    try {
+      const items = (project.procurementItems || []).map(item => 
+        item.id === itemId ? { ...item, isPurchased: !item.isPurchased } : item
+      );
+      await updateProject(project.id, { procurementItems: items });
+      loadProjectData();
+    } catch {
+      addToast('error', 'Gagal memperbarui status checklist');
+    }
+  };
+
+  const handleDeleteChecklist = async (itemId: string) => {
+    if (!project) return;
+    try {
+      const items = (project.procurementItems || []).filter(item => item.id !== itemId);
+      await updateProject(project.id, { procurementItems: items });
+      loadProjectData();
+    } catch {
+      addToast('error', 'Gagal menghapus checklist');
     }
   };
 
@@ -283,6 +340,16 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           >
             {aiLoading ? 'Menganalisis...' : 'Analisis AI Proyek'}
           </Button>
+          {project.suratPengajuanPdf && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<FileText size={15} className="text-blue-600" />}
+              onClick={() => window.open(project.suratPengajuanPdf, '_blank')}
+            >
+              Lihat PDF Pengajuan
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -328,6 +395,73 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </div>
         </Card>
       )}
+
+      {/* ====== PROCUREMENT CHECKLIST ====== */}
+        <Card className="!p-5 border border-gray-100 shadow-card animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-3 border-b border-gray-100">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <CheckSquare className="text-blue-600" size={18} /> Daftar Kebutuhan Pengadaan
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">Checklist *cross-check* kesesuaian belanja dengan surat pengajuan.</p>
+            </div>
+            {(() => {
+              const items = project.procurementItems || [];
+              const total = items.length;
+              const purchased = items.filter(i => i.isPurchased).length;
+              const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
+              return (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs font-bold text-gray-700">Progress: {purchased} / {total} Item ({pct}%)</span>
+                  <div className="w-32 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+  
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newChecklistItem}
+                onChange={e => setNewChecklistItem(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Contoh: Semen 50 Sak, Laptop Operasional..."
+              />
+              <Button variant="primary" size="sm" onClick={handleAddChecklist} icon={<PlusCircle size={16} />}>Tambah</Button>
+            </div>
+  
+            {project.procurementItems && project.procurementItems.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                {project.procurementItems.map(item => (
+                  <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                    <div 
+                      className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                      onClick={() => handleToggleChecklist(item.id)}
+                    >
+                      {item.isPurchased ? (
+                        <CheckSquare size={18} className="text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <Square size={18} className="text-gray-400 flex-shrink-0" />
+                      )}
+                      <span className={`text-sm font-medium truncate ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                        {item.nama}
+                      </span>
+                    </div>
+                    <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1 rounded-md transition-colors">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-sm text-gray-500 italic">Belum ada item checklist. Tambahkan item di atas.</div>
+            )}
+          </div>
+        </Card>
 
       {/* ====== PROJECT FINANCIAL REPORT (Laporan Realisasi) ====== */}
       <Card className="!p-0 border border-gray-100 shadow-card overflow-hidden">
@@ -584,14 +718,21 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Anggaran Modal Operasional (Rp)</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Dokumen Pengajuan / Kontrak (PDF, Opsional)
+            </label>
             <input
-              type="text"
-              inputMode="numeric"
-              value={editBudgetStr}
-              onChange={e => setEditBudgetStr(formatRupiahInput(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold text-emerald-700"
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) setEditPdfFile(file);
+              }}
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
+            {project?.suratPengajuanPdf && !editPdfFile && (
+              <p className="text-[10px] text-slate-500 mt-1.5 italic">Proyek ini sudah memiliki dokumen PDF terlampir. Unggah file baru untuk menggantinya.</p>
+            )}
           </div>
 
           <div className="flex gap-2 justify-end pt-3">

@@ -12,6 +12,7 @@ import {
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject } from '../services/transactionService';
 import { getProjectFinancialSummary } from '../services/analyticsService';
+import { uploadAttachmentFile } from '../services/storageService';
 import { type Project } from '../types';
 import { Card, Button, Badge, LoadingSpinner, EmptyState, formatRupiah, formatDate, ProjectsSkeleton } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
@@ -50,7 +51,7 @@ export function Projects() {
     nama: '',
     klien: '',
     tipe: 'proyek_klien' as 'proyek_klien' | 'operasional_kantor',
-    anggaranStr: '',
+    suratPengajuanPdfFile: null as File | null,
     tanggalMulai: '',
     deskripsi: '',
   });
@@ -88,7 +89,7 @@ export function Projects() {
       nama: '',
       klien: defaultTipe === 'operasional_kantor' ? 'Internal Kantor' : '',
       tipe: defaultTipe,
-      anggaranStr: '',
+      suratPengajuanPdfFile: null,
       tanggalMulai: new Date().toISOString().split('T')[0],
       deskripsi: '',
     });
@@ -102,7 +103,7 @@ export function Projects() {
       nama: p.nama,
       klien: p.klien,
       tipe: p.tipe ?? 'proyek_klien',
-      anggaranStr: p.anggaran ? new Intl.NumberFormat('id-ID').format(p.anggaran) : '',
+      suratPengajuanPdfFile: null,
       tanggalMulai: p.tanggalMulai,
       deskripsi: p.deskripsi ?? '',
     });
@@ -114,15 +115,24 @@ export function Projects() {
     if (!form.nama.trim()) { addToast('error', 'Nama alokasi/proyek wajib diisi'); return; }
 
     const klienFinal = form.klien.trim() || (form.tipe === 'operasional_kantor' ? 'Internal Kantor' : 'Klien');
-    const anggaran = parseRupiahInput(form.anggaranStr);
     setSaving(true);
     try {
+      let pdfUrl = editingProject?.suratPengajuanPdf;
+      if (form.suratPengajuanPdfFile) {
+        const result = await uploadAttachmentFile(form.suratPengajuanPdfFile, {
+          tanggal: form.tanggalMulai,
+          proyekNama: form.nama.trim(),
+        });
+        pdfUrl = result.dataUrl;
+      }
+
       if (editingProject) {
         await updateProject(editingProject.id, {
           nama: form.nama.trim(),
           klien: klienFinal,
           tipe: form.tipe,
-          anggaran: anggaran || 0,
+          anggaran: 0,
+          suratPengajuanPdf: pdfUrl,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
@@ -132,7 +142,8 @@ export function Projects() {
           nama: form.nama.trim(),
           klien: klienFinal,
           tipe: form.tipe,
-          anggaran: anggaran || 0,
+          anggaran: 0,
+          suratPengajuanPdf: pdfUrl,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
@@ -350,16 +361,20 @@ export function Projects() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {form.tipe === 'operasional_kantor' ? 'Plafon / Drop Dana Kas Operasional Kantor (Rp)' : 'Modal Awal Operasional (Rp)'}
+              Dokumen Pengajuan / Kontrak (PDF, Opsional)
             </label>
             <input
-              type="text"
-              inputMode="numeric"
-              value={form.anggaranStr}
-              onChange={e => setForm(f => ({ ...f, anggaranStr: formatRupiahInput(e.target.value) }))}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-semibold text-emerald-700"
-              placeholder="0"
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) setForm(f => ({ ...f, suratPengajuanPdfFile: file }));
+              }}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
+            {editingProject?.suratPengajuanPdf && !form.suratPengajuanPdfFile && (
+              <p className="text-xs text-slate-500 mt-2 italic">Proyek ini sudah memiliki dokumen PDF terlampir. Unggah file baru untuk menggantinya.</p>
+            )}
           </div>
 
           <div>

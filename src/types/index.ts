@@ -39,12 +39,20 @@ export interface Transaction {
   diupdatePada: string; // ISO datetime
 }
 
+export interface ProcurementItem {
+  id: string;
+  nama: string;
+  isPurchased: boolean;
+}
+
 export interface Project {
   id: string;
   nama: string;
   klien: string;
   tipe?: 'proyek_klien' | 'operasional_kantor'; // 'proyek_klien' (default) vs 'operasional_kantor'
-  anggaran?: number; // Modal/Anggaran Operasional
+  anggaran?: number; // Modal/Anggaran Operasional (Legacy/Depreceated)
+  suratPengajuanPdf?: string; // URL to the uploaded PDF
+  procurementItems?: ProcurementItem[]; // Checklist pengadaan
   tanggalMulai: string;
   tanggalSelesai?: string;
   status: 'aktif' | 'selesai';
