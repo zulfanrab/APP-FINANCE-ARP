@@ -237,10 +237,13 @@ export async function addTransaction(
     diupdatePada: now(),
   };
 
-  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const [transactions, projects] = await Promise.all([
+    getItem<Transaction[]>(KEYS.TRANSACTIONS, []),
+    getProjects()
+  ]);
 
   // HARD GUARDRAIL: Validate balance before allowing outflow/mutasi
-  const currentLedger = calculateCompanyLedger(transactions);
+  const currentLedger = calculateCompanyLedger(transactions, projects);
   const classification = classifyTransaction(newTransaction);
 
   let feeNominalPreview = 0;
