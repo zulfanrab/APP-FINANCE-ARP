@@ -258,17 +258,24 @@ export async function addTransaction(
       else if (newTransaction.jalurTransfer === 'online_rtgs') feeNominalPreview = 6500;
       else if (newTransaction.jalurTransfer === 'custom') feeNominalPreview = newTransaction.adminNominalCustom || 0;
     }
-    const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
 
     if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
       // PROYEK EXPENSE: Validate ONLY against target project wallet
       const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
-      if (totalOutflowRequired > projectBalance) {
+      
+      // Biaya admin dipotong dari Kas Utama, jadi kas proyek hanya menanggung nominal utama
+      if (Math.round(newTransaction.nominal) > Math.round(projectBalance)) {
         throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+      }
+      
+      // Pastikan Kas Utama sanggup membayar biaya admin
+      if (feeNominalPreview > 0 && Math.round(feeNominalPreview) > Math.round(currentLedger.sisaKasUtama)) {
+        throw new Error('Saldo Kas Utama Tidak Mencukupi untuk membayar Biaya Admin Bank!');
       }
     } else if (classification.isCapitalInjectionToProject || (!newTransaction.proyekId && newTransaction.jenis === 'keluar')) {
       // MAIN CASH OUTFLOW or INTERNAL TRANSFER TO PROJECT: Validate against sisaKasUtama
-      if (totalOutflowRequired > currentLedger.sisaKasUtama) {
+      const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
+      if (Math.round(totalOutflowRequired) > Math.round(currentLedger.sisaKasUtama)) {
         throw new Error('Saldo Kas Utama Tidak Mencukupi!');
       }
     }
