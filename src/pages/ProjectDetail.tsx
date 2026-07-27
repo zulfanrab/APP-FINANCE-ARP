@@ -32,6 +32,73 @@ function formatRupiahInput(value: string): string {
   return new Intl.NumberFormat('id-ID').format(Number(num));
 }
 
+function parseBulkImportText(text: string): ProcurementItem[] {
+  if (!text || !text.trim()) return [];
+  const lines = text.split('\n');
+  const items: ProcurementItem[] = [];
+
+  for (const rawLine of lines) {
+    let line = rawLine.trim();
+    if (!line) continue;
+
+    // Remove leading bullet points or numbers like "1.", "1)", "-", "*"
+    line = line.replace(/^[\d+\.\-\*\)]+\s*/, '').trim();
+    if (!line) continue;
+
+    // Split by pipe '|', comma ',', or tab '\t'
+    let parts: string[] = [];
+    if (line.includes('|')) {
+      parts = line.split('|').map(p => p.trim());
+    } else if (line.includes(',')) {
+      parts = line.split(',').map(p => p.trim());
+    } else if (line.includes('\t')) {
+      parts = line.split('\t').map(p => p.trim());
+    } else {
+      parts = [line];
+    }
+
+    const nama = parts[0] || 'Item Pengadaan';
+    let kuantitas = 1;
+    let satuan: string | undefined = undefined;
+    let hargaRencana: number | undefined = undefined;
+
+    if (parts.length >= 2) {
+      const qtyMatch = parts[1].match(/^(\d+)\s*(.*)$/);
+      if (qtyMatch) {
+        kuantitas = parseInt(qtyMatch[1]) || 1;
+        if (qtyMatch[2] && qtyMatch[2].trim()) {
+          satuan = qtyMatch[2].trim();
+        }
+      }
+    }
+
+    if (parts.length >= 3) {
+      if (!satuan && parts[2] && !/^\d+$/.test(parts[2].replace(/\D/g, ''))) {
+        satuan = parts[2].trim();
+      } else if (!hargaRencana && parts[2]) {
+        const num = parts[2].replace(/\D/g, '');
+        if (num) hargaRencana = parseInt(num);
+      }
+    }
+
+    if (parts.length >= 4 && hargaRencana === undefined) {
+      const num = parts[3].replace(/\D/g, '');
+      if (num) hargaRencana = parseInt(num);
+    }
+
+    items.push({
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      nama,
+      kuantitas,
+      satuan,
+      hargaRencana,
+      isPurchased: false,
+    });
+  }
+
+  return items;
+}
+
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -58,6 +125,11 @@ export function ProjectDetail() {
   
   const [editingHargaAktual, setEditingHargaAktual] = useState<string | null>(null);
   const [aktualHargaValue, setAktualHargaValue] = useState('');
+
+  // Bulk Import Modal
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -257,6 +329,31 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     }
   };
 
+  const handleImportBulkText = async () => {
+    if (!importText.trim() || !project) return;
+    setImporting(true);
+    try {
+      const parsedItems = parseBulkImportText(importText);
+      if (parsedItems.length === 0) {
+        addToast('error', 'Tidak ada item yang dapat diproses. Cek format teks.');
+        setImporting(false);
+        return;
+      }
+      const existing = project.procurementItems || [];
+      await updateProject(project.id, {
+        procurementItems: [...existing, ...parsedItems]
+      });
+      setImportText('');
+      setImportModalOpen(false);
+      loadProjectData();
+      addToast('success', `${parsedItems.length} item pengadaan berhasil di-import!`);
+    } catch {
+      addToast('error', 'Gagal memproses import teks');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleDeleteChecklist = async (itemId: string) => {
     if (!project) return;
     try {
@@ -438,20 +535,30 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               </h2>
               <p className="text-xs text-gray-500 mt-1">Checklist *cross-check* kesesuaian belanja dengan surat pengajuan.</p>
             </div>
-            {(() => {
-              const items = project.procurementItems || [];
-              const total = items.length;
-              const purchased = items.filter(i => i.isPurchased).length;
-              const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
-              return (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs font-bold text-gray-700">Progress: {purchased} / {total} Item ({pct}%)</span>
-                  <div className="w-32 bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<FileText size={15} className="text-purple-600" />}
+                onClick={() => setImportModalOpen(true)}
+              >
+                Import Teks Praktis
+              </Button>
+              {(() => {
+                const items = project.procurementItems || [];
+                const total = items.length;
+                const purchased = items.filter(i => i.isPurchased).length;
+                const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
+                return (
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-xs font-bold text-gray-700">Progress: {purchased} / {total} Item ({pct}%)</span>
+                    <div className="w-32 bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
+            </div>
           </div>
   
           <div className="space-y-4">
@@ -889,6 +996,49 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         onClose={() => setSelectedTx(null)}
         onUpdate={loadProjectData}
       />
+
+      {/* Modal Import Bulk Teks */}
+      <Modal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Import Teks Praktis (Bulk Insert Pengadaan)"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Tempel teks dari AI Assistant / catatan Anda (1 item per baris). Sistem akan otomatis memecah nama, kuantitas, satuan, dan harga rencana.
+          </p>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] font-mono text-slate-700 space-y-1">
+            <p className="font-bold text-slate-900 mb-1">Contoh Format Pemisah (Koma `,` atau Garis Tegak `|`):</p>
+            <p>Semen, 50, Sak, 3.250.000</p>
+            <p>Cat Tembok 5kg | 5 | Pail | 750000</p>
+            <p>Genset 5000W | 1 Unit | 8500000</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Tempel Teks Multi-baris:</label>
+            <textarea
+              rows={8}
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+              placeholder="Paste teks daftar kebutuhan di sini..."
+              className="w-full border border-gray-200 rounded-xl p-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <Button variant="secondary" size="sm" onClick={() => setImportModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={importing ? <LoadingSpinner size={14} /> : <CheckSquare size={16} />}
+              onClick={handleImportBulkText}
+              disabled={importing || !importText.trim()}
+            >
+              {importing ? 'Memproses...' : 'Proses & Import Item'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Official PDF Realisasi Modal */}
       <PdfReportModal
