@@ -66,42 +66,59 @@ export function classifyTransaction(t: Transaction): TransactionClassification {
   const approved = isApproved(t);
   const categoryNormalized = (t.kategori || '').trim();
   const descNormalized = (t.deskripsi || '').toLowerCase().trim();
+  const hasProject = Boolean(t.proyekId);
 
-  // 1. External Capital Check (Setoran Modal Owner / Holding / Saldo Awal)
-  const isExternalCapital =
-    EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized) ||
-    descNormalized.startsWith('setoran modal') ||
-    descNormalized.startsWith('drop dana');
+  // 1. Check if description/category represents modal/capital funding keywords
+  const isCapitalKeyword =
+    categoryNormalized === 'Alokasi Modal Operasional Proyek' ||
+    categoryNormalized === 'Suntikan Modal Proyek' ||
+    categoryNormalized === 'Mutasi Internal / Transfer Kas' ||
+    categoryNormalized === 'Drop Dana Kas Utama / Holding' ||
+    categoryNormalized === 'Setoran Modal Owner / Direksi' ||
+    descNormalized.includes('modal angkur') ||
+    descNormalized.includes('alokasi modal') ||
+    descNormalized.includes('suntikan modal') ||
+    descNormalized.includes('drop dana') ||
+    descNormalized.includes('transfer modal');
 
   // 2. Internal Capital Transfer (Kas Utama -> Kas Proyek)
+  // MUST HAVE a target proyekId AND be a modal/transfer entry
   const isInternalTransfer =
-    Boolean(t.proyekId) &&
-    !isExternalCapital &&
-    (INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized) ||
-     descNormalized.startsWith('alokasi modal proyek:') ||
-     descNormalized.startsWith('suntikan modal proyek:'));
+    hasProject &&
+    (isCapitalKeyword || t.jenis === 'masuk') &&
+    categoryNormalized !== 'Pengembalian Dana (Refund)' &&
+    !descNormalized.includes('refund');
 
-  // 3. Refund to Kas Utama (Project returning unspent cash to Kas Utama)
+  // 3. External Capital Check (Setoran Modal Owner / Holding / Saldo Awal DIRECTLY TO KAS UTAMA)
+  // MUST NOT HAVE a proyekId (no target project bound)
+  const isExternalCapital =
+    !hasProject &&
+    (EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized) ||
+     descNormalized.startsWith('setoran modal') ||
+     descNormalized.startsWith('drop dana') ||
+     descNormalized.startsWith('saldo awal'));
+
+  // 4. Refund to Kas Utama (Project returning unspent cash to Kas Utama)
   const isRefundToKasUtama =
-    Boolean(t.proyekId) &&
+    hasProject &&
     (REFUND_TO_KAS_UTAMA_CATEGORIES_SET.has(categoryNormalized) ||
      (t.jenis === 'keluar' && descNormalized.includes('refund')));
 
-  // 4. Vendor Refund (Supplier returning money to Project/Office)
+  // 5. Vendor Refund (Supplier returning overpaid money to Project/Office)
   const isVendorRefund =
     categoryNormalized === 'Pengembalian Dana (Refund)' ||
-    (t.jenis === 'masuk' && descNormalized.includes('refund') && !isExternalCapital && !isInternalTransfer);
+    (t.jenis === 'masuk' && descNormalized.includes('refund') && !isInternalTransfer);
 
-  // 5. Admin Bank Fee Check
+  // 6. Admin Bank Fee Check
   const isAdminFee =
     categoryNormalized === 'Biaya Admin Bank' ||
     Boolean(t.parentTransactionId) ||
     descNormalized.includes('biaya admin bank');
 
-  // 6. Direct Kas Utama Transaction
-  const isKasUtamaTransaction = !t.proyekId || isExternalCapital;
+  // 7. Direct Kas Utama Transaction
+  const isKasUtamaTransaction = !hasProject || isExternalCapital;
 
-  // 7. General Mutasi Flag (Excludes internal movements from P&L revenue)
+  // 8. General Mutasi Flag (Excludes internal movements from P&L revenue)
   const isMutasiInternal = isInternalTransfer || isRefundToKasUtama;
 
   const isKasUtamaInflow = approved && isKasUtamaTransaction && t.jenis === 'masuk' && !isMutasiInternal;
@@ -138,7 +155,7 @@ export function calculateCompanyLedger(
       const hasExplicitFunding = transactions.some(t => {
         if (!isApproved(t) || t.proyekId !== p.id) return false;
         const c = classifyTransaction(t);
-        return c.isCapitalInjectionToProject || c.isExternalCapital;
+        return c.isCapitalInjectionToProject;
       });
       if (!hasExplicitFunding) {
         projectCashMap[p.id] = p.anggaran;
@@ -153,19 +170,19 @@ export function calculateCompanyLedger(
 
     // ---- A. KAS UTAMA BALANCING ----
     if (classification.isExternalCapital) {
-      // External Capital Injection (Setoran Owner / Drop Holding) ALWAYS ADDS to Kas Utama
+      // External Capital Injection (Setoran Owner / Drop Holding directly to Kas Utama) -> ADDS to Kas Utama
       sisaKasUtama += t.nominal;
     } else if (classification.isCapitalInjectionToProject) {
-      // Internal Transfer (Kas Utama -> Kas Proyek) DEDUCTS from Kas Utama
+      // Internal Capital Transfer (Kas Utama -> Kas Proyek) -> DEDUCTS from Kas Utama
       sisaKasUtama -= t.nominal;
     } else if (classification.isRefundToKasUtama) {
-      // Refund from Kas Proyek back to Kas Utama ADDS to Kas Utama
+      // Refund from Kas Proyek back to Kas Utama -> ADDS to Kas Utama
       sisaKasUtama += t.nominal;
     } else if (classification.isAdminFee) {
-      // Admin Bank Fee ALWAYS DEDUCTS from Kas Utama
+      // Admin Bank Fee -> ALWAYS DEDUCTS from Kas Utama
       sisaKasUtama -= t.nominal;
     } else if (!t.proyekId) {
-      // Direct Kas Utama Transaction (Revenue / Office Expense)
+      // Direct Kas Utama Revenue / Expense
       if (t.jenis === 'masuk') {
         sisaKasUtama += t.nominal;
       } else {
@@ -177,11 +194,11 @@ export function calculateCompanyLedger(
     if (t.proyekId && !classification.isAdminFee) {
       if (!projectCashMap[t.proyekId]) projectCashMap[t.proyekId] = 0;
 
-      if (classification.isExternalCapital || classification.isCapitalInjectionToProject || classification.isVendorRefund) {
-        // Money added into Project Pool
+      if (classification.isCapitalInjectionToProject || classification.isVendorRefund) {
+        // Internal Transfer into Project Pool -> ADDS to Kas Proyek
         projectCashMap[t.proyekId] += t.nominal;
       } else if (classification.isRefundToKasUtama) {
-        // Money returned from Project Pool back to Kas Utama
+        // Money returned from Project Pool back to Kas Utama -> DEDUCTS from Kas Proyek
         projectCashMap[t.proyekId] -= t.nominal;
       } else {
         // Regular Project Revenue / Expense
