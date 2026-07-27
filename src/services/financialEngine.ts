@@ -58,66 +58,32 @@ export function isApproved(t: Transaction): boolean {
 
 /**
  * Single Source of Truth for Transaction Classification.
- * Memisahkan suntikan eksternal (Modal Angkur 20M) dengan transfer internal (Alokasi Kantor 4,45M).
+ * Strictly relies on Category sets and explicit project IDs. No string-matching guesswork.
  */
-export function classifyTransaction(t: Transaction, projects: Project[] = []): TransactionClassification {
+export function classifyTransaction(t: Transaction, _projects: Project[] = []): TransactionClassification {
   const approved = isApproved(t);
   const categoryNormalized = (t.kategori || '').trim();
-  const descNormalized = (t.deskripsi || '').toLowerCase().trim();
 
-  // Smart Routing: Mencegah error jika proyek_id di database kosong tapi nama proyek ada di deskripsi
-  let resolvedProjectId = t.proyekId;
-  if (!resolvedProjectId && projects.length > 0) {
-    for (const p of projects) {
-      const projName = p.nama.toLowerCase().trim();
-      if (projName && (descNormalized.includes(projName) || (projName.includes('angkur') && descNormalized.includes('angkur')))) {
-        resolvedProjectId = p.id;
-        break;
-      }
-    }
-  }
-
+  // Hapus "Smart Routing" deskripsi. Proyek HANYA valid jika proyekId terisi.
+  const resolvedProjectId = t.proyekId;
   const hasProject = Boolean(resolvedProjectId);
 
   // 1. External Capital Check (Menambah likuiditas perusahaan)
-  // Khusus 'modal angkur' (20M) dikunci eksternal agar tidak memotong Kas Utama.
-  // PENTING: Jangan masukkan kata 'alokasi' ke sini agar Baris 19 tidak salah kamar!
-  const isExternalCapital =
-    EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized) ||
-    descNormalized.includes('modal angkur') ||
-    descNormalized.includes('setoran modal') ||
-    descNormalized.includes('drop dana') ||
-    descNormalized.includes('saldo awal') ||
-    descNormalized.includes('tambah modal') ||
-    descNormalized.includes('mutasi kas masuk') ||
-    descNormalized.includes('pengajuan budget');
+  // WAJIB terdaftar di EXTERNAL_CAPITAL_CATEGORIES_SET
+  const isExternalCapital = EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized);
 
   // 2. Internal Transfer (Kas Utama -> Kas Proyek)
-  // Termasuk Baris 19 ('Alokasi Modal Proyek: Kebutuhan Kantor') yang WAJIB memotong Kas Utama!
-  const isInternalTransfer =
-    !isExternalCapital &&
-    hasProject &&
-    (INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized) ||
-      descNormalized.includes('alokasi') ||
-      descNormalized.includes('transfer modal') ||
-      descNormalized.includes('untuk bayar kates'));
+  // WAJIB terdaftar di INTERNAL_TRANSFER_CATEGORIES_SET dan memiliki proyekId
+  const isInternalTransfer = hasProject && INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized);
 
   // 3. Refund to Kas Utama (Proyek mengembalikan sisa dana ke Kas Utama)
-  const isRefundToKasUtama =
-    hasProject &&
-    (REFUND_TO_KAS_UTAMA_CATEGORIES_SET.has(categoryNormalized) ||
-      (t.jenis === 'keluar' && descNormalized.includes('refund')));
+  const isRefundToKasUtama = hasProject && REFUND_TO_KAS_UTAMA_CATEGORIES_SET.has(categoryNormalized);
 
-  // 4. Vendor Refund (Supplier mengembalikan uang belanja ke proyek)
-  const isVendorRefund =
-    categoryNormalized === 'Pengembalian Dana (Refund)' ||
-    (t.jenis === 'masuk' && descNormalized.includes('refund') && !isInternalTransfer && !isRefundToKasUtama);
+  // 4. Vendor Refund (Supplier mengembalikan uang belanja)
+  const isVendorRefund = categoryNormalized === 'Pengembalian Dana (Refund)';
 
   // 5. Admin Bank Fee Check (Selalu memotong Kas Utama)
-  const isAdminFee =
-    categoryNormalized === 'Biaya Admin Bank' ||
-    Boolean(t.parentTransactionId) ||
-    descNormalized.includes('biaya admin bank');
+  const isAdminFee = categoryNormalized === 'Biaya Admin Bank' || Boolean(t.parentTransactionId);
 
   // 6. Direct Kas Utama Transaction
   const isKasUtamaTransaction = !hasProject || isExternalCapital || isRefundToKasUtama || isAdminFee;
