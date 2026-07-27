@@ -35,7 +35,7 @@ function SummaryCard({ label, value, icon, color, sub }: {
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <p className="text-xs sm:text-sm text-gray-500 font-medium mb-0.5 truncate">{label}</p>
-        <p className="text-base sm:text-lg lg:text-xl font-extrabold text-gray-900 truncate tabular-nums tracking-tight">{value}</p>
+        <p className="text-xs sm:text-sm md:text-base lg:text-lg font-extrabold text-gray-900 tabular-nums tracking-tight whitespace-nowrap overflow-x-auto scrollbar-none">{value}</p>
         {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate font-medium">{sub}</p>}
       </div>
     </Card>

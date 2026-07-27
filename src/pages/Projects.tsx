@@ -465,7 +465,7 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
             <Wallet size={12} className="text-blue-500" />
             <p className="text-[11px] text-gray-500 font-medium">Sisa Kas</p>
           </div>
-          <p className={`text-xs font-extrabold truncate ${sisaModal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+          <p className={`text-[11px] sm:text-xs font-extrabold whitespace-nowrap overflow-x-auto scrollbar-none ${sisaModal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             {formatRupiah(sisaModal)}
           </p>
         </div>
@@ -474,14 +474,14 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
             <TrendingDown size={12} className="text-red-500" />
             <p className="text-[11px] text-gray-500 font-medium">Terpakai</p>
           </div>
-          <p className="text-xs font-extrabold text-red-600 truncate">{formatRupiah(project.totalPengeluaran)}</p>
+          <p className="text-[11px] sm:text-xs font-extrabold text-red-600 whitespace-nowrap overflow-x-auto scrollbar-none">{formatRupiah(project.totalPengeluaran)}</p>
         </div>
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <TrendingUp size={12} className="text-emerald-500" />
             <p className="text-[11px] text-gray-500 font-medium">{isKantor ? 'Drop Dana' : 'Profit'}</p>
           </div>
-          <p className={`text-xs font-extrabold truncate ${isKantor || project.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`text-[11px] sm:text-xs font-extrabold whitespace-nowrap overflow-x-auto scrollbar-none ${isKantor || project.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {isKantor ? formatRupiah(project.anggaran || 0) : formatRupiah(project.profit)}
           </p>
         </div>
