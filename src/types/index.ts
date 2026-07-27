@@ -42,6 +42,10 @@ export interface Transaction {
 export interface ProcurementItem {
   id: string;
   nama: string;
+  kuantitas: number;
+  satuan?: string; // Unit like pcs, sak, roll, m2, unit, etc.
+  hargaRencana?: number; // Total harga rencana untuk kuantitas ini
+  hargaAktual?: number;  // Total harga aktual pembelian
   isPurchased: boolean;
 }
 

@@ -52,6 +52,12 @@ export function ProjectDetail() {
 
   // Procurement Checklist
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [newChecklistKuantitas, setNewChecklistKuantitas] = useState('1');
+  const [newChecklistSatuan, setNewChecklistSatuan] = useState('');
+  const [newChecklistHargaRencana, setNewChecklistHargaRencana] = useState('');
+  
+  const [editingHargaAktual, setEditingHargaAktual] = useState<string | null>(null);
+  const [aktualHargaValue, setAktualHargaValue] = useState('');
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -198,12 +204,18 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       const newItem: ProcurementItem = {
         id: Date.now().toString(),
         nama: newChecklistItem.trim(),
+        kuantitas: parseInt(newChecklistKuantitas) || 1,
+        satuan: newChecklistSatuan.trim() || undefined,
+        hargaRencana: newChecklistHargaRencana ? parseInt(newChecklistHargaRencana.replace(/\D/g, '')) : undefined,
         isPurchased: false
       };
       await updateProject(project.id, {
         procurementItems: [...items, newItem]
       });
       setNewChecklistItem('');
+      setNewChecklistKuantitas('1');
+      setNewChecklistSatuan('');
+      setNewChecklistHargaRencana('');
       loadProjectData();
       addToast('success', 'Item berhasil ditambahkan');
     } catch {
@@ -211,16 +223,37 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     }
   };
 
-  const handleToggleChecklist = async (itemId: string) => {
+  const handleToggleChecklist = async (itemId: string, itemPurchased: boolean) => {
+    if (!project) return;
+    if (!itemPurchased) {
+      setEditingHargaAktual(itemId);
+      setAktualHargaValue('');
+    } else {
+      try {
+        const items = (project.procurementItems || []).map(item => 
+          item.id === itemId ? { ...item, isPurchased: false, hargaAktual: undefined } : item
+        );
+        await updateProject(project.id, { procurementItems: items });
+        loadProjectData();
+      } catch {
+        addToast('error', 'Gagal memperbarui status checklist');
+      }
+    }
+  };
+
+  const handleSaveHargaAktual = async (itemId: string) => {
     if (!project) return;
     try {
+      const hAktual = aktualHargaValue ? parseInt(aktualHargaValue.replace(/\D/g, '')) : undefined;
       const items = (project.procurementItems || []).map(item => 
-        item.id === itemId ? { ...item, isPurchased: !item.isPurchased } : item
+        item.id === itemId ? { ...item, isPurchased: true, hargaAktual: hAktual } : item
       );
       await updateProject(project.id, { procurementItems: items });
+      setEditingHargaAktual(null);
+      setAktualHargaValue('');
       loadProjectData();
     } catch {
-      addToast('error', 'Gagal memperbarui status checklist');
+      addToast('error', 'Gagal menyimpan harga aktual');
     }
   };
 
@@ -422,38 +455,112 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </div>
   
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 value={newChecklistItem}
                 onChange={e => setNewChecklistItem(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Contoh: Semen 50 Sak, Laptop Operasional..."
+                className="flex-[2] border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Nama Barang (Cth: Semen)"
               />
-              <Button variant="primary" size="sm" onClick={handleAddChecklist} icon={<PlusCircle size={16} />}>Tambah</Button>
+              <div className="flex gap-1.5 flex-1">
+                <input
+                  type="number"
+                  min="1"
+                  value={newChecklistKuantitas}
+                  onChange={e => setNewChecklistKuantitas(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
+                  className="w-14 border border-gray-200 rounded-xl px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Qty"
+                  title="Kuantitas"
+                />
+                <input
+                  type="text"
+                  value={newChecklistSatuan}
+                  onChange={e => setNewChecklistSatuan(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
+                  className="w-20 border border-gray-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Satuan"
+                  title="Satuan (Pcs, Sak, Unit, Roll, dll)"
+                />
+                <input
+                  type="text"
+                  value={newChecklistHargaRencana}
+                  onChange={e => setNewChecklistHargaRencana(formatRupiahInput(e.target.value))}
+                  onKeyDown={e => e.key === 'Enter' && handleAddChecklist()}
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Harga Rencana (Rp)"
+                />
+              </div>
+              <Button variant="primary" size="sm" onClick={handleAddChecklist} icon={<PlusCircle size={16} />} className="whitespace-nowrap">Tambah</Button>
             </div>
   
             {project.procurementItems && project.procurementItems.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+              <div className="grid grid-cols-1 gap-2 mt-3">
                 {project.procurementItems.map(item => (
-                  <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                  <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
                     <div 
-                      className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-                      onClick={() => handleToggleChecklist(item.id)}
+                      className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
+                      onClick={() => handleToggleChecklist(item.id, item.isPurchased)}
                     >
                       {item.isPurchased ? (
-                        <CheckSquare size={18} className="text-emerald-500 flex-shrink-0" />
+                        <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                       ) : (
-                        <Square size={18} className="text-gray-400 flex-shrink-0" />
+                        <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
                       )}
-                      <span className={`text-sm font-medium truncate ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                        {item.nama}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className={`text-sm font-medium ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                          {item.kuantitas} {item.satuan ? item.satuan : 'x'} {item.nama}
+                        </span>
+                        {item.hargaRencana !== undefined && (
+                          <span className={`text-[10px] ${item.isPurchased ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Rencana: {formatRupiah(item.hargaRencana)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1 rounded-md transition-colors">
-                      <Trash2 size={15} />
-                    </button>
+
+                    <div className="flex items-center gap-2 mt-2 sm:mt-0 sm:ml-4 self-end sm:self-auto">
+                      {editingHargaAktual === item.id ? (
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-blue-200 shadow-sm animate-fade-in">
+                          <span className="text-xs text-gray-500 ml-1">Rp</span>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={aktualHargaValue}
+                            onChange={e => setAktualHargaValue(formatRupiahInput(e.target.value))}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveHargaAktual(item.id)}
+                            className="w-24 text-sm border-none focus:outline-none focus:ring-0 py-0.5"
+                            placeholder="Aktual"
+                          />
+                          <button onClick={() => handleSaveHargaAktual(item.id)} className="p-1 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200">
+                            <CheckSquare size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        item.isPurchased && item.hargaAktual !== undefined && (
+                          <div className="flex items-center gap-2 mr-2">
+                            <span className="text-xs font-semibold text-gray-700">Aktual: {formatRupiah(item.hargaAktual)}</span>
+                            {item.hargaRencana !== undefined && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                item.hargaAktual < item.hargaRencana ? 'bg-emerald-100 text-emerald-700' :
+                                item.hargaAktual > item.hargaRencana ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {item.hargaAktual < item.hargaRencana ? `Hemat ${formatRupiah(item.hargaRencana - item.hargaAktual)}` :
+                                 item.hargaAktual > item.hargaRencana ? `Over ${formatRupiah(item.hargaAktual - item.hargaRencana)}` :
+                                 'Sesuai'}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      )}
+                      
+                      <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md transition-colors border border-transparent hover:bg-red-50">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
