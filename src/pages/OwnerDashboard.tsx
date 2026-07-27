@@ -110,7 +110,7 @@ export function OwnerDashboard() {
       const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
       setProjectsList(prjs);
       const activePrjCount = prjs.filter(p => p.status === 'aktif').length;
-      setSummary(getDashboardSummary(txns, activePrjCount));
+      setSummary(getDashboardSummary(txns, activePrjCount, prjs));
       setChartData(getMonthlyChartData(txns));
       setPendingApproval(txns.filter(t => t.status === 'menunggu_approval'));
       setPendingTransfer(txns.filter(t => t.status === 'disetujui'));

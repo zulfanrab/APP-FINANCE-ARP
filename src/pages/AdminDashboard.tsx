@@ -66,11 +66,11 @@ export function AdminDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [txns, projects] = await Promise.all([getTransactions(), getProjects()]);
+      const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
       setAllTransactions(txns);
-      setProjectsList(projects);
-      const activeProjects = projects.filter(p => p.status === 'aktif').length;
-      setSummary(getDashboardSummary(txns, activeProjects));
+      setProjectsList(prjs);
+      const activeProjects = prjs.filter(p => p.status === 'aktif').length;
+      setSummary(getDashboardSummary(txns, activeProjects, prjs));
     } finally {
       setLoading(false);
     }

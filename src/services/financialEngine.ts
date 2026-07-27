@@ -3,7 +3,7 @@
 // Domain-Driven Accounting & Net-Zero Balancing Architecture
 // ============================================================
 
-import { type Transaction } from '../types';
+import { type Transaction, type Project } from '../types';
 
 /**
  * Exact Set of Normalized Categories representing Internal Mutasi & Capital Transfers.
@@ -99,9 +99,24 @@ export function classifyTransaction(t: Transaction): TransactionClassification {
  * Core Financial Engine: Calculates Consolidated Company Ledger with Net-Zero Balancing.
  * Guarantees zero double-counting across Kas Utama and Kas Proyek.
  */
-export function calculateCompanyLedger(transactions: Transaction[]): UnifiedCompanyLedger {
+export function calculateCompanyLedger(
+  transactions: Transaction[],
+  projects: Project[] = []
+): UnifiedCompanyLedger {
   let sisaKasUtama = 0;
   const projectCashMap: Record<string, number> = {};
+
+  // Initialize project cash map with project anggaran if no explicit capital injection transaction exists
+  for (const p of projects) {
+    if (p.anggaran && p.anggaran > 0) {
+      const hasExplicit = transactions.some(
+        t => isApproved(t) && t.proyekId === p.id && classifyTransaction(t).isCapitalInjectionToProject
+      );
+      if (!hasExplicit) {
+        projectCashMap[p.id] = p.anggaran;
+      }
+    }
+  }
 
   for (const t of transactions) {
     if (!isApproved(t)) continue;

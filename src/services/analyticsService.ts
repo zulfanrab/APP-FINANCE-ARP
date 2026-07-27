@@ -6,6 +6,7 @@
 // ============================================================
 
 import {
+  type Project,
   type Transaction,
   type DashboardSummary,
   type MonthlyChartData,
@@ -47,13 +48,14 @@ export function isRefundToKasUtama(t: Transaction): boolean {
 // ---- Dashboard Summary (COMBINED COMPANY CASH & REAL P&L) ----
 export function getDashboardSummary(
   transactions: Transaction[],
-  proyekAktifCount: number
+  proyekAktifCount: number,
+  projects: Project[] = []
 ): DashboardSummary {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  const ledger = calculateCompanyLedger(transactions);
+  const ledger = calculateCompanyLedger(transactions, projects);
 
   let pemasukanBulanIni = 0;
   let pengeluaranOperasionalBulanIni = 0;
