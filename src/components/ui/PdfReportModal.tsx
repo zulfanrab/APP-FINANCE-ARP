@@ -211,7 +211,7 @@ export function PdfReportModal({
   }
 
   // Universal Hidden-Iframe Printing (Works 100% on Mobile HP & Desktop Browsers without popup blocking!)
-  const handlePrint = () => {
+  const handlePrint = (withAttachments: boolean = false) => {
     const content = printRef.current;
     if (!content) return;
 
@@ -230,6 +230,56 @@ export function PdfReportModal({
 
     const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
     if (!frameDoc) return;
+
+    let attachmentsHtml = '';
+    
+    if (withAttachments) {
+      // Find all transactions with image attachments based on the report context
+      const reportTxs = project 
+        ? groupAndSortTransactions(approvedTx.filter(t => t.proyekId === project?.id), 'asc') 
+        : groupAndSortTransactions(approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'), 'asc');
+
+      const txWithImages = reportTxs.filter(t => 
+        t.lampiran && t.lampiran.length > 0 && t.lampiran.some(l => l.tipe.startsWith('image/') || l.dataUrl.startsWith('data:image/'))
+      );
+
+      if (txWithImages.length > 0) {
+        attachmentsHtml += `
+          <div style="page-break-before: always; padding-top: 20px;">
+            <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #1A365D; margin-bottom: 2px;">
+              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 900; color: #1A365D; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI</h1>
+              <p class="company-info" style="font-size: 9.5px; color: #334155; margin-top: 4px; line-height: 1.5;">
+                ${title} &middot; Periode: ${periodText}
+              </p>
+            </div>
+            
+            <div class="gallery-grid">
+        `;
+
+        txWithImages.forEach(t => {
+          const images = t.lampiran.filter(l => l.tipe.startsWith('image/') || l.dataUrl.startsWith('data:image/'));
+          images.forEach(img => {
+            attachmentsHtml += `
+              <div class="gallery-item">
+                <div class="img-wrapper">
+                  <img src="${img.dataUrl}" alt="Lampiran" />
+                </div>
+                <div class="caption">
+                  <div class="caption-date">${formatDate(t.tanggal)}</div>
+                  <div class="caption-desc">${t.deskripsi}</div>
+                  <div class="caption-nom">${formatSaldoRupiah(t.nominal)}</div>
+                </div>
+              </div>
+            `;
+          });
+        });
+
+        attachmentsHtml += `
+            </div>
+          </div>
+        `;
+      }
+    }
 
     frameDoc.open();
     frameDoc.write(`
@@ -440,10 +490,65 @@ export function PdfReportModal({
               font-weight: 700;
               color: #1A365D;
             }
+            .gallery-grid {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 15px;
+              margin-top: 20px;
+            }
+            .gallery-item {
+              width: calc(50% - 7.5px);
+              border: 1px solid #CBD5E1;
+              border-radius: 8px;
+              padding: 10px;
+              background: #F8FAFC;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              box-sizing: border-box;
+              margin-bottom: 10px;
+            }
+            .img-wrapper {
+              width: 100%;
+              height: 200px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #F1F5F9;
+              border-radius: 4px;
+              overflow: hidden;
+              margin-bottom: 10px;
+            }
+            .img-wrapper img {
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+            }
+            .caption {
+              text-align: left;
+            }
+            .caption-date {
+              font-size: 8.5px;
+              color: #64748B;
+              font-weight: 600;
+              margin-bottom: 2px;
+            }
+            .caption-desc {
+              font-size: 10px;
+              color: #0F172A;
+              font-weight: 700;
+              line-height: 1.3;
+              margin-bottom: 4px;
+            }
+            .caption-nom {
+              font-size: 11px;
+              color: #DC2626;
+              font-weight: 800;
+            }
           </style>
         </head>
         <body>
           ${content.innerHTML}
+          ${attachmentsHtml}
         </body>
       </html>
     `);
@@ -465,12 +570,20 @@ export function PdfReportModal({
             <FileText size={16} className="text-emerald-600 flex-shrink-0" />
             <span>Format PDF KOP Resmi (Siap Cetak / Save PDF di HP &amp; PC)</span>
           </div>
-          <button
-            onClick={handlePrint}
-            className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
-          >
-            <Printer size={16} /> Cetak / Download PDF
-          </button>
+          <div className="flex w-full sm:w-auto gap-2">
+            <button
+              onClick={() => handlePrint(false)}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+            >
+              <FileText size={16} /> Cetak Standar
+            </button>
+            <button
+              onClick={() => handlePrint(true)}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+            >
+              <Printer size={16} /> Cetak + Lampiran
+            </button>
+          </div>
         </div>
 
         {/* Printable Document Preview Area */}
