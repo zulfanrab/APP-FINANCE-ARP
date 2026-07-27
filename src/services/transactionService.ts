@@ -4,7 +4,7 @@
 // Project Allocation Binding & Cascade Delete Handling
 // ============================================================
 
-import { type Transaction, type TransactionStatus, type FilterOptions } from '../types';
+import { type Transaction, type TransactionStatus, type FilterOptions, type Project } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
@@ -237,40 +237,40 @@ export async function addTransaction(
     diupdatePada: now(),
   };
 
-  const [transactions, projects] = await Promise.all([
-    getItem<Transaction[]>(KEYS.TRANSACTIONS, []),
-    getProjects()
-  ]);
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
 
   // HARD GUARDRAIL: Validate balance before allowing outflow/mutasi
-  const currentLedger = calculateCompanyLedger(transactions, projects);
-  const classification = classifyTransaction(newTransaction);
+  const isTargetApproved = newTransaction.status === 'disetujui' || newTransaction.status === 'selesai';
 
-  let feeNominalPreview = 0;
-  if (
-    newTransaction.jenis === 'keluar' &&
-    newTransaction.jalurTransfer &&
-    newTransaction.jalurTransfer !== 'sesama_bca'
-  ) {
-    if (newTransaction.jalurTransfer === 'ewallet') feeNominalPreview = 1000;
-    else if (newTransaction.jalurTransfer === 'bi_fast') feeNominalPreview = 2500;
-    else if (newTransaction.jalurTransfer === 'online_rtgs') feeNominalPreview = 6500;
-    else if (newTransaction.jalurTransfer === 'custom') feeNominalPreview = newTransaction.adminNominalCustom || 0;
-  }
-  const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
+  if (isTargetApproved) {
+    const projects = getItem<Project[]>(KEYS.PROJECTS, []);
+    const currentLedger = calculateCompanyLedger(transactions, projects);
+    const classification = classifyTransaction(newTransaction);
 
-  if (!newTransaction.proyekId && newTransaction.jenis === 'keluar') {
-    if (totalOutflowRequired > currentLedger.sisaKasUtama) {
-      throw new Error('Saldo Kas Utama Tidak Mencukupi!');
+    let feeNominalPreview = 0;
+    if (
+      newTransaction.jenis === 'keluar' &&
+      newTransaction.jalurTransfer &&
+      newTransaction.jalurTransfer !== 'sesama_bca'
+    ) {
+      if (newTransaction.jalurTransfer === 'ewallet') feeNominalPreview = 1000;
+      else if (newTransaction.jalurTransfer === 'bi_fast') feeNominalPreview = 2500;
+      else if (newTransaction.jalurTransfer === 'online_rtgs') feeNominalPreview = 6500;
+      else if (newTransaction.jalurTransfer === 'custom') feeNominalPreview = newTransaction.adminNominalCustom || 0;
     }
-  } else if (classification.isCapitalInjectionToProject) {
-    if (totalOutflowRequired > currentLedger.sisaKasUtama) {
-      throw new Error('Saldo Kas Utama Tidak Mencukupi!');
-    }
-  } else if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
-    const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
-    if (totalOutflowRequired > projectBalance) {
-      throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+    const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
+
+    if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
+      // PROYEK EXPENSE: Validate ONLY against target project wallet
+      const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
+      if (totalOutflowRequired > projectBalance) {
+        throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+      }
+    } else if (classification.isCapitalInjectionToProject || (!newTransaction.proyekId && newTransaction.jenis === 'keluar')) {
+      // MAIN CASH OUTFLOW or INTERNAL TRANSFER TO PROJECT: Validate against sisaKasUtama
+      if (totalOutflowRequired > currentLedger.sisaKasUtama) {
+        throw new Error('Saldo Kas Utama Tidak Mencukupi!');
+      }
     }
   }
 
