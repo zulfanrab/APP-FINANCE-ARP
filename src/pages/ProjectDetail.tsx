@@ -10,7 +10,7 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
@@ -153,10 +153,11 @@ export function ProjectDetail() {
   const [editingHargaAktual, setEditingHargaAktual] = useState<string | null>(null);
   const [aktualHargaValue, setAktualHargaValue] = useState('');
 
-  // Bulk Import Modal
+  // Bulk Import Modal & Accordion State
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [procurementExpanded, setProcurementExpanded] = useState(true);
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -572,15 +573,23 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               >
                 Import Teks Praktis
               </Button>
+              <button
+                onClick={() => setProcurementExpanded(!procurementExpanded)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-colors border border-gray-200"
+                title={procurementExpanded ? 'Kecilkan / Sembunyikan' : 'Buka Checklist'}
+              >
+                <span>{procurementExpanded ? 'Tutup' : 'Buka List'}</span>
+                {procurementExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </button>
               {(() => {
                 const items = project.procurementItems || [];
                 const total = items.length;
                 const purchased = items.filter(i => i.isPurchased).length;
                 const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
                 return (
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-1 ml-1">
                     <span className="text-xs font-bold text-gray-700">Progress: {purchased} / {total} Item ({pct}%)</span>
-                    <div className="w-32 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-28 bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
@@ -589,7 +598,8 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             </div>
           </div>
   
-          <div className="space-y-4">
+          {procurementExpanded && (
+            <div className="space-y-4 animate-fade-in">
             <div className="flex flex-col lg:flex-row gap-2">
               <input
                 type="text"
@@ -765,6 +775,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               );
             })()}
           </div>
+          )}
         </Card>
 
       {/* ====== PROJECT FINANCIAL REPORT (Laporan Realisasi) ====== */}
