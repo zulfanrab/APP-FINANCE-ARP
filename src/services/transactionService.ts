@@ -273,9 +273,15 @@ export async function addTransaction(
 
   transactions.unshift(newTransaction);
 
-  // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER REQUIRES FEE
+  // AUTO-SPLIT BIAYA ADMIN BANK IF JALUR TRANSFER REQUIRES FEE (IDEMPOTENT CHECK)
+  const isAlreadyAdminFee =
+    newTransaction.kategori === 'Biaya Admin Bank' ||
+    Boolean(newTransaction.parentTransactionId) ||
+    newTransaction.deskripsi.toLowerCase().includes('biaya admin bank');
+
   let adminFeeTx: Transaction | null = null;
   if (
+    !isAlreadyAdminFee &&
     newTransaction.jenis === 'keluar' &&
     newTransaction.jalurTransfer &&
     newTransaction.jalurTransfer !== 'sesama_bca'
@@ -365,13 +371,19 @@ export async function updateTransaction(
     transactions[idx] = updated;
   }
 
-  // CHECK AND SYNC CHILD ADMIN FEE TRANSACTION
+  // CHECK AND SYNC CHILD ADMIN FEE TRANSACTION (IDEMPOTENT CHECK)
+  const isAlreadyAdminFee =
+    updated.kategori === 'Biaya Admin Bank' ||
+    Boolean(updated.parentTransactionId) ||
+    updated.deskripsi.toLowerCase().includes('biaya admin bank');
+
   const childIdx = transactions.findIndex(t => t.parentTransactionId === id);
   let childToUpdate: Transaction | null = null;
   let childToDeleteId: string | null = null;
   let childToCreate: Transaction | null = null;
 
   const requiresAdminFee =
+    !isAlreadyAdminFee &&
     updated.jenis === 'keluar' &&
     updated.jalurTransfer &&
     updated.jalurTransfer !== 'sesama_bca';

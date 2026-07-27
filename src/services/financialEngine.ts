@@ -28,6 +28,7 @@ export interface TransactionClassification {
   isCapitalInjectionToProject: boolean;
   isRefundToKasUtama: boolean;
   isVendorRefund: boolean;
+  isAdminFee: boolean;
 }
 
 export interface UnifiedCompanyLedger {
@@ -77,7 +78,13 @@ export function classifyTransaction(t: Transaction): TransactionClassification {
   // 5. Kas Utama Direct Transaction (No Project Bound)
   const isKasUtamaTransaction = !t.proyekId;
 
-  // 6. General Mutasi Flag
+  // 6. Admin Bank Fee Check
+  const isAdminFee =
+    categoryNormalized === 'Biaya Admin Bank' ||
+    Boolean(t.parentTransactionId) ||
+    descNormalized.includes('biaya admin bank');
+
+  // 7. General Mutasi Flag
   const isMutasiInternal = isMutasiCategory || isCapitalInjectionToProject || isRefundToKasUtama;
 
   const isKasUtamaInflow = approved && isKasUtamaTransaction && t.jenis === 'masuk' && !isMutasiInternal;
@@ -92,6 +99,7 @@ export function classifyTransaction(t: Transaction): TransactionClassification {
     isCapitalInjectionToProject,
     isRefundToKasUtama,
     isVendorRefund,
+    isAdminFee,
   };
 }
 
@@ -124,9 +132,9 @@ export function calculateCompanyLedger(
     const classification = classifyTransaction(t);
 
     // ---- A. KAS UTAMA BALANCING ----
-    if (!t.proyekId) {
-      // Direct Main Cash Transaction
-      if (t.jenis === 'masuk') {
+    if (!t.proyekId || classification.isAdminFee) {
+      // Direct Main Cash Transaction OR Bank Admin Fee (Always deducted purely from Kas Utama)
+      if (t.jenis === 'masuk' && !classification.isAdminFee) {
         sisaKasUtama += t.nominal;
       } else {
         sisaKasUtama -= t.nominal;
@@ -143,7 +151,7 @@ export function calculateCompanyLedger(
     }
 
     // ---- B. KAS PROYEK BALANCING ----
-    if (t.proyekId) {
+    if (t.proyekId && !classification.isAdminFee) {
       if (!projectCashMap[t.proyekId]) projectCashMap[t.proyekId] = 0;
 
       if (classification.isCapitalInjectionToProject || classification.isVendorRefund) {
