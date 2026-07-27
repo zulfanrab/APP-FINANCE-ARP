@@ -234,20 +234,81 @@ export function PdfReportModal({
     let attachmentsHtml = '';
     
     if (withAttachments) {
-      // Find all transactions with image attachments based on the report context
+      // Find all transactions with attachments or receipts based on report context
       const reportTxs = project 
         ? groupAndSortTransactions(approvedTx.filter(t => t.proyekId === project?.id), 'asc') 
         : groupAndSortTransactions(approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'), 'asc');
 
-      const txWithImages = reportTxs.filter(t => 
-        t.lampiran && t.lampiran.length > 0 && t.lampiran.some(l => l.tipe.startsWith('image/') || l.dataUrl.startsWith('data:image/'))
-      );
+      const itemsToPrint: Array<{
+        type: 'image' | 'pdf';
+        url: string;
+        nama: string;
+        tanggal: string;
+        deskripsi: string;
+        nominal: number;
+      }> = [];
 
-      if (txWithImages.length > 0) {
+      const getDriveId = (url: string): string | null => {
+        if (!url) return null;
+        const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
+      };
+
+      const resolveUrl = (url: string): string => {
+        if (!url) return '';
+        if (url.includes('drive.google.com')) {
+          const driveId = getDriveId(url);
+          if (driveId) return `https://lh3.googleusercontent.com/d/${driveId}`;
+        }
+        return url;
+      };
+
+      reportTxs.forEach(t => {
+        // 1. Include Bukti Transfer if present
+        if (t.buktiTransfer && t.buktiTransfer.trim()) {
+          itemsToPrint.push({
+            type: 'image',
+            url: resolveUrl(t.buktiTransfer),
+            nama: 'Bukti Transfer',
+            tanggal: t.tanggal,
+            deskripsi: t.deskripsi,
+            nominal: t.nominal,
+          });
+        }
+
+        // 2. Include Lampiran items
+        if (t.lampiran && t.lampiran.length > 0) {
+          t.lampiran.forEach(att => {
+            if (!att.dataUrl) return;
+            const isPdf = att.tipe?.includes('pdf') || att.nama?.toLowerCase().endsWith('.pdf') || att.dataUrl.toLowerCase().endsWith('.pdf');
+            if (isPdf) {
+              itemsToPrint.push({
+                type: 'pdf',
+                url: att.dataUrl,
+                nama: att.nama || 'Dokumen PDF',
+                tanggal: t.tanggal,
+                deskripsi: t.deskripsi,
+                nominal: t.nominal,
+              });
+            } else {
+              itemsToPrint.push({
+                type: 'image',
+                url: resolveUrl(att.dataUrl),
+                nama: att.nama || 'Lampiran Foto',
+                tanggal: t.tanggal,
+                deskripsi: t.deskripsi,
+                nominal: t.nominal,
+              });
+            }
+          });
+        }
+      });
+
+      if (itemsToPrint.length > 0) {
         attachmentsHtml += `
           <div style="page-break-before: always; padding-top: 20px;">
             <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #1A365D; margin-bottom: 2px;">
-              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 900; color: #1A365D; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI</h1>
+              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 900; color: #1A365D; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI & STRUK</h1>
               <p class="company-info" style="font-size: 9.5px; color: #334155; margin-top: 4px; line-height: 1.5;">
                 ${title} &middot; Periode: ${periodText}
               </p>
@@ -256,22 +317,38 @@ export function PdfReportModal({
             <div class="gallery-grid">
         `;
 
-        txWithImages.forEach(t => {
-          const images = t.lampiran.filter(l => l.tipe.startsWith('image/') || l.dataUrl.startsWith('data:image/'));
-          images.forEach(img => {
+        itemsToPrint.forEach(item => {
+          if (item.type === 'image') {
+            const driveId = getDriveId(item.url);
+            const fallbackSrc = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w800` : item.url;
             attachmentsHtml += `
               <div class="gallery-item">
                 <div class="img-wrapper">
-                  <img src="${img.dataUrl}" alt="Lampiran" />
+                  <img src="${item.url}" alt="${item.nama}" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                 </div>
                 <div class="caption">
-                  <div class="caption-date">${formatDate(t.tanggal)}</div>
-                  <div class="caption-desc">${t.deskripsi}</div>
-                  <div class="caption-nom">${formatSaldoRupiah(t.nominal)}</div>
+                  <div class="caption-date">${formatDate(item.tanggal)}</div>
+                  <div class="caption-desc">${item.deskripsi}</div>
+                  <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
                 </div>
               </div>
             `;
-          });
+          } else {
+            attachmentsHtml += `
+              <div class="gallery-item" style="background: #F8FAFC; border: 1.5px border #CBD5E1;">
+                <div class="img-wrapper" style="background: #EEF2FF; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 12px;">
+                  <div style="font-size: 32px; margin-bottom: 4px;">📄</div>
+                  <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 90%;">${item.nama}</div>
+                  <div style="font-size: 9px; font-weight: 600; color: #4F46E5; margin-top: 4px;">Dokumen Berkas PDF</div>
+                </div>
+                <div class="caption">
+                  <div class="caption-date">${formatDate(item.tanggal)}</div>
+                  <div class="caption-desc">${item.deskripsi}</div>
+                  <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
+                </div>
+              </div>
+            `;
+          }
         });
 
         attachmentsHtml += `
