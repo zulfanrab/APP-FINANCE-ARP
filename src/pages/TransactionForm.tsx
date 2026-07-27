@@ -275,8 +275,9 @@ export function TransactionForm() {
       } else {
         navigate(-1);
       }
-    } catch {
-      addToast('error', 'Gagal menyimpan transaksi');
+    } catch (err: any) {
+      console.error('Gagal menyimpan transaksi:', err);
+      addToast('error', err?.message || 'Gagal menyimpan transaksi');
     } finally {
       setLoading(false);
     }

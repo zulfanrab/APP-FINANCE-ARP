@@ -70,7 +70,7 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      const MAX_DIM = 1400;
+      const MAX_DIM = 1000;
       let w = img.width;
       let h = img.height;
       if (w > MAX_DIM || h > MAX_DIM) {
@@ -90,7 +90,7 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.70);
         resolve({
           nama: file.name,
           tipe: 'image/jpeg',

@@ -21,7 +21,52 @@ export function getItem<T>(key: string, defaultValue: T): T {
 }
 
 export function setItem<T>(key: string, value: T): void {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err: any) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22 || (err?.message && err.message.toLowerCase().includes('quota'))) {
+      console.warn(`localStorage quota exceeded for key "${key}". Cleaning old attachment DataURLs...`);
+      if (key === KEYS.TRANSACTIONS && Array.isArray(value)) {
+        const cleaned = (value as any[]).map((tx, idx) => {
+          if (idx > 15 && Array.isArray(tx.lampiran)) {
+            return {
+              ...tx,
+              lampiran: tx.lampiran.map((att: any) => ({
+                ...att,
+                dataUrl: att.dataUrl?.startsWith('data:') ? '' : att.dataUrl,
+              })),
+            };
+          }
+          return tx;
+        });
+        try {
+          localStorage.setItem(key, JSON.stringify(cleaned));
+          return;
+        } catch {
+          // If still over quota, strip all dataUrls except the newest 5
+          const aggressiveCleaned = (value as any[]).map((tx, idx) => {
+            if (idx > 5 && Array.isArray(tx.lampiran)) {
+              return {
+                ...tx,
+                lampiran: tx.lampiran.map((att: any) => ({
+                  ...att,
+                  dataUrl: att.dataUrl?.startsWith('data:') ? '' : att.dataUrl,
+                })),
+              };
+            }
+            return tx;
+          });
+          try {
+            localStorage.setItem(key, JSON.stringify(aggressiveCleaned));
+            return;
+          } catch (finalErr) {
+            console.error('Final localStorage attempt failed:', finalErr);
+          }
+        }
+      }
+    }
+    console.error(`Failed to setItem for key "${key}":`, err);
+  }
 }
 
 export function removeItem(key: string): void {
