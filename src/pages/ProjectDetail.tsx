@@ -36,10 +36,29 @@ function parseBulkImportText(text: string): ProcurementItem[] {
   if (!text || !text.trim()) return [];
   const lines = text.split('\n');
   const items: ProcurementItem[] = [];
+  let currentCategory = 'Operational Cost';
 
   for (const rawLine of lines) {
     let line = rawLine.trim();
     if (!line) continue;
+
+    // Detect if this line is a Category Header (starts with #, [, --- or ends with : without commas/pipes)
+    const isHeaderLine =
+      (line.startsWith('#') ||
+        line.startsWith('[') ||
+        line.startsWith('---') ||
+        (line.endsWith(':') && !line.includes(','))) &&
+      !line.includes('|');
+
+    if (isHeaderLine) {
+      let cleanCategory = line.replace(/^[#\-\[\:\*]+|[#\-\]\:\*]+$/g, '').trim();
+      // Remove leading emojis if present (e.g. 🚗 Transportasi & Akomodasi -> Transportasi & Akomodasi)
+      cleanCategory = cleanCategory.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+      if (cleanCategory) {
+        currentCategory = cleanCategory;
+      }
+      continue; // Skip adding header line as an item!
+    }
 
     // Remove leading bullet points or numbers like "1.", "1)", "-", "*"
     line = line.replace(/^[\d+\.\-\*\)]+\s*/, '').trim();
@@ -61,6 +80,7 @@ function parseBulkImportText(text: string): ProcurementItem[] {
     let kuantitas = 1;
     let satuan: string | undefined = undefined;
     let hargaRencana: number | undefined = undefined;
+    let itemCategory = currentCategory;
 
     if (parts.length >= 2) {
       const qtyMatch = parts[1].match(/^(\d+)\s*(.*)$/);
@@ -86,12 +106,18 @@ function parseBulkImportText(text: string): ProcurementItem[] {
       if (num) hargaRencana = parseInt(num);
     }
 
+    if (parts.length >= 5 && parts[4]) {
+      const catOverride = parts[4].replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+      if (catOverride) itemCategory = catOverride;
+    }
+
     items.push({
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       nama,
       kuantitas,
       satuan,
       hargaRencana,
+      kategori: itemCategory,
       isPurchased: false,
     });
   }
