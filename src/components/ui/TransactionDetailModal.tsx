@@ -787,18 +787,20 @@ export function TransactionDetailModal({
                   <p className="text-[10px] text-gray-500 font-medium mt-0.5">Unggah foto struk, nota, atau bukti transfer baru</p>
                 </div>
                 <div>
-                  <label
-                    htmlFor="modal-edit-file-input"
-                    className={`cursor-pointer px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${processingFiles ? 'opacity-50 pointer-events-none' : ''}`}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={processingFiles}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
                   >
                     {processingFiles ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
                     <span>{processingFiles ? 'Memproses...' : 'Tambah Foto / PDF'}</span>
-                  </label>
+                  </button>
                   <input
                     id="modal-edit-file-input"
                     type="file"
                     ref={fileInputRef}
-                    accept="image/*,application/pdf"
+                    accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
                     multiple
                     onChange={handleSelectFiles}
                     className="hidden"
@@ -807,8 +809,15 @@ export function TransactionDetailModal({
               </div>
 
               {stagedAttachments.length === 0 ? (
-                <div className="p-4 border border-dashed border-gray-200 rounded-xl text-center bg-white">
-                  <p className="text-xs text-gray-400 italic">Belum ada lampiran. Klik "Tambah Foto" di atas untuk melampirkan resi/nota.</p>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-5 border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-xl text-center bg-white cursor-pointer transition-all active:scale-[0.99] space-y-1.5"
+                >
+                  <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                    <Plus size={18} />
+                  </div>
+                  <p className="text-xs font-bold text-gray-700">Belum ada lampiran.</p>
+                  <p className="text-[10px] text-gray-400">Klik di sini atau tombol "+ Tambah Foto" untuk melampirkan resi/nota/PDF.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
