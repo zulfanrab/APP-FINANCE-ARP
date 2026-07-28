@@ -1,13 +1,13 @@
 // ============================================================
 // ARKA Finance — Professional Attachment & Receipt Preview Component
 // Hardware-Accelerated 60FPS Zoom/Pan Lightbox Engine
-// Clean Corporate Layout (No Childish Tutorial Overlay Text)
+// Universal PDF & Image Viewer Engine (Cross-Browser & Mobile Safe)
 // ============================================================
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  Paperclip, ExternalLink, FileText, Image as ImageIcon, Eye, X,
-  ZoomIn, ZoomOut, RotateCw, CloudCheck, Maximize2, RefreshCw
+  FileText, Image as ImageIcon, ExternalLink, X,
+  ZoomIn, ZoomOut, RotateCw, Maximize2, RefreshCw, Eye
 } from 'lucide-react';
 import { type Attachment } from '../../types';
 
@@ -24,6 +24,30 @@ function getDriveFileId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Converts Base64 Data URIs to Blob Object URLs
+ * Prevents mobile Chrome/Safari "Blocked top-level navigation to data URI" error!
+ */
+function convertBase64ToBlobUrl(dataUrl: string): string {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+  try {
+    const parts = dataUrl.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    const blob = new Blob([u8arr], { type: mime });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.error('Failed to convert base64 to Blob URL:', e);
+    return dataUrl;
+  }
+}
+
 export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
   const safeAttachments: Attachment[] = Array.isArray(attachments)
     ? attachments
@@ -31,10 +55,19 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
         ? (() => { try { const p = JSON.parse(attachments); return Array.isArray(p) ? p : []; } catch { return []; } })()
         : []);
 
-  const [activePreview, setActivePreview] = useState<{ att: Attachment; imgUrl: string } | null>(null);
+  // Image Lightbox Modal state
+  const [activeImagePreview, setActiveImagePreview] = useState<{ att: Attachment; imgUrl: string } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  // PDF In-App Fullscreen Viewer Modal state
+  const [activePdfModal, setActivePdfModal] = useState<{
+    att: Attachment;
+    blobUrl?: string;
+    driveId?: string | null;
+    isGoogleDrive: boolean;
+  } | null>(null);
 
   // Touch gesture & animation frame references for smooth 60FPS performance
   const [isDragging, setIsDragging] = useState(false);
@@ -52,9 +85,27 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
     setPan({ x: 0, y: 0 });
   };
 
-  const handleOpenPreview = (att: Attachment, imgUrl: string) => {
-    setActivePreview({ att, imgUrl });
+  const handleOpenImagePreview = (att: Attachment, imgUrl: string) => {
+    setActiveImagePreview({ att, imgUrl });
     resetTransform();
+  };
+
+  const handleOpenPdf = (att: Attachment) => {
+    const isGoogleDrive = att.dataUrl && att.dataUrl.includes('drive.google.com');
+    const driveId = isGoogleDrive ? getDriveFileId(att.dataUrl) : null;
+    const isBase64 = att.dataUrl && att.dataUrl.startsWith('data:');
+
+    let blobUrl = '';
+    if (isBase64) {
+      blobUrl = convertBase64ToBlobUrl(att.dataUrl);
+    }
+
+    setActivePdfModal({
+      att,
+      blobUrl,
+      driveId,
+      isGoogleDrive: Boolean(isGoogleDrive),
+    });
   };
 
   const handleZoomIn = () => setZoom(z => Math.min(z + 0.35, 4));
@@ -79,7 +130,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
     setZoom(z => Math.max(0.75, Math.min(z + delta, 4)));
   };
 
-  // Touch Events with RAF smoothness
+  // Touch Events with RAF smoothness for Image Lightbox
   const handleTouchStart = (e: React.TouchEvent) => {
     handleDoubleTap();
     if (e.touches.length === 2) {
@@ -180,10 +231,18 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                 </div>
 
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {!isPdf && (
+                  {isPdf ? (
                     <button
                       type="button"
-                      onClick={() => handleOpenPreview(att, imgUrl)}
+                      onClick={() => handleOpenPdf(att)}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                    >
+                      <Eye size={12} /> Buka PDF
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenImagePreview(att, imgUrl)}
                       className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm transition-all active:scale-95"
                     >
                       <Maximize2 size={11} /> Perbesar
@@ -195,7 +254,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg text-xs transition-colors"
-                      title="Buka di Google Drive"
+                      title="Buka Langsung di Google Drive"
                     >
                       <ExternalLink size={13} />
                     </a>
@@ -206,32 +265,34 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
               {/* Body: EMBEDDED VISUAL PREVIEW DISPLAY */}
               <div className="relative bg-slate-950 flex items-center justify-center min-h-[160px] max-h-[260px] overflow-hidden p-2">
                 {isPdf ? (
-                  isGoogleDrive && driveId ? (
-                    <iframe
-                      src={`https://drive.google.com/file/d/${driveId}/preview`}
-                      title={att.nama}
-                      className="w-full h-48 rounded-xl border border-slate-800"
-                    />
-                  ) : (
-                    <div className="text-center p-6 space-y-2">
-                      <FileText size={40} className="text-amber-400 mx-auto" />
-                      <p className="text-xs font-bold text-slate-200">{att.nama}</p>
-                      <a
-                        href={att.dataUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-xl text-xs font-semibold hover:bg-amber-500/30"
-                      >
-                        <ExternalLink size={12} /> Buka Berkas PDF
-                      </a>
+                  <div
+                    onClick={() => handleOpenPdf(att)}
+                    className="w-full p-4 bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl text-center space-y-2 cursor-pointer transition-all active:scale-[0.98] group/pdf"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto group-hover/pdf:scale-110 transition-transform">
+                      <FileText size={24} />
                     </div>
-                  )
+                    <div>
+                      <p className="text-xs font-extrabold text-slate-100 truncate px-2">{att.nama}</p>
+                      <p className="text-[10px] text-amber-400 font-semibold mt-0.5">Dokumen Berkas PDF Resmi</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenPdf(att);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-xl text-xs font-bold hover:bg-amber-500/30 transition-colors"
+                    >
+                      <Eye size={13} /> Tampilkan Dokumen PDF
+                    </button>
+                  </div>
                 ) : (
                   <img
                     src={imgUrl}
                     alt={att.nama}
                     className="max-h-[240px] w-full object-contain rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleOpenPreview(att, imgUrl)}
+                    onClick={() => handleOpenImagePreview(att, imgUrl)}
                     onError={(e) => {
                       const target = e.currentTarget;
                       if (isGoogleDrive && driveId && !target.dataset.fallback) {
@@ -247,17 +308,99 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
         })}
       </div>
 
-      {/* LUXURY FULLSCREEN LIGHTBOX MODAL (SMOOTH 60FPS HARDWARE ACCELERATED) */}
-      {activePreview && (
+      {/* IN-APP FULLSCREEN PDF VIEWER MODAL */}
+      {activePdfModal && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-6 animate-fade-in"
-          onClick={() => setActivePreview(null)}
+          onClick={() => {
+            if (activePdfModal.blobUrl) URL.revokeObjectURL(activePdfModal.blobUrl);
+            setActivePdfModal(null);
+          }}
+        >
+          <div
+            className="relative max-w-5xl w-full bg-slate-900 border border-white/10 text-white rounded-3xl overflow-hidden shadow-2xl animate-scale-up flex flex-col h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* PDF Header */}
+            <div className="px-4 sm:px-6 py-3 bg-slate-900 border-b border-white/10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <FileText size={18} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm text-white truncate leading-tight">
+                    {activePdfModal.att.nama || 'Dokumen PDF'}
+                  </h3>
+                  <p className="text-[10.5px] text-slate-400 font-medium mt-0.5">
+                    Pratinjau Dokumen Berkas PDF Resmi
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activePdfModal.isGoogleDrive && activePdfModal.driveId && (
+                  <a
+                    href={`https://drive.google.com/file/d/${activePdfModal.driveId}/view?usp=sharing`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                  >
+                    <ExternalLink size={13} /> Buka di Drive
+                  </a>
+                )}
+                {activePdfModal.blobUrl && (
+                  <a
+                    href={activePdfModal.blobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                  >
+                    <ExternalLink size={13} /> Buka Tab Baru
+                  </a>
+                )}
+                <button
+                  onClick={() => {
+                    if (activePdfModal.blobUrl) URL.revokeObjectURL(activePdfModal.blobUrl);
+                    setActivePdfModal(null);
+                  }}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* PDF Viewport */}
+            <div className="relative flex-1 bg-slate-950 p-2 overflow-hidden flex flex-col">
+              {activePdfModal.isGoogleDrive && activePdfModal.driveId ? (
+                <iframe
+                  src={`https://drive.google.com/file/d/${activePdfModal.driveId}/preview`}
+                  title={activePdfModal.att.nama}
+                  className="w-full h-full rounded-2xl border-0 bg-white"
+                />
+              ) : (
+                <iframe
+                  src={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                  title={activePdfModal.att.nama}
+                  className="w-full h-full rounded-2xl border-0 bg-white"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LUXURY FULLSCREEN LIGHTBOX MODAL FOR IMAGES */}
+      {activeImagePreview && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-6 animate-fade-in"
+          onClick={() => setActiveImagePreview(null)}
         >
           <div
             className="relative max-w-5xl w-full bg-slate-900 border border-white/10 text-white rounded-3xl overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[95vh] h-[88vh]"
             onClick={e => e.stopPropagation()}
           >
-            {/* CLEAN CORPORATE MODAL HEADER (NO CHILDISH TUTORIAL OVERLAY) */}
+            {/* HEADER */}
             <div className="px-4 sm:px-6 py-3 bg-slate-900/95 border-b border-white/10 flex items-center justify-between gap-2 z-20">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center flex-shrink-0">
@@ -265,7 +408,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-bold text-sm text-white truncate leading-tight">
-                    {activePreview.att.nama}
+                    {activeImagePreview.att.nama}
                   </h3>
                   <p className="text-[10.5px] text-slate-400 font-medium mt-0.5">
                     Bukti Resi &amp; Lampiran Transaksi Resmi
@@ -309,9 +452,9 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                   </button>
                 </div>
 
-                {activePreview.att.dataUrl.includes('drive.google.com') && (
+                {activeImagePreview.att.dataUrl.includes('drive.google.com') && (
                   <a
-                    href={activePreview.att.dataUrl}
+                    href={activeImagePreview.att.dataUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-md"
@@ -322,7 +465,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                 )}
 
                 <button
-                  onClick={() => setActivePreview(null)}
+                  onClick={() => setActiveImagePreview(null)}
                   className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
                 >
                   <X size={18} />
@@ -343,8 +486,8 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
               onMouseLeave={handleMouseUp}
             >
               <img
-                src={activePreview.imgUrl}
-                alt={activePreview.att.nama}
+                src={activeImagePreview.imgUrl}
+                alt={activeImagePreview.att.nama}
                 style={{
                   transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom}) rotate(${rotation}deg)`,
                   willChange: 'transform',
