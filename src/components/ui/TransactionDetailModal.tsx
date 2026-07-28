@@ -45,6 +45,12 @@ function parseRupiahInput(value: string): number {
   return Number(value.replace(/\./g, '').replace(',', ''));
 }
 
+function getDriveFileId(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
 export function TransactionDetailModal({
   transaction,
   isOpen,
@@ -80,6 +86,7 @@ export function TransactionDetailModal({
 
   const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [processingFiles, setProcessingFiles] = useState(false);
 
   useEffect(() => {
     if (transaction && isOpen) {
@@ -97,13 +104,28 @@ export function TransactionDetailModal({
         adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
         divisi: transaction.divisi || undefined,
       });
-      setStagedAttachments(
-        (transaction.lampiran || []).map(att => ({
-          nama: att.nama,
-          tipe: att.tipe,
-          dataUrl: att.dataUrl,
-        }))
-      );
+
+      const initialStaged: StagedAttachment[] = [];
+      if (transaction.buktiTransfer && transaction.buktiTransfer.trim()) {
+        initialStaged.push({
+          nama: 'Bukti Transfer Bank',
+          tipe: 'image/png',
+          dataUrl: transaction.buktiTransfer,
+        });
+      }
+      if (transaction.lampiran && transaction.lampiran.length > 0) {
+        transaction.lampiran.forEach(att => {
+          if (!initialStaged.some(a => a.dataUrl === att.dataUrl)) {
+            initialStaged.push({
+              nama: att.nama,
+              tipe: att.tipe,
+              dataUrl: att.dataUrl,
+            });
+          }
+        });
+      }
+
+      setStagedAttachments(initialStaged);
       Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
         ([projs, cats, txs]) => {
           setProjects(projs);
@@ -123,24 +145,30 @@ export function TransactionDetailModal({
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    for (const file of files) {
-      try {
-        const attachment = await compressFileToAttachment(file);
-        setStagedAttachments(prev => [
-          ...prev,
-          {
+    setProcessingFiles(true);
+    try {
+      const newStaged: StagedAttachment[] = [];
+      for (const file of files) {
+        try {
+          const attachment = await compressFileToAttachment(file);
+          newStaged.push({
             nama: attachment.nama,
             tipe: attachment.tipe,
             dataUrl: attachment.dataUrl,
             fileObj: file,
-          },
-        ]);
-      } catch (err) {
-        console.error('Gagal memproses lampiran:', err);
+          });
+        } catch (err) {
+          console.error('Gagal memproses lampiran:', err);
+        }
       }
+      if (newStaged.length > 0) {
+        setStagedAttachments(prev => [...prev, ...newStaged]);
+        addToast('success', `✅ ${newStaged.length} foto/berkas berhasil dilampirkan.`);
+      }
+    } finally {
+      setProcessingFiles(false);
+      e.target.value = '';
     }
-    addToast('info', `${files.length} foto/berkas dipilih.`);
-    e.target.value = '';
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -729,43 +757,84 @@ export function TransactionDetailModal({
               onDragOver={handleDrag}
               onDrop={handleDrop}
             >
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Kelola Lampiran Foto / Nota</label>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
-                >
-                  <Plus size={14} /> Tambah Foto / PDF
-                </button>
-                <input type="file" ref={fileInputRef} accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleSelectFiles} className="hidden" />
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">Kelola Lampiran Foto / Nota</label>
+                  <p className="text-[10px] text-gray-500 font-medium mt-0.5">Unggah foto struk, nota, atau bukti transfer baru</p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="modal-edit-file-input"
+                    className={`cursor-pointer px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${processingFiles ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {processingFiles ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                    <span>{processingFiles ? 'Memproses...' : 'Tambah Foto / PDF'}</span>
+                  </label>
+                  <input
+                    id="modal-edit-file-input"
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*,application/pdf"
+                    multiple
+                    onChange={handleSelectFiles}
+                    className="hidden"
+                  />
+                </div>
               </div>
 
               {stagedAttachments.length === 0 ? (
-                <p className="text-xs text-gray-400 italic">Belum ada lampiran. Klik "Tambah Foto" untuk menambahkan resi baru.</p>
+                <div className="p-4 border border-dashed border-gray-200 rounded-xl text-center bg-white">
+                  <p className="text-xs text-gray-400 italic">Belum ada lampiran. Klik "Tambah Foto" di atas untuk melampirkan resi/nota.</p>
+                </div>
               ) : (
-                <div className="space-y-2">
-                  {stagedAttachments.map((att, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2.5 bg-white border border-gray-200 rounded-xl text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Paperclip size={14} className="text-gray-400 flex-shrink-0" />
-                        <span className="font-semibold text-gray-800 truncate">{att.nama}</span>
-                        {att.fileObj && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
-                            Baru (Diunggah saat simpan)
-                          </span>
-                        )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                  {stagedAttachments.map((att, idx) => {
+                    const isPdf = att.tipe?.includes('pdf') || att.nama?.toLowerCase().endsWith('.pdf');
+                    const isDrive = att.dataUrl?.includes('drive.google.com');
+                    const driveId = isDrive ? getDriveFileId(att.dataUrl) : null;
+                    const imgSrc = isDrive && driveId
+                      ? `https://lh3.googleusercontent.com/d/${driveId}`
+                      : att.dataUrl;
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-xl text-xs gap-2 shadow-sm hover:border-gray-300 transition-all">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {!isPdf && imgSrc ? (
+                            <img
+                              src={imgSrc}
+                              alt={att.nama}
+                              className="w-10 h-10 object-cover rounded-lg border border-gray-200 flex-shrink-0 bg-slate-900"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (isDrive && driveId && !target.dataset.fallback) {
+                                  target.dataset.fallback = 'true';
+                                  target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 flex-shrink-0 font-bold text-[10px]">
+                              PDF
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-gray-800 truncate" title={att.nama}>{att.nama}</span>
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              {att.fileObj ? '⭐ Foto Baru (Diunggah)' : 'Foto Terlampir'}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStagedAttachment(idx)}
+                          className="text-red-500 hover:text-red-700 p-1.5 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                          title="Hapus Lampiran Ini"
+                        >
+                          <X size={15} />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveStagedAttachment(idx)}
-                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg"
-                        title="Hapus Lampiran Ini"
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
