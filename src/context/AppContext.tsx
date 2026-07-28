@@ -27,6 +27,7 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const addToast = useCallback((type: ToastMessage['type'], message: string) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -41,8 +42,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  // Debounced refresh trigger — prevents rapid stacking re-renders on mobile
   const triggerRefresh = useCallback(() => {
-    setRefreshKey(k => k + 1);
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = setTimeout(() => {
+      setRefreshKey(k => k + 1);
+    }, 250);
   }, []);
 
   // 1. REALTIME CROSS-DEVICE SYNC WITH SUPABASE REALTIME CHANNEL
@@ -74,10 +81,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [triggerRefresh]);
 
-  // 2. AUTO-REFETCH WHEN SWITCHING TABS OR UNLOCKING HP SCREEN
+  // 2. AUTO-REFETCH WHEN SWITCHING TABS OR UNLOCKING HP SCREEN (Throttled 15s)
   useEffect(() => {
+    let lastFocusTime = Date.now();
     const handleFocusOrVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      const now = Date.now();
+      if (document.visibilityState === 'visible' && now - lastFocusTime > 15000) {
+        lastFocusTime = now;
         triggerRefresh();
       }
     };

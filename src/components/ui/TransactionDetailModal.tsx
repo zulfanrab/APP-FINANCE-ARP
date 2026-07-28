@@ -260,6 +260,7 @@ export function TransactionDetailModal({
   };
 
   const handleSave = async () => {
+    (document.activeElement as HTMLElement)?.blur(); // Dismiss mobile keyboard smoothly
     const nominal = parseRupiahInput(editForm.nominalStr);
     if (!nominal || nominal <= 0) {
       addToast('error', 'Nominal harus lebih dari 0');
@@ -271,6 +272,7 @@ export function TransactionDetailModal({
     }
 
     setSaving(true);
+    await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
       const finalAttachments = [];
       const currentProject = projects.find(p => p.id === editForm.proyekId);

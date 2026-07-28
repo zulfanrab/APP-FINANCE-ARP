@@ -209,6 +209,7 @@ export function TransactionForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    (document.activeElement as HTMLElement)?.blur(); // Dismiss mobile keyboard smoothly
     const nominal = parseRupiahInput(form.nominalStr);
 
     if (!nominal || nominal <= 0) { addToast('error', 'Nominal harus lebih dari 0'); return; }
@@ -216,6 +217,7 @@ export function TransactionForm() {
     if (!form.kategori) { addToast('error', 'Pilih kategori transaksi'); return; }
 
     setLoading(true);
+    await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
       const uploadedAttachments: Attachment[] = [];
       const currentProject = projects.find(p => p.id === (form.proyekId || urlProyekId));

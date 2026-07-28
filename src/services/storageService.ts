@@ -66,45 +66,48 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
 
   // Handle Images (compress via canvas)
   return new Promise((resolve) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const MAX_DIM = 1000;
-      let w = img.width;
-      let h = img.height;
-      if (w > MAX_DIM || h > MAX_DIM) {
-        if (w > h) {
-          h = Math.round((h * MAX_DIM) / w);
-          w = MAX_DIM;
-        } else {
-          w = Math.round((w * MAX_DIM) / h);
-          h = MAX_DIM;
+    // Yield to main thread first so UI button animation renders smoothly
+    setTimeout(() => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const MAX_DIM = 1000;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX_DIM || h > MAX_DIM) {
+          if (w > h) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          } else {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
         }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.70);
-        resolve({
-          nama: file.name,
-          tipe: 'image/jpeg',
-          dataUrl: compressedDataUrl,
-        });
-      } else {
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+          resolve({
+            nama: file.name,
+            tipe: 'image/jpeg',
+            dataUrl: compressedDataUrl,
+          });
+        } else {
+          readAsDataUrlFallback(file, mimeType, resolve);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
         readAsDataUrlFallback(file, mimeType, resolve);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      readAsDataUrlFallback(file, mimeType, resolve);
-    };
-    img.src = objectUrl;
+      };
+      img.src = objectUrl;
+    }, 10);
   });
 }
 
