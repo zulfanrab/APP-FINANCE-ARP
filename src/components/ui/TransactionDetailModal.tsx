@@ -51,6 +51,18 @@ function getDriveFileId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+function normalizeAttachments(raw: any): { nama: string; tipe: string; dataUrl: string }[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* ignore */ }
+  }
+  return [];
+}
+
 export function TransactionDetailModal({
   transaction,
   isOpen,
@@ -92,15 +104,60 @@ export function TransactionDetailModal({
   const [dragActive, setDragActive] = useState(false);
   const [processingFiles, setProcessingFiles] = useState(false);
 
-  // CRITICAL: Only reset form when a DIFFERENT transaction is opened.
-  // Using transaction.id as the stable key prevents resetting staged
-  // attachments when the parent re-renders with the same transaction.
+  const populateFormAndAttachments = (targetTx: Transaction) => {
+    setEditForm({
+      tanggal: targetTx.tanggal,
+      jenis: targetTx.jenis,
+      deskripsi: targetTx.deskripsi,
+      nominalStr: formatRupiahInput(targetTx.nominal.toString()),
+      kategori: targetTx.kategori,
+      tag: targetTx.tag || 'operasional',
+      proyekId: targetTx.proyekId || '',
+      penerimaDetail: targetTx.penerimaDetail || '',
+      jalurTransfer: targetTx.jalurTransfer || 'sesama_bca',
+      adminNominalCustomStr: targetTx.adminNominalCustom ? formatRupiahInput(targetTx.adminNominalCustom.toString()) : '1.000',
+      divisi: targetTx.divisi || undefined,
+    });
+
+    const parsedLampiran = normalizeAttachments(targetTx.lampiran);
+    const initialStaged: StagedAttachment[] = [];
+
+    if (targetTx.buktiTransfer && targetTx.buktiTransfer.trim()) {
+      initialStaged.push({
+        nama: 'Bukti Transfer Bank',
+        tipe: 'image/png',
+        dataUrl: targetTx.buktiTransfer,
+      });
+    }
+
+    parsedLampiran.forEach(att => {
+      if (att && att.dataUrl && !initialStaged.some(a => a.dataUrl === att.dataUrl)) {
+        initialStaged.push({
+          nama: att.nama || 'Lampiran',
+          tipe: att.tipe || 'image/jpeg',
+          dataUrl: att.dataUrl,
+        });
+      }
+    });
+
+    setStagedAttachments(initialStaged);
+  };
+
+  const handleStartEditing = () => {
+    const targetTx = currentTx || transaction;
+    if (targetTx) {
+      populateFormAndAttachments(targetTx);
+    }
+    setIsEditing(true);
+  };
+
+  // CRITICAL: Only reset form when a DIFFERENT transaction is opened or updated
   useEffect(() => {
     const txId = transaction?.id ?? null;
     if (isOpen && transaction) {
       const isNewTx = txId !== prevTxIdRef.current;
       const isUpdatedTx = currentTx && (
-        (transaction.lampiran?.length || 0) > (currentTx.lampiran?.length || 0) ||
+        normalizeAttachments(transaction.lampiran).length > normalizeAttachments(currentTx.lampiran).length ||
         transaction.diupdatePada !== currentTx.diupdatePada
       );
 
@@ -108,41 +165,8 @@ export function TransactionDetailModal({
         prevTxIdRef.current = txId;
         setCurrentTx(transaction);
         if (isNewTx) setIsEditing(false);
-        setEditForm({
-          tanggal: transaction.tanggal,
-          jenis: transaction.jenis,
-          deskripsi: transaction.deskripsi,
-          nominalStr: formatRupiahInput(transaction.nominal.toString()),
-          kategori: transaction.kategori,
-          tag: transaction.tag || 'operasional',
-          proyekId: transaction.proyekId || '',
-          penerimaDetail: transaction.penerimaDetail || '',
-          jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
-          adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
-          divisi: transaction.divisi || undefined,
-        });
+        populateFormAndAttachments(transaction);
 
-        const initialStaged: StagedAttachment[] = [];
-        if (transaction.buktiTransfer && transaction.buktiTransfer.trim()) {
-          initialStaged.push({
-            nama: 'Bukti Transfer Bank',
-            tipe: 'image/png',
-            dataUrl: transaction.buktiTransfer,
-          });
-        }
-        if (transaction.lampiran && transaction.lampiran.length > 0) {
-          transaction.lampiran.forEach(att => {
-            if (!initialStaged.some(a => a.dataUrl === att.dataUrl)) {
-              initialStaged.push({
-                nama: att.nama,
-                tipe: att.tipe,
-                dataUrl: att.dataUrl,
-              });
-            }
-          });
-        }
-
-        setStagedAttachments(initialStaged);
         Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
           ([projs, cats, txs]) => {
             setProjects(projs);
@@ -155,7 +179,7 @@ export function TransactionDetailModal({
     if (!isOpen) {
       prevTxIdRef.current = null;
     }
-  }, [transaction?.id, transaction?.lampiran?.length, isOpen]);
+  }, [transaction?.id, isOpen]);
 
   // Use currentTx for display; fallback to prop
   const displayTx = currentTx || transaction;
@@ -434,8 +458,8 @@ export function TransactionDetailModal({
                 <span className="text-[10px] text-emerald-600 font-semibold">Google Drive Sync</span>
               </h4>
 
-              {displayTx.lampiran && displayTx.lampiran.length > 0 ? (
-                <AttachmentViewer attachments={displayTx.lampiran} />
+              {normalizeAttachments(displayTx.lampiran).length > 0 ? (
+                <AttachmentViewer attachments={normalizeAttachments(displayTx.lampiran)} />
               ) : (
                 <p className="text-xs text-gray-400 italic">Tidak ada lampiran foto/berkas pada transaksi ini.</p>
               )}
@@ -464,7 +488,7 @@ export function TransactionDetailModal({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleStartEditing}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md"
                 >
                   <Edit3 size={15} /> Edit Transaksi

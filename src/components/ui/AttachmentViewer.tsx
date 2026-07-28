@@ -25,6 +25,12 @@ function getDriveFileId(url: string): string | null {
 }
 
 export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
+  const safeAttachments: Attachment[] = Array.isArray(attachments)
+    ? attachments
+    : (typeof attachments === 'string' && (attachments as string).trim().startsWith('[')
+        ? (() => { try { const p = JSON.parse(attachments); return Array.isArray(p) ? p : []; } catch { return []; } })()
+        : []);
+
   const [activePreview, setActivePreview] = useState<{ att: Attachment; imgUrl: string } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -38,7 +44,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
   const [lastTapTime, setLastTapTime] = useState<number>(0);
   const animFrameRef = useRef<number | null>(null);
 
-  if (!attachments || attachments.length === 0) return null;
+  if (!safeAttachments || safeAttachments.length === 0) return null;
 
   const resetTransform = () => {
     setZoom(1);
@@ -144,7 +150,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
     <div className="mt-3 space-y-4">
       {/* GRID EMBEDDED PREVIEW CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {attachments.map((att, idx) => {
+        {safeAttachments.map((att, idx) => {
           const isGoogleDrive = att.dataUrl && att.dataUrl.includes('drive.google.com');
           const driveId = isGoogleDrive ? getDriveFileId(att.dataUrl) : null;
 
