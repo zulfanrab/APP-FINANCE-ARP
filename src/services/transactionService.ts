@@ -4,7 +4,7 @@
 // Project Allocation Binding & Cascade Delete Handling
 // ============================================================
 
-import { type Transaction, type TransactionStatus, type FilterOptions, type Project } from '../types';
+import { type Transaction, type TransactionStatus, type FilterOptions, type Project, type Attachment } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
@@ -62,6 +62,14 @@ async function safeSupabaseUpdate(table: string, payload: any, id: string) {
   return { error };
 }
 
+function parseLampiranField(raw: any): Attachment[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try { return JSON.parse(raw); } catch { /* ignore */ }
+  }
+  return [];
+}
+
 function mapRowToTransaction(row: any): Transaction {
   return {
     id: row.id,
@@ -72,7 +80,7 @@ function mapRowToTransaction(row: any): Transaction {
     kategori: row.kategori,
     tag: row.tag ?? undefined,
     proyekId: row.proyek_id ?? undefined,
-    lampiran: Array.isArray(row.lampiran) ? row.lampiran : [],
+    lampiran: parseLampiranField(row.lampiran),
     status: row.status,
     buktiTransfer: row.bukti_transfer ?? undefined,
     catatanPenolakan: row.catatan_penolakan ?? undefined,

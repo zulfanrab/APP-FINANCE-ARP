@@ -65,6 +65,10 @@ export function TransactionDetailModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Internal transaction state — survives parent re-renders
+  const [currentTx, setCurrentTx] = useState<Transaction | null>(null);
+  const prevTxIdRef = useRef<string | null>(null);
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
@@ -88,8 +92,14 @@ export function TransactionDetailModal({
   const [dragActive, setDragActive] = useState(false);
   const [processingFiles, setProcessingFiles] = useState(false);
 
+  // CRITICAL: Only reset form when a DIFFERENT transaction is opened.
+  // Using transaction.id as the stable key prevents resetting staged
+  // attachments when the parent re-renders with the same transaction.
   useEffect(() => {
-    if (transaction && isOpen) {
+    const txId = transaction?.id ?? null;
+    if (isOpen && transaction && txId !== prevTxIdRef.current) {
+      prevTxIdRef.current = txId;
+      setCurrentTx(transaction);
       setIsEditing(false);
       setEditForm({
         tanggal: transaction.tanggal,
@@ -134,12 +144,17 @@ export function TransactionDetailModal({
         }
       );
     }
-  }, [transaction, isOpen]);
+    if (!isOpen) {
+      prevTxIdRef.current = null;
+    }
+  }, [transaction?.id, isOpen]);
 
-  if (!transaction) return null;
+  // Use currentTx for display; fallback to prop
+  const displayTx = currentTx || transaction;
+  if (!displayTx) return null;
 
-  const projectObj = projects.find(p => p.id === transaction.proyekId);
-  const isKasUtama = !transaction.proyekId;
+  const projectObj = projects.find(p => p.id === displayTx.proyekId);
+  const isKasUtama = !displayTx.proyekId;
 
   const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -255,7 +270,7 @@ export function TransactionDetailModal({
 
       const adminNominalCustom = parseRupiahInput(editForm.adminNominalCustomStr || '0');
 
-      const updatedTx = await updateTransaction(transaction.id, {
+      const updatedTx = await updateTransaction(displayTx.id, {
         tanggal: editForm.tanggal,
         jenis: editForm.jenis,
         deskripsi: editForm.deskripsi.trim(),
@@ -270,23 +285,32 @@ export function TransactionDetailModal({
         divisi: editForm.divisi || undefined,
       });
 
-      addToast('success', 'Transaksi berhasil diperbarui!');
+      // Update internal state so the view mode immediately reflects the saved data
+      setCurrentTx(updatedTx);
+      setStagedAttachments(
+        (updatedTx.lampiran || []).map(att => ({
+          nama: att.nama,
+          tipe: att.tipe,
+          dataUrl: att.dataUrl,
+        }))
+      );
+
+      addToast('success', `Transaksi diperbarui! (${finalAttachments.length} lampiran tersimpan)`);
+      setIsEditing(false);
       triggerRefresh();
       if (onUpdate) onUpdate(updatedTx);
-      setIsEditing(false);
-      onClose();
-    } catch {
-      addToast('error', 'Gagal memperbarui transaksi');
+    } catch (err: any) {
+      addToast('error', err?.message || 'Gagal memperbarui transaksi');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (window.confirm(`Yakin ingin menghapus transaksi "${transaction.deskripsi}"?`)) {
+    if (window.confirm(`Yakin ingin menghapus transaksi "${displayTx.deskripsi}"?`)) {
       setDeleting(true);
       try {
-        await deleteTransaction(transaction.id);
+        await deleteTransaction(displayTx.id);
         addToast('success', 'Transaksi berhasil dihapus');
         triggerRefresh();
         if (onUpdate) onUpdate();
@@ -317,54 +341,54 @@ export function TransactionDetailModal({
                     🏗️ {projectObj ? projectObj.nama : 'Internal Proyek'}
                   </span>
                 )}
-                <StatusBadge status={transaction.status} />
+                <StatusBadge status={displayTx.status} />
               </div>
 
               <div className="min-w-0">
                 <p className="text-xs text-slate-400 mb-0.5">Nominal Transaksi</p>
-                <p className={`text-2xl sm:text-3xl font-extrabold truncate tabular-nums tracking-tight ${transaction.jenis === 'masuk' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {transaction.jenis === 'masuk' ? '+' : '-'}{formatRupiah(transaction.nominal)}
+                <p className={`text-2xl sm:text-3xl font-extrabold truncate tabular-nums tracking-tight ${displayTx.jenis === 'masuk' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {displayTx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(displayTx.nominal)}
                 </p>
               </div>
 
               <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 gap-2 flex-wrap min-w-0">
-                <span className="truncate">Tanggal: <strong className="text-white">{formatDate(transaction.tanggal)}</strong></span>
-                <span className="truncate">Kategori: <strong className="text-emerald-300">{transaction.kategori}</strong></span>
+                <span className="truncate">Tanggal: <strong className="text-white">{formatDate(displayTx.tanggal)}</strong></span>
+                <span className="truncate">Kategori: <strong className="text-emerald-300">{displayTx.kategori}</strong></span>
               </div>
             </div>
 
             {/* Rejection Note from Management */}
-            {transaction.status === 'ditolak' && transaction.catatanPenolakan && (
+            {displayTx.status === 'ditolak' && displayTx.catatanPenolakan && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-2xl space-y-1.5 text-xs text-red-900 shadow-sm animate-fade-in">
                 <div className="flex items-center gap-1.5 font-bold text-red-700">
                   <AlertTriangle size={15} />
                   <span>Komentar / Alasan Penolakan Manajemen:</span>
                 </div>
                 <p className="font-semibold text-slate-800 bg-white p-3 rounded-xl border border-red-200 italic leading-relaxed break-words">
-                  "{transaction.catatanPenolakan}"
+                  "{displayTx.catatanPenolakan}"
                 </p>
               </div>
             )}
 
             {/* Recipient Details & Transfer Channel */}
-            {transaction.penerimaDetail && (
+            {displayTx.penerimaDetail && (
               <div className="p-3.5 bg-emerald-50/80 border border-emerald-200/90 rounded-2xl space-y-1 text-xs min-w-0">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
                     <Landmark size={12} /> Penerima / Tujuan Transfer
                   </span>
-                  {transaction.jalurTransfer && (
+                  {displayTx.jalurTransfer && (
                     <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 truncate max-w-full">
-                      {transaction.jalurTransfer === 'sesama_bca' ? '⚡ BCA/QRIS/VA (Rp0)' : transaction.jalurTransfer === 'ewallet' ? '⚡ Top Up E-Wallet (Rp 1.000)' : transaction.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : transaction.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Custom Admin'}
+                      {displayTx.jalurTransfer === 'sesama_bca' ? '⚡ BCA/QRIS/VA (Rp0)' : displayTx.jalurTransfer === 'ewallet' ? '⚡ Top Up E-Wallet (Rp 1.000)' : displayTx.jalurTransfer === 'bi_fast' ? '⚡ BI-FAST (Rp 2.500)' : displayTx.jalurTransfer === 'online_rtgs' ? '⚡ Online/RTGS (Rp 6.500)' : '⚡ Custom Admin'}
                     </span>
                   )}
                 </div>
-                <p className="text-sm font-extrabold text-slate-900 break-words">{transaction.penerimaDetail}</p>
+                <p className="text-sm font-extrabold text-slate-900 break-words">{displayTx.penerimaDetail}</p>
               </div>
             )}
 
             {/* Parent Relational Link Badge (If this transaction is an Admin Fee Child Entry) */}
-            {transaction.parentTransactionId && (
+            {displayTx.parentTransactionId && (
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 font-medium flex items-center justify-between">
                 <span className="flex items-center gap-1.5 font-bold">
                   <Zap size={14} className="text-blue-600" /> Entri Biaya Admin Bank (Terikat ke Transaksi Utama)
@@ -376,19 +400,19 @@ export function TransactionDetailModal({
             {/* Description Card */}
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Deskripsi / Keterangan</h4>
-              <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">{transaction.deskripsi}</p>
+              <p className="text-sm font-semibold text-gray-900 leading-relaxed whitespace-pre-wrap">{displayTx.deskripsi}</p>
 
-              {transaction.tag && (
+              {displayTx.tag && (
                 <div className="pt-2 flex items-center gap-2 text-xs flex-wrap">
                   <span className="text-gray-400">Peruntukan:</span>
                   <span className={`px-2.5 py-0.5 rounded-full font-semibold ${
-                    transaction.tag === 'operasional' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                    displayTx.tag === 'operasional' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
                   }`}>
-                    {transaction.tag === 'operasional' ? '🏢 Operasional' : '👤 Non-Operasional / Prive'}
+                    {displayTx.tag === 'operasional' ? '🏢 Operasional' : '👤 Non-Operasional / Prive'}
                   </span>
-                  {transaction.divisi && (
+                  {displayTx.divisi && (
                     <span className="px-2.5 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
-                      {transaction.divisi === 'admin' ? '💼 Divisi Admin' : transaction.divisi === 'it' ? '💻 Divisi IT' : transaction.divisi === 'ahli' ? '🛠️ Divisi Ahli' : '🌐 Umum'}
+                      {displayTx.divisi === 'admin' ? '💼 Divisi Admin' : displayTx.divisi === 'it' ? '💻 Divisi IT' : displayTx.divisi === 'ahli' ? '🛠️ Divisi Ahli' : '🌐 Umum'}
                     </span>
                   )}
                 </div>
@@ -398,20 +422,20 @@ export function TransactionDetailModal({
             {/* Attachments Section */}
             <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-3">
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
-                <span>Lampiran &amp; Bukti Resi ({transaction.lampiran?.length || 0})</span>
+                <span>Lampiran &amp; Bukti Resi ({displayTx.lampiran?.length || 0})</span>
                 <span className="text-[10px] text-emerald-600 font-semibold">Google Drive Sync</span>
               </h4>
 
-              {transaction.lampiran && transaction.lampiran.length > 0 ? (
-                <AttachmentViewer attachments={transaction.lampiran} />
+              {displayTx.lampiran && displayTx.lampiran.length > 0 ? (
+                <AttachmentViewer attachments={displayTx.lampiran} />
               ) : (
                 <p className="text-xs text-gray-400 italic">Tidak ada lampiran foto/berkas pada transaksi ini.</p>
               )}
 
-              {transaction.buktiTransfer && (
+              {displayTx.buktiTransfer && (
                 <div className="pt-2 border-t border-gray-200">
                   <p className="text-xs font-bold text-gray-500 mb-1">Bukti Transfer Bank:</p>
-                  <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: transaction.buktiTransfer }]} />
+                  <AttachmentViewer attachments={[{ nama: 'Bukti Transfer.png', tipe: 'image/png', dataUrl: displayTx.buktiTransfer }]} />
                 </div>
               )}
             </div>
