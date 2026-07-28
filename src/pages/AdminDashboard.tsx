@@ -365,7 +365,10 @@ export function AdminDashboard() {
         transaction={selectedTx}
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
-        onUpdate={loadData}
+        onUpdate={(updated) => {
+          loadData();
+          if (updated) setSelectedTx(updated);
+        }}
       />
     </div>
   );

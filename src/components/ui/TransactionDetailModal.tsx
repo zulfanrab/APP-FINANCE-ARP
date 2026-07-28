@@ -97,57 +97,65 @@ export function TransactionDetailModal({
   // attachments when the parent re-renders with the same transaction.
   useEffect(() => {
     const txId = transaction?.id ?? null;
-    if (isOpen && transaction && txId !== prevTxIdRef.current) {
-      prevTxIdRef.current = txId;
-      setCurrentTx(transaction);
-      setIsEditing(false);
-      setEditForm({
-        tanggal: transaction.tanggal,
-        jenis: transaction.jenis,
-        deskripsi: transaction.deskripsi,
-        nominalStr: formatRupiahInput(transaction.nominal.toString()),
-        kategori: transaction.kategori,
-        tag: transaction.tag || 'operasional',
-        proyekId: transaction.proyekId || '',
-        penerimaDetail: transaction.penerimaDetail || '',
-        jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
-        adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
-        divisi: transaction.divisi || undefined,
-      });
-
-      const initialStaged: StagedAttachment[] = [];
-      if (transaction.buktiTransfer && transaction.buktiTransfer.trim()) {
-        initialStaged.push({
-          nama: 'Bukti Transfer Bank',
-          tipe: 'image/png',
-          dataUrl: transaction.buktiTransfer,
-        });
-      }
-      if (transaction.lampiran && transaction.lampiran.length > 0) {
-        transaction.lampiran.forEach(att => {
-          if (!initialStaged.some(a => a.dataUrl === att.dataUrl)) {
-            initialStaged.push({
-              nama: att.nama,
-              tipe: att.tipe,
-              dataUrl: att.dataUrl,
-            });
-          }
-        });
-      }
-
-      setStagedAttachments(initialStaged);
-      Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
-        ([projs, cats, txs]) => {
-          setProjects(projs);
-          setCategories(cats);
-          setHistoricalRecipients(extractHistoricalRecipients(txs));
-        }
+    if (isOpen && transaction) {
+      const isNewTx = txId !== prevTxIdRef.current;
+      const isUpdatedTx = currentTx && (
+        (transaction.lampiran?.length || 0) > (currentTx.lampiran?.length || 0) ||
+        transaction.diupdatePada !== currentTx.diupdatePada
       );
+
+      if (isNewTx || isUpdatedTx) {
+        prevTxIdRef.current = txId;
+        setCurrentTx(transaction);
+        if (isNewTx) setIsEditing(false);
+        setEditForm({
+          tanggal: transaction.tanggal,
+          jenis: transaction.jenis,
+          deskripsi: transaction.deskripsi,
+          nominalStr: formatRupiahInput(transaction.nominal.toString()),
+          kategori: transaction.kategori,
+          tag: transaction.tag || 'operasional',
+          proyekId: transaction.proyekId || '',
+          penerimaDetail: transaction.penerimaDetail || '',
+          jalurTransfer: transaction.jalurTransfer || 'sesama_bca',
+          adminNominalCustomStr: transaction.adminNominalCustom ? formatRupiahInput(transaction.adminNominalCustom.toString()) : '1.000',
+          divisi: transaction.divisi || undefined,
+        });
+
+        const initialStaged: StagedAttachment[] = [];
+        if (transaction.buktiTransfer && transaction.buktiTransfer.trim()) {
+          initialStaged.push({
+            nama: 'Bukti Transfer Bank',
+            tipe: 'image/png',
+            dataUrl: transaction.buktiTransfer,
+          });
+        }
+        if (transaction.lampiran && transaction.lampiran.length > 0) {
+          transaction.lampiran.forEach(att => {
+            if (!initialStaged.some(a => a.dataUrl === att.dataUrl)) {
+              initialStaged.push({
+                nama: att.nama,
+                tipe: att.tipe,
+                dataUrl: att.dataUrl,
+              });
+            }
+          });
+        }
+
+        setStagedAttachments(initialStaged);
+        Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
+          ([projs, cats, txs]) => {
+            setProjects(projs);
+            setCategories(cats);
+            setHistoricalRecipients(extractHistoricalRecipients(txs));
+          }
+        );
+      }
     }
     if (!isOpen) {
       prevTxIdRef.current = null;
     }
-  }, [transaction?.id, isOpen]);
+  }, [transaction?.id, transaction?.lampiran?.length, isOpen]);
 
   // Use currentTx for display; fallback to prop
   const displayTx = currentTx || transaction;

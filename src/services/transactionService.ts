@@ -45,7 +45,20 @@ async function safeSupabaseInsert(table: string, payload: any[]) {
 async function safeSupabaseUpdate(table: string, payload: any, id: string) {
   if (!supabase) return { error: null };
   let retryRow = { ...payload };
+
+  // If lampiran is an array, try sending as is first
   let { error } = await supabase.from(table).update(retryRow).eq('id', id);
+
+  // If error occurs and lampiran is an array, try stringifying lampiran (in case column is TEXT)
+  if (error && Array.isArray(retryRow.lampiran)) {
+    console.warn('Supabase update failed with array lampiran. Retrying with JSON stringified lampiran...');
+    retryRow.lampiran = JSON.stringify(retryRow.lampiran);
+    const retryJson = await supabase.from(table).update(retryRow).eq('id', id);
+    if (!retryJson.error) {
+      return { error: null };
+    }
+    error = retryJson.error;
+  }
 
   while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
     const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
@@ -65,7 +78,10 @@ async function safeSupabaseUpdate(table: string, payload: any, id: string) {
 function parseLampiranField(raw: any): Attachment[] {
   if (Array.isArray(raw)) return raw;
   if (typeof raw === 'string' && raw.trim().startsWith('[')) {
-    try { return JSON.parse(raw); } catch { /* ignore */ }
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* ignore */ }
   }
   return [];
 }
@@ -141,8 +157,11 @@ export async function getTransactions(): Promise<Transaction[]> {
           const tx = mapRowToTransaction(row);
           const local = localMap.get(tx.id);
           if (local) {
-            if ((!tx.lampiran || tx.lampiran.length === 0) && local.lampiran && local.lampiran.length > 0) {
-              tx.lampiran = local.lampiran;
+            // CRITICAL: Always preserve local attachments if local has attachments and remote has fewer/none
+            if (local.lampiran && local.lampiran.length > 0) {
+              if (!tx.lampiran || tx.lampiran.length < local.lampiran.length) {
+                tx.lampiran = local.lampiran;
+              }
             }
             if (!tx.buktiTransfer && local.buktiTransfer) {
               tx.buktiTransfer = local.buktiTransfer;
@@ -400,6 +419,8 @@ export async function updateTransaction(
 
   if (idx !== -1) {
     transactions[idx] = updated;
+  } else {
+    transactions.unshift(updated);
   }
 
   // CHECK AND SYNC CHILD ADMIN FEE TRANSACTION (IDEMPOTENT CHECK)

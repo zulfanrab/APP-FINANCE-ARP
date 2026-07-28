@@ -1095,7 +1095,10 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         transaction={selectedTx}
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
-        onUpdate={loadProjectData}
+        onUpdate={(updated) => {
+          loadProjectData();
+          if (updated) setSelectedTx(updated);
+        }}
       />
 
       {/* Modal Import Bulk Teks */}

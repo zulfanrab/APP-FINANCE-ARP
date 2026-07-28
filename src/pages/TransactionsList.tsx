@@ -329,7 +329,10 @@ export function TransactionsList() {
         transaction={selectedTx}
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
-        onUpdate={loadTransactions}
+        onUpdate={(updated) => {
+          loadTransactions();
+          if (updated) setSelectedTx(updated);
+        }}
       />
     </div>
   );
