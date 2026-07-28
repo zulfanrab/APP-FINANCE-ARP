@@ -157,11 +157,11 @@ export async function getTransactions(): Promise<Transaction[]> {
           const tx = mapRowToTransaction(row);
           const local = localMap.get(tx.id);
           if (local) {
-            // CRITICAL: Always preserve local attachments if local has more items than remote
+            // CRITICAL: Always preserve local attachments if local has equal/more items than remote
             const localAtts = parseLampiranField(local.lampiran);
             const remoteAtts = parseLampiranField(tx.lampiran);
 
-            if (localAtts.length > remoteAtts.length) {
+            if (localAtts.length >= remoteAtts.length && localAtts.length > 0) {
               tx.lampiran = localAtts;
             }
             if (!tx.buktiTransfer && local.buktiTransfer) {

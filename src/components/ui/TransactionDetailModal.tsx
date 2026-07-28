@@ -154,14 +154,17 @@ export function TransactionDetailModal({
     setIsEditing(true);
   };
 
-  // CRITICAL: Only reset form when a DIFFERENT transaction is opened or updated
+  // CRITICAL: Only reset form when a DIFFERENT transaction is opened or explicitly updated with more data
   useEffect(() => {
     const txId = transaction?.id ?? null;
     if (isOpen && transaction) {
       const isNewTx = txId !== prevTxIdRef.current;
+      const propAtts = normalizeAttachments(transaction.lampiran);
+      const currAtts = currentTx ? normalizeAttachments(currentTx.lampiran) : [];
+
       const isUpdatedTx = currentTx && (
-        normalizeAttachments(transaction.lampiran).length > normalizeAttachments(currentTx.lampiran).length ||
-        transaction.diupdatePada !== currentTx.diupdatePada
+        propAtts.length > currAtts.length ||
+        (new Date(transaction.diupdatePada).getTime() > new Date(currentTx.diupdatePada).getTime() && propAtts.length >= currAtts.length)
       );
 
       if (isNewTx || isUpdatedTx) {
@@ -181,8 +184,9 @@ export function TransactionDetailModal({
     }
     if (!isOpen) {
       prevTxIdRef.current = null;
+      setCurrentTx(null);
     }
-  }, [transaction?.id, isOpen]);
+  }, [transaction, isOpen]);
 
   // Use currentTx for display; fallback to prop
   const displayTx = currentTx || transaction;
