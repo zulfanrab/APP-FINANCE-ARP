@@ -98,39 +98,48 @@ export async function uploadToGoogleDrive(
 
     const responseText = await response.text();
 
-    let resData: any;
+    let resData: any = null;
     try {
       resData = JSON.parse(responseText);
     } catch {
-      // If responseText contains a Drive file URL directly
-      const driveMatch = responseText.match(/https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+/);
-      if (driveMatch) {
-        return {
-          nama: file.name,
-          tipe: file.type,
-          dataUrl: driveMatch[0] + '/view?usp=sharing',
-        };
-      }
-      throw new Error(`Google Drive Response Error: ${responseText.substring(0, 150)}`);
+      // Non-JSON response, will fallback to regex match below
     }
 
-    if (resData && resData.success && resData.fileUrl) {
+    // Support all possible URL keys from Google Apps Script Webhooks
+    const extractedUrl =
+      resData?.fileUrl ||
+      resData?.url ||
+      resData?.link ||
+      resData?.webViewLink ||
+      resData?.webContentLink ||
+      resData?.downloadUrl ||
+      resData?.resultUrl ||
+      resData?.dataUrl ||
+      resData?.data?.fileUrl ||
+      resData?.data?.url ||
+      (resData?.id ? `https://drive.google.com/file/d/${resData.id}/view?usp=sharing` : null);
+
+    if (extractedUrl && typeof extractedUrl === 'string' && extractedUrl.startsWith('http')) {
       return {
         nama: file.name,
         tipe: file.type,
-        dataUrl: resData.fileUrl,
+        dataUrl: extractedUrl,
       };
-    } else if (resData && resData.fileUrl) {
-      return {
-        nama: file.name,
-        tipe: file.type,
-        dataUrl: resData.fileUrl,
-      };
-    } else {
-      throw new Error(resData?.error || 'Gagal menyimpan file ke Google Drive');
     }
+
+    // Fallback: Regex scan responseText for any Google Drive file URL
+    const driveMatch = responseText.match(/https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+/);
+    if (driveMatch) {
+      return {
+        nama: file.name,
+        tipe: file.type,
+        dataUrl: driveMatch[0] + '/view?usp=sharing',
+      };
+    }
+
+    throw new Error(resData?.error || resData?.message || `Google Drive response unrecognized: ${responseText.substring(0, 100)}`);
   } catch (err: any) {
     console.error('Google Drive Upload Exception:', err);
-    throw new Error(err.message || 'Terjadi kesalahan saat mengunggah ke Google Drive');
+    throw err;
   }
 }

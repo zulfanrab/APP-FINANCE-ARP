@@ -283,7 +283,15 @@ export function TransactionDetailModal({
               tag: editForm.tag,
               proyekNama: currentProject?.nama,
             });
-            finalAttachments.push(uploaded);
+            if (uploaded && uploaded.dataUrl) {
+              finalAttachments.push(uploaded);
+            } else {
+              finalAttachments.push({
+                nama: att.nama,
+                tipe: att.tipe,
+                dataUrl: att.dataUrl,
+              });
+            }
           } catch {
             finalAttachments.push({
               nama: att.nama,
