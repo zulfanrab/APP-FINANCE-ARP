@@ -42,28 +42,28 @@ async function safeSupabaseInsert(table: string, payload: any[]) {
   return { error };
 }
 
-async function safeSupabaseUpdate(table: string, payload: any, id: string) {
+async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<{ error: any }> {
   if (!supabase) return { error: null };
-  let retryRow = { ...payload };
+  const retryRow = { ...row };
 
-  // If lampiran is an array, try sending as is first
-  let { error } = await supabase.from(table).update(retryRow).eq('id', id);
-
-  // If error occurs and lampiran is an array, try stringifying lampiran (in case column is TEXT)
-  if (error && Array.isArray(retryRow.lampiran)) {
-    console.warn('Supabase update failed with array lampiran. Retrying with JSON stringified lampiran...');
-    retryRow.lampiran = JSON.stringify(retryRow.lampiran);
-    const retryJson = await supabase.from(table).update(retryRow).eq('id', id);
-    if (!retryJson.error) {
-      return { error: null };
-    }
-    error = retryJson.error;
+  // Always stringify lampiran array for maximum PostgreSQL column type compatibility (JSONB & TEXT)
+  if (Array.isArray(retryRow.lampiran)) {
+    try {
+      retryRow.lampiran = JSON.stringify(retryRow.lampiran);
+    } catch { /* fallback */ }
   }
+
+  let { error } = await supabase.from(table).update(retryRow).eq('id', id);
 
   while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
     const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
     if (match && match[1]) {
       const missingCol = match[1];
+      // PROTECT CORE COLUMNS: Never delete lampiran, nominal, deskripsi, or status!
+      if (['lampiran', 'nominal', 'deskripsi', 'status', 'tanggal', 'kategori'].includes(missingCol)) {
+        console.error(`Cannot strip core column "${missingCol}" from Supabase update payload!`);
+        break;
+      }
       console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
       delete retryRow[missingCol];
       const retryRes = await supabase.from(table).update(retryRow).eq('id', id);
@@ -157,11 +157,12 @@ export async function getTransactions(): Promise<Transaction[]> {
           const tx = mapRowToTransaction(row);
           const local = localMap.get(tx.id);
           if (local) {
-            // CRITICAL: Always preserve local attachments if local has attachments and remote has fewer/none
-            if (local.lampiran && local.lampiran.length > 0) {
-              if (!tx.lampiran || tx.lampiran.length < local.lampiran.length) {
-                tx.lampiran = local.lampiran;
-              }
+            // CRITICAL: Always preserve local attachments if local has more items than remote
+            const localAtts = parseLampiranField(local.lampiran);
+            const remoteAtts = parseLampiranField(tx.lampiran);
+
+            if (localAtts.length > remoteAtts.length) {
+              tx.lampiran = localAtts;
             }
             if (!tx.buktiTransfer && local.buktiTransfer) {
               tx.buktiTransfer = local.buktiTransfer;

@@ -845,25 +845,24 @@ export function TransactionForm() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-gray-700">Lampiran Berkas ({stagedFiles.length})</label>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition-all"
+              <label
+                htmlFor="form-file-input"
+                className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition-all cursor-pointer select-none"
               >
                 <Plus size={14} /> Pilih Foto / Berkas PDF
-              </button>
-              <input type="file" ref={fileInputRef} accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleFileUpload} className="hidden" />
+              </label>
+              <input id="form-file-input" type="file" ref={fileInputRef} accept=".pdf,application/pdf,image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple onChange={handleFileUpload} className="hidden" />
             </div>
 
             {stagedFiles.length === 0 ? (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-2xl p-6 text-center text-gray-400 space-y-2 cursor-pointer transition-all active:scale-[0.99]"
+              <label
+                htmlFor="form-file-input"
+                className="block border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-2xl p-6 text-center text-gray-400 space-y-2 cursor-pointer transition-all active:scale-[0.99] select-none"
               >
                 <Upload size={28} className="mx-auto text-gray-400" />
                 <p className="text-xs font-semibold text-gray-600">Belum ada lampiran. Klik di sini untuk memilih foto resi / PDF.</p>
                 <p className="text-[10px] text-gray-400">Mendukung kamera HP, Galeri Foto &amp; Berkas PDF</p>
-              </div>
+              </label>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {stagedFiles.map((staged, idx) => (
