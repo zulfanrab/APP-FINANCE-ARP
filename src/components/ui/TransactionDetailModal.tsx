@@ -32,6 +32,7 @@ interface StagedAttachment {
   nama: string;
   tipe: string;
   dataUrl: string;
+  previewUrl?: string;
   fileObj?: File;
 }
 
@@ -102,10 +103,6 @@ export function TransactionDetailModal({
     adminNominalCustomStr: '1.000',
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
   });
-
-  useEffect(() => {
-    getStoredRole().then(r => setRole(r));
-  }, []);
 
   const populateFormAndAttachments = (targetTx: Transaction) => {
     setEditForm({

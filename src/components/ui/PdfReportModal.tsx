@@ -303,9 +303,9 @@ export function PdfReportModal({
         let parsedLampiran: any[] = [];
         if (Array.isArray(rawLampiran)) {
           parsedLampiran = rawLampiran;
-        } else if (typeof rawLampiran === 'string' && rawLampiran.trim().startsWith('[')) {
+        } else if (typeof rawLampiran === 'string' && (rawLampiran as string).trim().startsWith('[')) {
           try {
-            const parsed = JSON.parse(rawLampiran);
+            const parsed = JSON.parse(rawLampiran as string);
             if (Array.isArray(parsed)) parsedLampiran = parsed;
           } catch { /* ignore */ }
         }

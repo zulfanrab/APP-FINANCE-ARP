@@ -8,6 +8,7 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react';
 import { type ToastMessage } from '../types';
