@@ -128,7 +128,20 @@ export async function getTransactions(): Promise<Transaction[]> {
         .order('tanggal', { ascending: false });
 
       if (!error && data) {
-        const remoteTxs = data.map(mapRowToTransaction);
+        const localMap = new Map(localData.map(t => [t.id, t]));
+        const remoteTxs = data.map(row => {
+          const tx = mapRowToTransaction(row);
+          const local = localMap.get(tx.id);
+          if (local) {
+            if ((!tx.lampiran || tx.lampiran.length === 0) && local.lampiran && local.lampiran.length > 0) {
+              tx.lampiran = local.lampiran;
+            }
+            if (!tx.buktiTransfer && local.buktiTransfer) {
+              tx.buktiTransfer = local.buktiTransfer;
+            }
+          }
+          return tx;
+        });
         const remoteIds = new Set(remoteTxs.map(t => t.id));
 
         // Only keep local transactions that were explicitly created offline and never synced to Supabase

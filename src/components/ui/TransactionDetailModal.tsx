@@ -25,7 +25,7 @@ interface TransactionDetailModalProps {
   transaction: Transaction | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate?: () => void;
+  onUpdate?: (updatedTx?: Transaction) => void;
 }
 
 interface StagedAttachment {
@@ -255,7 +255,7 @@ export function TransactionDetailModal({
 
       const adminNominalCustom = parseRupiahInput(editForm.adminNominalCustomStr || '0');
 
-      await updateTransaction(transaction.id, {
+      const updatedTx = await updateTransaction(transaction.id, {
         tanggal: editForm.tanggal,
         jenis: editForm.jenis,
         deskripsi: editForm.deskripsi.trim(),
@@ -272,7 +272,7 @@ export function TransactionDetailModal({
 
       addToast('success', 'Transaksi berhasil diperbarui!');
       triggerRefresh();
-      if (onUpdate) onUpdate();
+      if (onUpdate) onUpdate(updatedTx);
       setIsEditing(false);
       onClose();
     } catch {
