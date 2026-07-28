@@ -125,6 +125,7 @@ export function TransactionForm() {
     nama: string;
     tipe: string;
     dataUrl: string;
+    previewUrl?: string;
     fileObj?: File;
   }
 
@@ -157,13 +158,13 @@ export function TransactionForm() {
         setField('tanggal', aiResult.tanggal);
       }
 
-      const attachment = await compressFileToAttachment(file);
       setStagedFiles(prev => [
         ...prev,
         {
-          nama: attachment.nama,
-          tipe: attachment.tipe,
-          dataUrl: attachment.dataUrl,
+          nama: file.name,
+          tipe: file.type || 'image/jpeg',
+          dataUrl: '',
+          previewUrl: URL.createObjectURL(file),
           fileObj: file,
         },
       ]);
@@ -177,34 +178,32 @@ export function TransactionForm() {
     }
   };
 
-  // Manual File Selection (Staged Locally)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manual File Selection (Instant zero-lag Blob Object URL)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    for (const file of files) {
-      try {
-        const attachment = await compressFileToAttachment(file);
-        setStagedFiles(prev => [
-          ...prev,
-          {
-            nama: attachment.nama,
-            tipe: attachment.tipe,
-            dataUrl: attachment.dataUrl,
-            fileObj: file,
-          },
-        ]);
-      } catch (err) {
-        console.error('Gagal memproses file:', err);
-      }
-    }
+    const newStaged: StagedFormAttachment[] = files.map(file => ({
+      nama: file.name,
+      tipe: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      dataUrl: '',
+      previewUrl: URL.createObjectURL(file),
+      fileObj: file,
+    }));
 
-    addToast('info', `${files.length} berkas dipilih.`);
+    setStagedFiles(prev => [...prev, ...newStaged]);
+    addToast('success', `✅ ${newStaged.length} berkas ditambahkan.`);
     e.target.value = '';
   };
 
   const removeAttachment = (idx: number) => {
-    setStagedFiles(prev => prev.filter((_, i) => i !== idx));
+    setStagedFiles(prev => {
+      const target = prev[idx];
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,13 +229,23 @@ export function TransactionForm() {
               tag: form.tag,
               proyekNama: currentProject?.nama,
             });
-            uploadedAttachments.push(uploaded);
+            if (uploaded && uploaded.dataUrl) {
+              uploadedAttachments.push(uploaded);
+            } else {
+              const fallbackAtt = await compressFileToAttachment(staged.fileObj);
+              uploadedAttachments.push(fallbackAtt);
+            }
           } catch {
-            uploadedAttachments.push({
-              nama: staged.nama,
-              tipe: staged.tipe,
-              dataUrl: staged.dataUrl,
-            });
+            try {
+              const fallbackAtt = await compressFileToAttachment(staged.fileObj);
+              uploadedAttachments.push(fallbackAtt);
+            } catch {
+              uploadedAttachments.push({
+                nama: staged.nama,
+                tipe: staged.tipe,
+                dataUrl: staged.dataUrl || '',
+              });
+            }
           }
         } else {
           uploadedAttachments.push({

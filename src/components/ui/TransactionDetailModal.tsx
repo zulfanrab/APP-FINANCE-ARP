@@ -85,6 +85,9 @@ export function TransactionDetailModal({
   const [categories, setCategories] = useState<string[]>([]);
   const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
 
+  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+  const [dragActive, setDragActive] = useState(false);
+
   // Edit Form state
   const [editForm, setEditForm] = useState({
     tanggal: '',
@@ -100,9 +103,9 @@ export function TransactionDetailModal({
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
   });
 
-  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
-  const [dragActive, setDragActive] = useState(false);
-  const [processingFiles, setProcessingFiles] = useState(false);
+  useEffect(() => {
+    getStoredRole().then(r => setRole(r));
+  }, []);
 
   const populateFormAndAttachments = (targetTx: Transaction) => {
     setEditForm({
@@ -188,34 +191,22 @@ export function TransactionDetailModal({
   const projectObj = projects.find(p => p.id === displayTx.proyekId);
   const isKasUtama = !displayTx.proyekId;
 
-  const handleSelectFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Instant zero-lag Blob Object URL file staging for mobile HP
+  const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setProcessingFiles(true);
-    try {
-      const newStaged: StagedAttachment[] = [];
-      for (const file of files) {
-        try {
-          const attachment = await compressFileToAttachment(file);
-          newStaged.push({
-            nama: attachment.nama,
-            tipe: attachment.tipe,
-            dataUrl: attachment.dataUrl,
-            fileObj: file,
-          });
-        } catch (err) {
-          console.error('Gagal memproses lampiran:', err);
-        }
-      }
-      if (newStaged.length > 0) {
-        setStagedAttachments(prev => [...prev, ...newStaged]);
-        addToast('success', `✅ ${newStaged.length} foto/berkas berhasil dilampirkan.`);
-      }
-    } finally {
-      setProcessingFiles(false);
-      e.target.value = '';
-    }
+    const newStaged: StagedAttachment[] = files.map(file => ({
+      nama: file.name,
+      tipe: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      dataUrl: '',
+      previewUrl: URL.createObjectURL(file),
+      fileObj: file,
+    }));
+
+    setStagedAttachments(prev => [...prev, ...newStaged]);
+    addToast('success', `✅ ${newStaged.length} foto/berkas berhasil dilampirkan.`);
+    e.target.value = '';
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -228,35 +219,33 @@ export function TransactionDetailModal({
     }
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const files = Array.from(e.dataTransfer.files);
-      for (const file of files) {
-        try {
-          const attachment = await compressFileToAttachment(file);
-          setStagedAttachments(prev => [
-            ...prev,
-            {
-              nama: attachment.nama,
-              tipe: attachment.tipe,
-              dataUrl: attachment.dataUrl,
-              fileObj: file,
-            },
-          ]);
-        } catch (err) {
-          console.error('Gagal memproses lampiran drop:', err);
-        }
-      }
-      addToast('info', `${files.length} berkas ditambahkan dari Drop.`);
+      const newStaged: StagedAttachment[] = files.map(file => ({
+        nama: file.name,
+        tipe: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        dataUrl: '',
+        previewUrl: URL.createObjectURL(file),
+        fileObj: file,
+      }));
+      setStagedAttachments(prev => [...prev, ...newStaged]);
+      addToast('success', `✅ ${newStaged.length} foto/berkas berhasil dilampirkan.`);
     }
   };
 
   const handleRemoveStagedAttachment = (idx: number) => {
-    setStagedAttachments(prev => prev.filter((_, i) => i !== idx));
+    setStagedAttachments(prev => {
+      const target = prev[idx];
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const handleSave = async () => {
@@ -288,18 +277,20 @@ export function TransactionDetailModal({
             if (uploaded && uploaded.dataUrl) {
               finalAttachments.push(uploaded);
             } else {
+              const fallbackAtt = await compressFileToAttachment(att.fileObj);
+              finalAttachments.push(fallbackAtt);
+            }
+          } catch {
+            try {
+              const fallbackAtt = await compressFileToAttachment(att.fileObj);
+              finalAttachments.push(fallbackAtt);
+            } catch {
               finalAttachments.push({
                 nama: att.nama,
                 tipe: att.tipe,
-                dataUrl: att.dataUrl,
+                dataUrl: att.dataUrl || '',
               });
             }
-          } catch {
-            finalAttachments.push({
-              nama: att.nama,
-              tipe: att.tipe,
-              dataUrl: att.dataUrl,
-            });
           }
         } else {
           finalAttachments.push({
@@ -867,9 +858,9 @@ export function TransactionDetailModal({
                     const isPdf = att.tipe?.includes('pdf') || att.nama?.toLowerCase().endsWith('.pdf');
                     const isDrive = att.dataUrl?.includes('drive.google.com');
                     const driveId = isDrive ? getDriveFileId(att.dataUrl) : null;
-                    const imgSrc = isDrive && driveId
+                    const imgSrc = att.previewUrl || (isDrive && driveId
                       ? `https://lh3.googleusercontent.com/d/${driveId}`
-                      : att.dataUrl;
+                      : att.dataUrl);
 
                     return (
                       <div key={idx} className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded-xl text-xs gap-2 shadow-sm hover:border-gray-300 transition-all">
