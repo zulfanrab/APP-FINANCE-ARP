@@ -7,6 +7,7 @@
 
 import React, { useRef } from 'react';
 import { Printer, FileText } from 'lucide-react';
+import QRCode from 'qrcode';
 import { Modal } from './Modal';
 import { type Transaction, type Project } from '../../types';
 import { formatDate, formatRupiah } from './index';
@@ -56,6 +57,25 @@ export function PdfReportModal({
   const companyPhone = '+62 821-2984-9515';
   const companyEmail = 'aksara.riksa.perdana@gmail.com';
   const companyWebsite = 'aksarariksapjk3.com';
+
+  // Dynamic Terminology Check: Internal Office/Operational Pos vs External Project
+  const isInternal = Boolean(
+    project && (
+      project.tipe === 'operasional_kantor' ||
+      (project.nama || '').toLowerCase().includes('kantor') ||
+      (project.nama || '').toLowerCase().includes('operasional') ||
+      (project.klien || '').toLowerCase().includes('admin') ||
+      (project.klien || '').toLowerCase().includes('internal')
+    )
+  );
+
+  const displayTitle = isInternal
+    ? 'LAPORAN REALISASI & PERTANGGUNGJAWABAN KAS OPERASIONAL'
+    : title;
+
+  const displaySubtitle = isInternal
+    ? (subtitle.includes('Dokumen Keuangan Resmi') ? 'Dokumen Pertanggungjawaban Kas Operasional Internal' : subtitle)
+    : subtitle;
 
   // Filter approved transactions
   const approvedTx = transactions.filter(t => t.status === 'disetujui' || t.status === 'selesai');
@@ -211,7 +231,7 @@ export function PdfReportModal({
   }
 
   // Universal Hidden-Iframe Printing (Works 100% on Mobile HP & Desktop Browsers without popup blocking!)
-  const handlePrint = (withAttachments: boolean = false) => {
+  const handlePrint = async (withAttachments: boolean = false) => {
     const content = printRef.current;
     if (!content) return;
 
@@ -243,9 +263,11 @@ export function PdfReportModal({
         type: 'image' | 'pdf';
         url: string;
         nama: string;
+        seqLabel: string;
         tanggal: string;
         deskripsi: string;
         nominal: number;
+        qrDataUrl?: string;
       }> = [];
 
       const getDriveId = (url: string): string | null => {
@@ -263,46 +285,78 @@ export function PdfReportModal({
         return url;
       };
 
-      reportTxs.forEach(t => {
+      // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
+      for (const t of reportTxs) {
+        const txAtts: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
+
         // 1. Include Bukti Transfer if present
         if (t.buktiTransfer && t.buktiTransfer.trim()) {
-          itemsToPrint.push({
-            type: 'image',
-            url: resolveUrl(t.buktiTransfer),
-            nama: 'Bukti Transfer',
-            tanggal: t.tanggal,
-            deskripsi: t.deskripsi,
-            nominal: t.nominal,
+          txAtts.push({
+            nama: 'Bukti Transfer Bank',
+            tipe: 'image/png',
+            dataUrl: t.buktiTransfer.trim(),
           });
         }
 
-        // 2. Include Lampiran items
-        if (t.lampiran && t.lampiran.length > 0) {
-          t.lampiran.forEach(att => {
-            if (!att.dataUrl) return;
-            const isPdf = att.tipe?.includes('pdf') || att.nama?.toLowerCase().endsWith('.pdf') || att.dataUrl.toLowerCase().endsWith('.pdf');
-            if (isPdf) {
-              itemsToPrint.push({
-                type: 'pdf',
-                url: att.dataUrl,
-                nama: att.nama || 'Dokumen PDF',
-                tanggal: t.tanggal,
-                deskripsi: t.deskripsi,
-                nominal: t.nominal,
+        // 2. Include all items from Lampiran array
+        const rawLampiran = t.lampiran;
+        let parsedLampiran: any[] = [];
+        if (Array.isArray(rawLampiran)) {
+          parsedLampiran = rawLampiran;
+        } else if (typeof rawLampiran === 'string' && rawLampiran.trim().startsWith('[')) {
+          try {
+            const parsed = JSON.parse(rawLampiran);
+            if (Array.isArray(parsed)) parsedLampiran = parsed;
+          } catch { /* ignore */ }
+        }
+
+        parsedLampiran.forEach(att => {
+          if (att && att.dataUrl && !txAtts.some(a => a.dataUrl === att.dataUrl)) {
+            txAtts.push({
+              nama: att.nama || 'Lampiran Transaksi',
+              tipe: att.tipe || (att.dataUrl.toLowerCase().includes('.pdf') ? 'application/pdf' : 'image/jpeg'),
+              dataUrl: att.dataUrl,
+            });
+          }
+        });
+
+        const totalAtts = txAtts.length;
+
+        for (let i = 0; i < totalAtts; i++) {
+          const att = txAtts[i];
+          const isPdf =
+            att.tipe?.includes('pdf') ||
+            att.nama?.toLowerCase().endsWith('.pdf') ||
+            att.dataUrl.toLowerCase().includes('.pdf');
+
+          const seqLabel = totalAtts > 1 ? ` (Lampiran ${i + 1} dari ${totalAtts})` : '';
+
+          let qrDataUrl = '';
+          if (isPdf) {
+            try {
+              const qrTarget = att.dataUrl.startsWith('http') ? att.dataUrl : `PDF: ${att.nama}`;
+              qrDataUrl = await QRCode.toDataURL(qrTarget, {
+                width: 300,
+                margin: 1,
+                color: { dark: '#0F172A', light: '#FFFFFF' },
               });
-            } else {
-              itemsToPrint.push({
-                type: 'image',
-                url: resolveUrl(att.dataUrl),
-                nama: att.nama || 'Lampiran Foto',
-                tanggal: t.tanggal,
-                deskripsi: t.deskripsi,
-                nominal: t.nominal,
-              });
+            } catch (qrErr) {
+              console.warn('Gagal meng-generate QR code PDF:', qrErr);
             }
+          }
+
+          itemsToPrint.push({
+            type: isPdf ? 'pdf' : 'image',
+            url: isPdf ? att.dataUrl : resolveUrl(att.dataUrl),
+            nama: att.nama || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
+            seqLabel,
+            tanggal: t.tanggal,
+            deskripsi: t.deskripsi,
+            nominal: t.nominal,
+            qrDataUrl,
           });
         }
-      });
+      }
 
       if (itemsToPrint.length > 0) {
         attachmentsHtml += `
@@ -310,7 +364,7 @@ export function PdfReportModal({
             <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #1A365D; margin-bottom: 2px;">
               <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 900; color: #1A365D; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI & STRUK</h1>
               <p class="company-info" style="font-size: 9.5px; color: #334155; margin-top: 4px; line-height: 1.5;">
-                ${title} &middot; Periode: ${periodText}
+                ${displayTitle} &middot; Periode: ${periodText}
               </p>
             </div>
             
@@ -327,23 +381,33 @@ export function PdfReportModal({
                   <img src="${item.url}" alt="${item.nama}" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                 </div>
                 <div class="caption">
-                  <div class="caption-date">${formatDate(item.tanggal)}</div>
-                  <div class="caption-desc">${item.deskripsi}</div>
+                  <div class="caption-date">[${formatDate(item.tanggal)}]</div>
+                  <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
                   <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
                 </div>
               </div>
             `;
           } else {
+            // PDF Document QR Code Fallback Card
             attachmentsHtml += `
-              <div class="gallery-item" style="background: #F8FAFC; border: 1.5px border #CBD5E1;">
-                <div class="img-wrapper" style="background: #EEF2FF; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 12px;">
-                  <div style="font-size: 32px; margin-bottom: 4px;">📄</div>
-                  <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 90%;">${item.nama}</div>
-                  <div style="font-size: 9px; font-weight: 600; color: #4F46E5; margin-top: 4px;">Dokumen Berkas PDF</div>
+              <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px;">
+                <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 200px;">
+                  ${
+                    item.qrDataUrl
+                      ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 110px; height: 110px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
+                      : `<div style="font-size: 32px; margin-bottom: 4px;">📄</div>`
+                  }
+                  <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
+                    📄 ${item.nama}
+                  </div>
+                  <div style="font-size: 8.5px; font-weight: 700; color: #4F46E5; margin-top: 2px;">DOKUMEN PDF CLOUD ARCHIVE</div>
+                  <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
+                    📱 Scan QR Code untuk melihat dokumen PDF asli di Google Drive / Cloud Archive
+                  </div>
                 </div>
-                <div class="caption">
-                  <div class="caption-date">${formatDate(item.tanggal)}</div>
-                  <div class="caption-desc">${item.deskripsi}</div>
+                <div class="caption" style="margin-top: 6px;">
+                  <div class="caption-date">[${formatDate(item.tanggal)}]</div>
+                  <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
                   <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
                 </div>
               </div>
@@ -682,46 +746,72 @@ export function PdfReportModal({
 
             {/* DOCUMENT TITLE & METADATA */}
             <div className="doc-header text-center my-3">
-              <h2 className="doc-title text-base font-extrabold text-[#1A365D] uppercase tracking-wide">{title}</h2>
+              <h2 className="doc-title text-base font-extrabold text-[#1A365D] uppercase tracking-wide">{displayTitle}</h2>
               <p className="doc-subtitle text-xs text-slate-600 mt-1">
-                {subtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
+                {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
               </p>
               {project && (
                 <p className="text-xs font-bold text-blue-800 mt-0.5">
-                  NAMA PROYEK: {project.nama.toUpperCase()} | KLIEN: {project.klien.toUpperCase()}
+                  {isInternal ? (
+                    <>POS OPERASIONAL: {project.nama.toUpperCase()} &nbsp;|&nbsp; DIVISI / PENGELOLA: ADMIN KEUANGAN</>
+                  ) : (
+                    <>NAMA PROYEK: {project.nama.toUpperCase()} &nbsp;|&nbsp; KLIEN: {project.klien.toUpperCase()}</>
+                  )}
                 </p>
               )}
             </div>
 
             {/* EXECUTIVE FINANCIAL SUMMARY */}
             {project ? (
-              <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
+              isInternal ? (
+                /* Internal / Kas Operasional: 3 Cards Only */
+                <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                  <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi / Drop Dana Kas</span>
+                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
+                  </div>
+                  <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Pengeluaran Riil</span>
+                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
+                  </div>
+                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Sisa Kas</span>
+                    <p className="summary-val text-sm font-black tabular-nums">
+                      {formatSaldoRupiah(sisaDana)}
+                    </p>
+                  </div>
                 </div>
-                <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(pemasukanKlien)}</p>
+              ) : (
+                /* External Project (e.g. Proyek Angkur): 5 Cards */
+                <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                  <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
+                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
+                  </div>
+                  <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
+                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(pemasukanKlien)}</p>
+                  </div>
+                  <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
+                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
+                  </div>
+                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
+                    <p className="summary-val text-sm font-black tabular-nums">
+                      {formatSaldoRupiah(pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk))}
+                    </p>
+                  </div>
+                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Proyek</span>
+                    <p className="summary-val text-sm font-black tabular-nums">
+                      {formatSaldoRupiah(sisaDana)}
+                    </p>
+                  </div>
                 </div>
-                <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
-                </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
-                  <p className="summary-val text-sm font-black tabular-nums">
-                    {formatSaldoRupiah(pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk))}
-                  </p>
-                </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Proyek</span>
-                  <p className="summary-val text-sm font-black tabular-nums">
-                    {formatSaldoRupiah(sisaDana)}
-                  </p>
-                </div>
-              </div>
+              )
             ) : (
+              /* Kas Utama: 3 Cards */
               <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
                 <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Debet (Pemasukan)</span>
