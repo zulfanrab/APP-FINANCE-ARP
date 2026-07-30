@@ -104,8 +104,12 @@ export function OwnerDashboard() {
   const [quickAttachments, setQuickAttachments] = useState<Attachment[]>([]);
   const [quickSaving, setQuickSaving] = useState(false);
 
+  const isFirstLoadRef = useRef(true);
+
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoadRef.current) {
+      setLoading(true);
+    }
     try {
       const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
       setProjectsList(prjs);
@@ -117,7 +121,10 @@ export function OwnerDashboard() {
     } catch {
       addToast('error', 'Gagal memuat data dashboard');
     } finally {
-      setLoading(false);
+      if (isFirstLoadRef.current) {
+        setLoading(false);
+        isFirstLoadRef.current = false;
+      }
     }
   }, [addToast]);
 

@@ -3,7 +3,7 @@
 // CRUD: tambah, edit, selesaikan proyek + kalkulasi profit & modal
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, FolderOpen, Edit2, CheckCircle, Trash2,
@@ -57,8 +57,12 @@ export function Projects() {
   });
   const [saving, setSaving] = useState(false);
 
+  const isFirstLoadRef = useRef(true);
+
   const loadProjects = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoadRef.current) {
+      setLoading(true);
+    }
     try {
       const raw = await getProjects();
       const withStats = await Promise.all(
@@ -77,7 +81,10 @@ export function Projects() {
       );
       setProjects(withStats);
     } finally {
-      setLoading(false);
+      if (isFirstLoadRef.current) {
+        setLoading(false);
+        isFirstLoadRef.current = false;
+      }
     }
   }, []);
 

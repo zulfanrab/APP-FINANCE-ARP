@@ -3,7 +3,7 @@
 // Includes Kas Utama vs Dana Proyek Scope Badges & Clickable Rows -> TransactionDetailModal
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, FolderOpen,
   ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight
@@ -63,8 +63,12 @@ export function AdminDashboard() {
 
   const [projectsList, setProjectsList] = useState<any[]>([]);
 
+  const isFirstLoadRef = useRef(true);
+
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (isFirstLoadRef.current) {
+      setLoading(true);
+    }
     try {
       const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
       setAllTransactions(txns);
@@ -72,7 +76,10 @@ export function AdminDashboard() {
       const activeProjects = prjs.filter(p => p.status === 'aktif').length;
       setSummary(getDashboardSummary(txns, activeProjects, prjs));
     } finally {
-      setLoading(false);
+      if (isFirstLoadRef.current) {
+        setLoading(false);
+        isFirstLoadRef.current = false;
+      }
     }
   }, []);
 

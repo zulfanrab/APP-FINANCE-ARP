@@ -78,34 +78,22 @@ export function initAutoUpdateEngine() {
   // 1. Fetch initial version
   checkForAppUpdates();
 
-  // 2. Poll Vercel for new deployment every 20 seconds
+  // 2. Poll Vercel for new deployment every 60 seconds (silent background check)
   const intervalId = setInterval(() => {
     if (!isUpdateDetected) {
       checkForAppUpdates();
     }
-  }, 20000);
+  }, 60000);
 
-  // 3. Check immediately when user brings app/PWA window to focus or switches tab
-  const handleFocusOrVisible = () => {
-    if (document.visibilityState === 'visible' && !isUpdateDetected) {
-      checkForAppUpdates();
-    }
-  };
-
-  window.addEventListener('focus', handleFocusOrVisible);
-  document.addEventListener('visibilitychange', handleFocusOrVisible);
-
-  // 4. Service Worker Registration & Update listener
+  // 3. Service Worker Registration & Update listener
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js').then((registration) => {
-        // Check for SW updates periodically
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New Service Worker installed & ready!
                 checkForAppUpdates();
               }
             });
@@ -115,20 +103,9 @@ export function initAutoUpdateEngine() {
         console.warn('SW registration skipped:', err);
       });
     });
-
-    // Listen for controllerchange event
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
-    });
   }
 
   return () => {
     clearInterval(intervalId);
-    window.removeEventListener('focus', handleFocusOrVisible);
-    document.removeEventListener('visibilitychange', handleFocusOrVisible);
   };
 }

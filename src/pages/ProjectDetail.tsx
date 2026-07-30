@@ -3,7 +3,7 @@
 // Includes: Project Fund Isolation, Realisasi Report, Refund Flow, Excel Export
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
@@ -129,7 +129,7 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  const { addToast } = useApp();
+  const { addToast, refreshKey } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
@@ -213,9 +213,13 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     }
   };
 
+  const isFirstLoadRef = useRef(true);
+
   const loadProjectData = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    if (isFirstLoadRef.current) {
+      setLoading(true);
+    }
     try {
       const [prj, txs] = await Promise.all([
         getProjectById(id),
@@ -231,13 +235,16 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     } catch {
       addToast('error', 'Gagal memuat data proyek');
     } finally {
-      setLoading(false);
+      if (isFirstLoadRef.current) {
+        setLoading(false);
+        isFirstLoadRef.current = false;
+      }
     }
   }, [id, addToast]);
 
   useEffect(() => {
     loadProjectData();
-  }, [loadProjectData]);
+  }, [loadProjectData, refreshKey]);
 
   if (loading) return <LoadingSpinner size={32} />;
 

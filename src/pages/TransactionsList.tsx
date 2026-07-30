@@ -4,7 +4,7 @@
 // Clickable Items -> Full Detail & Edit Modal with Staged Uploads
 // ============================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban, ChevronRight } from 'lucide-react';
 import { getTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
@@ -38,14 +38,21 @@ export function TransactionsList() {
     loadTransactions();
   }, [refreshKey]);
 
+  const isFirstLoadRef = useRef(true);
+
   const loadTransactions = async () => {
-    setLoading(true);
+    if (isFirstLoadRef.current) {
+      setLoading(true);
+    }
     try {
       const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
       setTransactions(txs);
       setProjects(projs);
     } finally {
-      setLoading(false);
+      if (isFirstLoadRef.current) {
+        setLoading(false);
+        isFirstLoadRef.current = false;
+      }
     }
   };
 

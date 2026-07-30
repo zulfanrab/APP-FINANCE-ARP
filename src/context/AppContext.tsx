@@ -82,25 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [triggerRefresh]);
 
-  // 2. AUTO-REFETCH WHEN SWITCHING TABS OR UNLOCKING HP SCREEN (Throttled 15s)
-  useEffect(() => {
-    let lastFocusTime = Date.now();
-    const handleFocusOrVisibility = () => {
-      const now = Date.now();
-      if (document.visibilityState === 'visible' && now - lastFocusTime > 15000) {
-        lastFocusTime = now;
-        triggerRefresh();
-      }
-    };
 
-    window.addEventListener('focus', handleFocusOrVisibility);
-    document.addEventListener('visibilitychange', handleFocusOrVisibility);
-
-    return () => {
-      window.removeEventListener('focus', handleFocusOrVisibility);
-      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
-    };
-  }, [triggerRefresh]);
 
   return (
     <AppContext.Provider
