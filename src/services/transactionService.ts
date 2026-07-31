@@ -105,6 +105,7 @@ function mapRowToTransaction(row: any): Transaction {
     adminNominalCustom: row.admin_nominal_custom ? Number(row.admin_nominal_custom) : undefined,
     parentTransactionId: row.parent_transaction_id ?? undefined,
     divisi: row.divisi ?? undefined,
+    urutan: row.urutan ? Number(row.urutan) : undefined,
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -127,6 +128,7 @@ function mapTransactionToRow(t: Transaction): any {
     penerima_detail: t.penerimaDetail ?? null,
     jalur_transfer: t.jalurTransfer ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
+    urutan: t.urutan ?? null,
     dibuat_pada: t.dibuatPada,
     diupdate_pada: t.diupdatePada,
   };
@@ -623,8 +625,14 @@ export function groupAndSortTransactions(
     }
   }
 
-  // 2. Sort parent transactions by date & created_at
+  // 2. Sort parent transactions by urutan (if custom order is defined), then date & created_at
   const sortedParents = [...parentTxs].sort((a, b) => {
+    if (a.urutan !== undefined && b.urutan !== undefined && a.urutan !== b.urutan) {
+      return order === 'asc' ? a.urutan - b.urutan : b.urutan - a.urutan;
+    }
+    if (a.urutan !== undefined && b.urutan === undefined) return order === 'asc' ? -1 : 1;
+    if (a.urutan === undefined && b.urutan !== undefined) return order === 'asc' ? 1 : -1;
+
     const timeA = new Date(a.tanggal).getTime();
     const timeB = new Date(b.tanggal).getTime();
     if (timeA !== timeB) {
@@ -664,4 +672,35 @@ export function groupAndSortTransactions(
   }
 
   return result;
+}
+
+/**
+ * Saves custom Drag & Drop transaction ordering
+ * Updates LocalStorage and syncs to Supabase seamlessly
+ */
+export async function saveTransactionCustomOrder(orderedIds: string[]): Promise<Transaction[]> {
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const orderMap = new Map(orderedIds.map((id, index) => [id, index + 1]));
+
+  const updatedTransactions = transactions.map(t => {
+    if (orderMap.has(t.id)) {
+      return { ...t, urutan: orderMap.get(t.id), diupdatePada: now() };
+    }
+    return t;
+  });
+
+  setItem(KEYS.TRANSACTIONS, updatedTransactions);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const updates = Array.from(orderMap.entries()).map(([id, urutan]) =>
+        safeSupabaseUpdate('transactions', { urutan }, id)
+      );
+      await Promise.all(updates);
+    } catch (err) {
+      console.warn('Supabase reorder sync warning:', err);
+    }
+  }
+
+  return updatedTransactions;
 }

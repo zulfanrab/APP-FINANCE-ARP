@@ -5,8 +5,8 @@
 // ============================================================
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban, ChevronRight } from 'lucide-react';
-import { getTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
+import { Search, Filter, Trash2, Calendar, FileText, ArrowUpRight, ArrowDownLeft, Building2, FolderKanban, ChevronRight, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { getTransactions, deleteTransaction, groupAndSortTransactions, saveTransactionCustomOrder } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { type Transaction, type TransactionType, type TransactionStatus, type Project } from '../types';
 import {
@@ -87,8 +87,72 @@ export function TransactionsList() {
     if (filterStatus !== 'semua' && t.status !== filterStatus) return false;
     return true;
   });
-
   const displaySorted = groupAndSortTransactions(filtered, 'desc');
+
+  // Drag & Drop / Reorder State
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  const handleReorderList = async (newList: Transaction[]) => {
+    setTransactions(prev => {
+      const remaining = prev.filter(t => !newList.some(n => n.id === t.id));
+      return [...newList, ...remaining];
+    });
+
+    const orderedIds = newList.map(t => t.id);
+    await saveTransactionCustomOrder(orderedIds);
+    addToast('success', 'Urutan transaksi berhasil diperbarui!');
+    triggerRefresh();
+  };
+
+  const handleMoveUp = async (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    if (index <= 0) return;
+    const newList = [...displaySorted];
+    const temp = newList[index];
+    newList[index] = newList[index - 1];
+    newList[index - 1] = temp;
+    await handleReorderList(newList);
+  };
+
+  const handleMoveDown = async (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    if (index >= displaySorted.length - 1) return;
+    const newList = [...displaySorted];
+    const temp = newList[index];
+    newList[index] = newList[index + 1];
+    newList[index + 1] = temp;
+    await handleReorderList(newList);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragOverIdx !== index) {
+      setDragOverIdx(index);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIdx === null || draggedIdx === targetIndex) {
+      setDraggedIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+
+    const newList = [...displaySorted];
+    const [movedItem] = newList.splice(draggedIdx, 1);
+    newList.splice(targetIndex, 0, movedItem);
+
+    setDraggedIdx(null);
+    setDragOverIdx(null);
+    await handleReorderList(newList);
+  };
 
   if (loading) return <TransactionListSkeleton />;
 
@@ -99,7 +163,7 @@ export function TransactionsList() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Semua Transaksi</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Klik item mana saja untuk melihat detail &amp; mengedit transaksi ({filtered.length} data)
+            Geser (Drag &amp; Drop) atau panah panah untuk mengatur urutan posisi transaksi ({filtered.length} data)
           </p>
         </div>
 
@@ -135,7 +199,7 @@ export function TransactionsList() {
         </div>
       </div>
 
-      {/* Scope Context Explanation Banner */}
+      {/* Scope Banner Info */}
       {scope === 'kas_utama' && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-medium">
           💡 <strong>Mode Kas Utama:</strong> Menampilkan transaksi brankas kantor &amp; kucuran modal ke proyek.
@@ -199,9 +263,9 @@ export function TransactionsList() {
           />
         ) : (
           <>
-            {/* MOBILE CARD VIEW (Directly Clickable) */}
+            {/* MOBILE CARD VIEW WITH DRAG & DROP & UP/DOWN REORDER CONTROLS */}
             <div className="md:hidden space-y-3.5">
-              {displaySorted.map(tx => {
+              {displaySorted.map((tx, idx) => {
                 const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                 const isKas = !tx.proyekId || isSuntikan;
                 const prjName = getProjectName(tx.proyekId);
@@ -209,10 +273,46 @@ export function TransactionsList() {
                 return (
                   <div
                     key={tx.id}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={(e) => handleDrop(e, idx)}
                     onClick={() => setSelectedTx(tx)}
-                    className="p-4 bg-gray-50/90 hover:bg-emerald-50/30 border border-gray-200/80 hover:border-emerald-300 rounded-2xl space-y-2.5 shadow-sm transition-all cursor-pointer active:scale-[0.99]"
+                    className={`p-4 border rounded-2xl space-y-2.5 shadow-sm transition-all cursor-pointer ${
+                      dragOverIdx === idx
+                        ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400'
+                        : 'bg-gray-50/90 hover:bg-emerald-50/30 border-gray-200/80 hover:border-emerald-300'
+                    } ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
                   >
-                    {/* Top Row: Scope Badge, Date & Status */}
+                    {/* Top Drag Control Bar */}
+                    <div className="flex items-center justify-between gap-2 border-b border-gray-200/70 pb-2">
+                      <div className="flex items-center gap-1 text-gray-400 cursor-grab active:cursor-grabbing select-none" title="Geser (Drag) untuk mengubah urutan">
+                        <GripVertical size={16} className="text-gray-400 hover:text-emerald-600" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Urutan #{idx + 1}</span>
+                      </div>
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={(e) => handleMoveUp(e, idx)}
+                          className="p-1 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-gray-600 transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                          title="Pindahkan Ke Atas"
+                        >
+                          <ChevronUp size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === displaySorted.length - 1}
+                          onClick={(e) => handleMoveDown(e, idx)}
+                          className="p-1 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-gray-600 transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
+                          title="Pindahkan Ke Bawah"
+                        >
+                          <ChevronDown size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scope Badge, Date & Status */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {isKas ? (
@@ -264,11 +364,12 @@ export function TransactionsList() {
               })}
             </div>
 
-            {/* DESKTOP TABLE VIEW (Directly Clickable Rows) */}
+            {/* DESKTOP TABLE VIEW WITH DRAG & DROP REORDERING */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                   <tr>
+                    <th className="px-3 py-3 w-16 text-center">Urutan</th>
                     <th className="px-4 py-3">Sumber Kas</th>
                     <th className="px-4 py-3">Tanggal</th>
                     <th className="px-4 py-3">Deskripsi &amp; Kategori</th>
@@ -278,7 +379,7 @@ export function TransactionsList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {displaySorted.map(tx => {
+                  {displaySorted.map((tx, idx) => {
                     const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                     const isKas = !tx.proyekId || isSuntikan;
                     const prjName = getProjectName(tx.proyekId);
@@ -286,9 +387,43 @@ export function TransactionsList() {
                     return (
                       <tr
                         key={tx.id}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDrop={(e) => handleDrop(e, idx)}
                         onClick={() => setSelectedTx(tx)}
-                        className="hover:bg-emerald-50/40 transition-colors cursor-pointer"
+                        className={`hover:bg-emerald-50/40 transition-colors cursor-pointer ${
+                          dragOverIdx === idx ? 'bg-emerald-100/70 border-y-2 border-emerald-500' : ''
+                        } ${draggedIdx === idx ? 'opacity-40' : 'opacity-100'}`}
                       >
+                        {/* Drag & Reorder Column */}
+                        <td className="px-3 py-3 w-16" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 justify-center">
+                            <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-emerald-600 p-1" title="Geser (Drag & Drop) untuk mengatur urutan">
+                              <GripVertical size={16} />
+                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={(e) => handleMoveUp(e, idx)}
+                                className="p-0.5 hover:bg-gray-200 rounded text-gray-500 disabled:opacity-20 transition-colors"
+                                title="Naikkan Urutan"
+                              >
+                                <ChevronUp size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === displaySorted.length - 1}
+                                onClick={(e) => handleMoveDown(e, idx)}
+                                className="p-0.5 hover:bg-gray-200 rounded text-gray-500 disabled:opacity-20 transition-colors"
+                                title="Turunkan Urutan"
+                              >
+                                <ChevronDown size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           {isKas ? (
                             <span className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
