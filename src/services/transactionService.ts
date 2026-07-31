@@ -628,10 +628,10 @@ export function groupAndSortTransactions(
   // 2. Sort parent transactions by urutan (if custom order is defined), then date & created_at
   const sortedParents = [...parentTxs].sort((a, b) => {
     if (a.urutan !== undefined && b.urutan !== undefined && a.urutan !== b.urutan) {
-      return order === 'asc' ? a.urutan - b.urutan : b.urutan - a.urutan;
+      return a.urutan - b.urutan; // urutan 1 is always top position!
     }
-    if (a.urutan !== undefined && b.urutan === undefined) return order === 'asc' ? -1 : 1;
-    if (a.urutan === undefined && b.urutan !== undefined) return order === 'asc' ? 1 : -1;
+    if (a.urutan !== undefined && b.urutan === undefined) return -1;
+    if (a.urutan === undefined && b.urutan !== undefined) return 1;
 
     const timeA = new Date(a.tanggal).getTime();
     const timeB = new Date(b.tanggal).getTime();

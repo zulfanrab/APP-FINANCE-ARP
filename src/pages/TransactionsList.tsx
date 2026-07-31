@@ -94,14 +94,19 @@ export function TransactionsList() {
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const handleReorderList = async (newList: Transaction[]) => {
+    const withUrutan = newList.map((t, idx) => ({
+      ...t,
+      urutan: idx + 1,
+    }));
+
     setTransactions(prev => {
-      const remaining = prev.filter(t => !newList.some(n => n.id === t.id));
-      return [...newList, ...remaining];
+      const remaining = prev.filter(t => !withUrutan.some(n => n.id === t.id));
+      return [...withUrutan, ...remaining];
     });
 
-    const orderedIds = newList.map(t => t.id);
+    const orderedIds = withUrutan.map(t => t.id);
     await saveTransactionCustomOrder(orderedIds);
-    addToast('success', 'Urutan transaksi berhasil diperbarui!');
+    addToast('success', 'Urutan posisi transaksi diperbarui!');
     triggerRefresh();
   };
 
@@ -127,11 +132,13 @@ export function TransactionsList() {
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIdx(index);
+    e.dataTransfer.setData('text/plain', index.toString());
     e.dataTransfer.effectAllowed = 'move';
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     if (dragOverIdx !== index) {
       setDragOverIdx(index);
     }
@@ -139,14 +146,19 @@ export function TransactionsList() {
 
   const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
-    if (draggedIdx === null || draggedIdx === targetIndex) {
+    e.stopPropagation();
+
+    const dataIndexStr = e.dataTransfer.getData('text/plain');
+    const sourceIndex = draggedIdx !== null ? draggedIdx : (dataIndexStr ? parseInt(dataIndexStr, 10) : null);
+
+    if (sourceIndex === null || isNaN(sourceIndex) || sourceIndex === targetIndex) {
       setDraggedIdx(null);
       setDragOverIdx(null);
       return;
     }
 
     const newList = [...displaySorted];
-    const [movedItem] = newList.splice(draggedIdx, 1);
+    const [movedItem] = newList.splice(sourceIndex, 1);
     newList.splice(targetIndex, 0, movedItem);
 
     setDraggedIdx(null);
