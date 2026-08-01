@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { getTransactions, filterTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
+import { classifyTransaction } from '../services/financialEngine';
 import {
   type Transaction, type FilterOptions, type DashboardSummary
 } from '../types';
@@ -260,8 +261,8 @@ export function AdminDashboard() {
               {/* Mobile Card List View (Clickable) */}
               <div className="md:hidden space-y-3 p-3">
                 {filtered.map(tx => {
-                  const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
-                  const isKas = !tx.proyekId || isSuntikan;
+                  const classification = classifyTransaction(tx);
+                  const isKas = !tx.proyekId || classification.isKasUtamaTransaction || classification.isMutasiInternal;
 
                   return (
                     <div
@@ -322,8 +323,8 @@ export function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filtered.map(tx => {
-                      const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
-                      const isKas = !tx.proyekId || isSuntikan;
+                      const classification = classifyTransaction(tx);
+                      const isKas = !tx.proyekId || classification.isKasUtamaTransaction || classification.isMutasiInternal;
 
                       return (
                         <tr
