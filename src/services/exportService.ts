@@ -18,10 +18,11 @@ interface ExportJournalOptions {
   transactions: Transaction[];
   projects?: Project[];
   fileName?: string;
+  isConsolidated?: boolean;
 }
 
 /**
- * Export a formal Corporate Accounting Journal Excel Workbook for Kas Utama
+ * Export a formal Corporate Accounting Journal Excel Workbook
  */
 export function exportAccountingJournalExcel({
   title,
@@ -30,13 +31,16 @@ export function exportAccountingJournalExcel({
   transactions,
   projects = [],
   fileName,
+  isConsolidated = true,
 }: ExportJournalOptions) {
   const wb = XLSX.utils.book_new();
 
-  // Filter approved Kas Utama transactions
-  const mainTx = transactions.filter(
-    t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || isMutasiInternal(t))
-  );
+  // Filter approved transactions (Consolidated 100% vs Kas Utama Only)
+  const mainTx = isConsolidated
+    ? transactions.filter(t => t.status === 'disetujui' || t.status === 'selesai')
+    : transactions.filter(
+        t => (t.status === 'disetujui' || t.status === 'selesai') && (!t.proyekId || isMutasiInternal(t))
+      );
 
   const sorted = groupAndSortTransactions(mainTx, 'asc');
 
@@ -67,18 +71,23 @@ export function exportAccountingJournalExcel({
   ];
 
   sorted.forEach((t, idx) => {
-    const classification = classifyTransaction(t);
     let debet = 0;
     let kredit = 0;
 
-    if (!t.proyekId) {
+    if (isConsolidated) {
       if (t.jenis === 'masuk') debet = t.nominal;
       else kredit = t.nominal;
     } else {
-      if (classification.isCapitalInjectionToProject) {
-        kredit = t.nominal; // Money transferred from Kas Utama to Kas Proyek
-      } else if (classification.isRefundToKasUtama) {
-        debet = t.nominal; // Money returned from Kas Proyek to Kas Utama
+      const classification = classifyTransaction(t);
+      if (!t.proyekId) {
+        if (t.jenis === 'masuk') debet = t.nominal;
+        else kredit = t.nominal;
+      } else {
+        if (classification.isCapitalInjectionToProject) {
+          kredit = t.nominal; // Money transferred from Kas Utama to Kas Proyek
+        } else if (classification.isRefundToKasUtama) {
+          debet = t.nominal; // Money returned from Kas Proyek to Kas Utama
+        }
       }
     }
 
@@ -140,7 +149,7 @@ export function exportAccountingJournalExcel({
   // Build Sheet 2: RINGKASAN EXECUTIVE
   const summaryRows: any[][] = [
     [companyName],
-    ['RINGKASAN EKSEKUTIF KEUANGAN KAS UTAMA'],
+    [isConsolidated ? 'RINGKASAN EKSEKUTIF KEUANGAN KONSOLIDASI' : 'RINGKASAN EKSEKUTIF KEUANGAN KAS UTAMA'],
     [`PERIODE: ${periodText}`],
     [],
     ['KOMPONEN KEUANGAN', 'NOMINAL (RP)', 'KETERANGAN'],
@@ -156,7 +165,7 @@ export function exportAccountingJournalExcel({
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Eksekutif');
 
   // Generate File
-  const defaultFileName = fileName || `Jurnal_Akuntansi_ARKA_${new Date().toISOString().split('T')[0]}.xlsx`;
+  const defaultFileName = fileName || `${isConsolidated ? 'Jurnal_Akuntansi_Konsolidasi_ARKA' : 'Jurnal_Akuntansi_KasUtama_ARKA'}_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(wb, defaultFileName);
 }
 

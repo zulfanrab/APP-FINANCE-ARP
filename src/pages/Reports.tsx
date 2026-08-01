@@ -229,13 +229,14 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
     const periodText = `${formatDate(from.toISOString())} - ${formatDate(to.toISOString())}`;
 
     exportAccountingJournalExcel({
-      title: 'Laporan Keuangan & Jurnal Akuntansi Kas Utama',
+      title: 'Laporan Keuangan & Jurnal Akuntansi Konsolidasi',
       periodText,
       transactions: allTransactions,
       projects,
+      isConsolidated: true,
     });
 
-    addToast('success', 'Jurnal Akuntansi Excel (Debet/Kredit/Saldo) berhasil didownload!');
+    addToast('success', 'Jurnal Akuntansi Excel Konsolidasi (74 Transaksi Lengkap) berhasil didownload!');
   };
 
   if (loading) return <LoadingSpinner size={32} />;
