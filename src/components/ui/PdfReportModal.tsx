@@ -5,7 +5,7 @@
 // Universal Hidden-Iframe Printing for 100% Mobile HP & Desktop Compatibility
 // ============================================================
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Printer, FileText } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Modal } from './Modal';
@@ -49,6 +49,7 @@ export function PdfReportModal({
   project,
 }: PdfReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama'>('konsolidasi');
 
   if (!isOpen) return null;
 
@@ -58,7 +59,7 @@ export function PdfReportModal({
   const companyEmail = 'aksara.riksa.perdana@gmail.com';
   const companyWebsite = 'aksarariksapjk3.com';
 
-  // Dynamic Terminology Check: Internal Office/Operational Pos vs External Project
+  // Dynamic Terminology Check: Internal Office/Operational Pos vs External Project vs General Consolidation
   const isInternal = Boolean(
     project && (
       project.tipe === 'operasional_kantor' ||
@@ -69,13 +70,19 @@ export function PdfReportModal({
     )
   );
 
-  const displayTitle = isInternal
-    ? 'LAPORAN REALISASI & PERTANGGUNGJAWABAN KAS OPERASIONAL'
-    : title;
+  let displayTitle = title;
+  let displaySubtitle = subtitle;
 
-  const displaySubtitle = isInternal
-    ? (subtitle.includes('Dokumen Keuangan Resmi') ? 'Dokumen Pertanggungjawaban Kas Operasional Internal' : subtitle)
-    : subtitle;
+  if (isInternal) {
+    displayTitle = 'LAPORAN REALISASI & PERTANGGUNGJAWABAN KAS OPERASIONAL';
+    displaySubtitle = subtitle.includes('Dokumen Keuangan Resmi') ? 'Dokumen Pertanggungjawaban Kas Operasional Internal' : subtitle;
+  } else if (!project && reportScope === 'konsolidasi') {
+    displayTitle = 'LAPORAN KEUANGAN KONSOLIDASI & AKUNTANSI PUSAT';
+    displaySubtitle = 'Dokumen Keuangan Resmi Konsolidasi Seluruh Mutasi Kas Utama & Proyek (Lengkap 100% Transaksi)';
+  } else if (!project && reportScope === 'kas_utama') {
+    displayTitle = 'LAPORAN KEUANGAN & JURNAL KAS UTAMA';
+    displaySubtitle = 'Dokumen Keuangan Resmi Mutasi Induk Kas Utama (Non-Proyek)';
+  }
 
   // Filter approved transactions
   const approvedTx = transactions.filter(t => t.status === 'disetujui' || t.status === 'selesai');
@@ -183,36 +190,43 @@ export function PdfReportModal({
     sisaDana = currentBalance;
   } else {
     // ============================================================
-    // KAS UTAMA JOURNAL MATH
+    // GENERAL REPORT MATH (MODE A: KONSOLIDASI 100% vs MODE B: KAS UTAMA ONLY)
     // ============================================================
-    const mainTx = approvedTx.filter(
-      t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
-    );
+    const mainTx = reportScope === 'konsolidasi'
+      ? approvedTx
+      : approvedTx.filter(
+          t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
+        );
 
     const sortedMain = groupAndSortTransactions(mainTx, 'asc');
 
     let currentBalance = 0;
 
     sortedMain.forEach((t, idx) => {
-      const classification = classifyTransaction(t);
       let debet = 0;
       let kredit = 0;
 
-      if (!t.proyekId) {
+      if (reportScope === 'konsolidasi') {
         if (t.jenis === 'masuk') debet = t.nominal;
         else kredit = t.nominal;
       } else {
-        if (classification.isCapitalInjectionToProject) {
-          kredit = t.nominal; // Money out of Kas Utama
-        } else if (classification.isRefundToKasUtama) {
-          debet = t.nominal; // Money in to Kas Utama
+        const classification = classifyTransaction(t);
+        if (!t.proyekId) {
+          if (t.jenis === 'masuk') debet = t.nominal;
+          else kredit = t.nominal;
+        } else {
+          if (classification.isCapitalInjectionToProject) {
+            kredit = t.nominal; // Money out of Kas Utama
+          } else if (classification.isRefundToKasUtama) {
+            debet = t.nominal; // Money in to Kas Utama
+          }
         }
       }
 
       currentBalance += debet - kredit;
       totalDebet += debet;
       totalKredit += kredit;
-      if (!classification.isMutasiInternal && kredit > 0) {
+      if (!isMutasiInternal(t) && kredit > 0) {
         totalPengeluaranRiil += kredit;
       }
 
@@ -257,7 +271,10 @@ export function PdfReportModal({
       // Find all transactions with attachments or receipts based on report context
       const reportTxs = project 
         ? groupAndSortTransactions(approvedTx.filter(t => t.proyekId === project?.id), 'asc') 
-        : groupAndSortTransactions(approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'), 'asc');
+        : (reportScope === 'konsolidasi'
+            ? groupAndSortTransactions(approvedTx, 'asc')
+            : groupAndSortTransactions(approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'), 'asc')
+          );
 
       const itemsToPrint: Array<{
         type: 'image' | 'pdf';
@@ -711,7 +728,17 @@ export function PdfReportModal({
             <FileText size={16} className="text-emerald-600 flex-shrink-0" />
             <span>Format PDF KOP Resmi (Siap Cetak / Save PDF di HP &amp; PC)</span>
           </div>
-          <div className="flex w-full sm:w-auto gap-2">
+          <div className="flex w-full sm:w-auto gap-2 flex-wrap items-center">
+            {!project && (
+              <select
+                value={reportScope}
+                onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
+                className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
+                <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
+              </select>
+            )}
             <button
               onClick={() => handlePrint(false)}
               className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
