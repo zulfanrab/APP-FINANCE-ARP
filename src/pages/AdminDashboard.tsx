@@ -174,7 +174,7 @@ export function AdminDashboard() {
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
           <SummaryCard label="Total Kas Perusahaan" value={formatRupiah(summary.sisaKasTotal)} icon={<Wallet size={20} className="text-white" />} color="gradient-primary" sub={`Utama: ${formatRupiah(summary.sisaKasUtama)} · Proyek: ${formatRupiah(summary.totalKasProyek)}`} />
-          <SummaryCard label="Pemasukan Bulan Ini" value={formatRupiah(summary.totalPemasukanBulanIni)} icon={<TrendingUp size={20} className="text-white" />} color="bg-blue-500" />
+          <SummaryCard label="Pemasukan Bulan Ini" value={formatRupiah(summary.totalPemasukanBulanIni)} icon={<TrendingUp size={20} className="text-white" />} color="bg-blue-500" sub={`Drop Dana: ${formatRupiah(summary.totalDropDanaBulanIni || 0)} | Omzet: ${formatRupiah(summary.totalOmzetBulanIni || 0)}`} />
           <SummaryCard label="Pengeluaran Ops" value={formatRupiah(summary.totalPengeluaranOperasionalBulanIni)} icon={<TrendingDown size={20} className="text-white" />} color="bg-amber-500" sub="Bulan ini" />
           <SummaryCard label="Pribadi Owner" value={formatRupiah(summary.totalPribadiOwnerBulanIni)} icon={<User size={20} className="text-white" />} color="bg-purple-500" sub="Bulan ini" />
           <SummaryCard label="Proyek Aktif" value={String(summary.proyekAktif)} icon={<FolderOpen size={20} className="text-white" />} color="bg-teal-500" />

@@ -470,6 +470,7 @@ export function OwnerDashboard() {
             value={formatRupiah(summary.totalPemasukanBulanIni)}
             icon={<TrendingUp size={22} className="text-white" />}
             color="bg-blue-500"
+            sub={`Drop Dana: ${formatRupiah(summary.totalDropDanaBulanIni || 0)} | Omzet: ${formatRupiah(summary.totalOmzetBulanIni || 0)}`}
           />
           <SummaryCard
             label="Pengeluaran Operasional"

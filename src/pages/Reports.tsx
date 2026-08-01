@@ -15,7 +15,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import {
-  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation, isMutasiInternal
+  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation, isMutasiInternal, isOmzetKlien
 } from '../services/analyticsService';
 import { exportAccountingJournalExcel } from '../services/exportService';
 import { type Transaction, type Project } from '../types';
@@ -123,10 +123,10 @@ export function Reports() {
     for (const t of periodTx) {
       if (t.jenis === 'masuk') {
         totalMasuk += t.nominal;
-        if (isMutasiInternal(t)) {
-          dropDanaOwner += t.nominal;
-        } else {
+        if (isOmzetKlien(t)) {
           omzetKlien += t.nominal;
+        } else {
+          dropDanaOwner += t.nominal;
         }
       } else {
         if (!isMutasiInternal(t)) {
@@ -146,6 +146,10 @@ export function Reports() {
       }
     }
 
+    // Formula Laba Bersih (P&L) = Omzet Klien - Total Pengeluaran Operasional
+    // (DILARANG Memasukkan Drop Dana / Modal Injection ke dalam P&L!)
+    const netPnL = omzetKlien - totalKeluar;
+
     setCategoryData(cats);
     setCashflowData(cashflow);
     setSummary({
@@ -158,7 +162,7 @@ export function Reports() {
       adminDivisiBiaya,
       itDivisiBiaya,
       ahliDivisiBiaya,
-      net: totalMasuk - totalKeluar,
+      net: netPnL,
       count: periodTx.length,
     });
     setAiResult('');
@@ -310,10 +314,10 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Pemasukan / Drop Dana</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan</p>
             <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(summary.totalMasuk)}</p>
-            <p className="text-[11px] text-gray-500 font-medium mt-1">
-              Kas Utama: {formatRupiah(summary.dropDanaOwner)} | Omzet: {formatRupiah(summary.omzetKlien)}
+            <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">
+              Drop Dana / Modal: <strong className="text-amber-700">{formatRupiah(summary.dropDanaOwner)}</strong> | Omzet Klien: <strong className="text-emerald-700">{formatRupiah(summary.omzetKlien)}</strong>
             </p>
           </Card>
 
@@ -324,11 +328,11 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
           </Card>
 
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Saldo Periode (Net)</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Laba Bersih P&amp;L (Net)</p>
             <p className={`text-2xl font-extrabold ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {summary.net >= 0 ? '+' : ''}{formatRupiah(summary.net)}
             </p>
-            <p className="text-[11px] text-gray-400 mt-1">Net Cashflow Periode</p>
+            <p className="text-[11px] text-gray-400 mt-1">Omzet Klien - Total Pengeluaran</p>
           </Card>
 
           <Card className="!p-4 bg-slate-900 text-white shadow-card">

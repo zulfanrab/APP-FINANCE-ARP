@@ -45,6 +45,58 @@ export function isRefundToKasUtama(t: Transaction): boolean {
   return classifyTransaction(t).isRefundToKasUtama;
 }
 
+/**
+ * Klasifikasi Pemasukan 1: Omzet Klien (Omzet Riil P&L)
+ * HANYA transaksi Pemasukan ber-kategori:
+ * - Pembayaran Klien / Proyek
+ * - DP / Termijn Proyek
+ * - Pelunasan Proyek
+ * - PENDAPATAN / OMZET KLIEN (Laba-Rugi P&L)
+ * - Atau keyword pembayaran, termijn, termin, pelunasan, klien, invoice, omzet, pendapatan
+ */
+export function isOmzetKlien(t: Transaction): boolean {
+  if (t.jenis !== 'masuk') return false;
+  if (!isApproved(t)) return false;
+
+  const classification = classifyTransaction(t);
+  if (classification.isMutasiInternal || classification.isExternalCapital || classification.isCapitalInjectionToProject || classification.isRefundToKasUtama || classification.isVendorRefund) {
+    return false;
+  }
+
+  const k = (t.kategori || '').toLowerCase().trim();
+
+  if (
+    k.includes('drop dana') ||
+    k.includes('alokasi modal') ||
+    k.includes('suntikan modal') ||
+    k.includes('setoran modal') ||
+    k.includes('modal awal') ||
+    k.includes('saldo awal') ||
+    k.includes('refund') ||
+    k.includes('prive') ||
+    k.includes('modal & drop dana')
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Klasifikasi Pemasukan 2: Drop Dana / Modal Injection
+ * Transaksi Pemasukan ber-kategori:
+ * - Drop Dana Kas Utama / Holding
+ * - Alokasi Modal Operasional Proyek
+ * - Setoran Modal Owner / Direksi
+ * - MODAL & DROP DANA (Menambah Kas)
+ * - Saldo Awal / Refund / Suntikan Modal
+ */
+export function isDropDanaModal(t: Transaction): boolean {
+  if (t.jenis !== 'masuk') return false;
+  if (!isApproved(t)) return false;
+  return !isOmzetKlien(t);
+}
+
 // ---- Dashboard Summary (COMBINED COMPANY CASH & REAL P&L) ----
 export function getDashboardSummary(
   transactions: Transaction[],
@@ -57,7 +109,9 @@ export function getDashboardSummary(
 
   const ledger = calculateCompanyLedger(transactions, projects);
 
-  let pemasukanBulanIni = 0;
+  let totalPemasukanBulanIni = 0;
+  let totalOmzetBulanIni = 0;
+  let totalDropDanaBulanIni = 0;
   let pengeluaranOperasionalBulanIni = 0;
   let pribadiOwnerBulanIni = 0;
 
@@ -65,34 +119,45 @@ export function getDashboardSummary(
     if (!isApproved(t)) continue;
     const classification = classifyTransaction(t);
 
-    // P&L Real Omzet & Expenses in current month (Excluding Internal Transfers)
     if (isInMonth(t.tanggal, year, month)) {
-      if (!classification.isMutasiInternal) {
-        if (t.jenis === 'masuk') {
-          pemasukanBulanIni += t.nominal;
+      if (t.jenis === 'masuk') {
+        totalPemasukanBulanIni += t.nominal;
+        if (isOmzetKlien(t)) {
+          totalOmzetBulanIni += t.nominal;
         } else {
+          totalDropDanaBulanIni += t.nominal;
+        }
+      } else {
+        if (!classification.isMutasiInternal) {
           if (t.tag === 'operasional') pengeluaranOperasionalBulanIni += t.nominal;
           if (t.tag === 'pribadi') pribadiOwnerBulanIni += t.nominal;
+        } else if (t.tag === 'pribadi') {
+          pribadiOwnerBulanIni += t.nominal;
         }
-      } else if (t.tag === 'pribadi' && t.jenis === 'keluar') {
-        pribadiOwnerBulanIni += t.nominal;
       }
     }
   }
+
+  // Formula Laba Bersih (P&L) = totalOmzetBulanIni - pengeluaranOperasionalBulanIni
+  // (Sangat Penting: DILARANG memasukkan totalDropDana ke dalam rumus Laba Bersih P&L!)
+  const labaBersihBulanIni = totalOmzetBulanIni - pengeluaranOperasionalBulanIni;
 
   return {
     sisaKasTotal: ledger.sisaKasTotal,
     sisaKasUtama: ledger.sisaKasUtama,
     totalKasProyek: ledger.totalKasProyek,
     sisaKas: ledger.sisaKasTotal, // legacy compatibility
-    totalPemasukanBulanIni: pemasukanBulanIni,
+    totalPemasukanBulanIni,
+    totalOmzetBulanIni,
+    totalDropDanaBulanIni,
     totalPengeluaranOperasionalBulanIni: pengeluaranOperasionalBulanIni,
     totalPribadiOwnerBulanIni: pribadiOwnerBulanIni,
+    labaBersihBulanIni,
     proyekAktif: proyekAktifCount,
   };
 }
 
-// ---- Monthly Chart (last N months) — REAL P&L ONLY ----
+// ---- Monthly Chart (last N months) — REAL P&L OMZET VS EXPENSES ----
 export function getMonthlyChartData(
   transactions: Transaction[],
   months: number = 6
@@ -112,11 +177,17 @@ export function getMonthlyChartData(
 
     for (const t of transactions) {
       if (!isApproved(t)) continue;
-      if (isMutasiInternal(t)) continue; // Exclude internal transfers from P&L chart
       if (!isInMonth(t.tanggal, year, month)) continue;
 
-      if (t.jenis === 'masuk') pemasukan += t.nominal;
-      else pengeluaran += t.nominal;
+      if (t.jenis === 'masuk') {
+        if (isOmzetKlien(t)) {
+          pemasukan += t.nominal;
+        }
+      } else {
+        if (!isMutasiInternal(t)) {
+          pengeluaran += t.nominal;
+        }
+      }
     }
 
     result.push({ bulan: monthLabel, pemasukan, pengeluaran });

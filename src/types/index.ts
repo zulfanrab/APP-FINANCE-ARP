@@ -79,9 +79,12 @@ export interface DashboardSummary {
   sisaKasUtama: number; // Kas Utama Perusahaan
   totalKasProyek: number; // Total Kas di Seluruh Proyek
   sisaKas?: number; // Legacy compatibility
-  totalPemasukanBulanIni: number; // Omzet Riil (Non-Mutasi)
+  totalPemasukanBulanIni: number; // Total Pemasukan bulan ini (Omzet + Drop Dana)
+  totalOmzetBulanIni: number; // Total Omzet Klien murni
+  totalDropDanaBulanIni: number; // Total Drop Dana / Modal Injection
   totalPengeluaranOperasionalBulanIni: number; // Beban Operasional Riil
   totalPribadiOwnerBulanIni: number; // Prive Owner
+  labaBersihBulanIni: number; // Formula: totalOmzetBulanIni - totalPengeluaranOperasionalBulanIni
   proyekAktif: number;
 }
 
