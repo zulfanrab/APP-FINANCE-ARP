@@ -77,16 +77,16 @@ export function TransactionForm() {
   // Approval Flow Switch
   const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
 
+  const { projects: cachedProjects, transactions: cachedTransactions, addToast, triggerRefresh } = useApp();
+
   useEffect(() => {
-    Promise.all([getProjects(), getTransactions()]).then(([projs, txs]) => {
-      setProjects(projs);
-      setHistoricalRecipients(extractHistoricalRecipients(txs));
-      if (urlProyekId) {
-        setForm(f => ({ ...f, proyekId: urlProyekId }));
-        setAutoApprove(true);
-      }
-    });
-  }, [urlProyekId]);
+    setProjects(cachedProjects);
+    setHistoricalRecipients(extractHistoricalRecipients(cachedTransactions));
+    if (urlProyekId) {
+      setForm(f => ({ ...f, proyekId: urlProyekId }));
+      setAutoApprove(true);
+    }
+  }, [urlProyekId, cachedProjects, cachedTransactions]);
 
   useEffect(() => {
     if (form.proyekId) {

@@ -102,7 +102,7 @@ function mapRowToTransaction(row: any): Transaction {
     catatanPenolakan: row.catatan_penolakan ?? undefined,
     penerimaDetail: row.penerima_detail ?? undefined,
     jalurTransfer: row.jalur_transfer ?? undefined,
-    rekeningId: row.rekening_id ?? (row.jenis === 'masuk' ? 'bca_utama' : 'kas_admin'),
+    rekeningId: row.rekening_id ?? (row.jenis === 'masuk' ? 'bca_utama' : (row.proyek_id ? 'kas_admin' : 'bca_utama')),
     rekeningTujuanId: row.rekening_tujuan_id ?? undefined,
     adminNominalCustom: row.admin_nominal_custom ? Number(row.admin_nominal_custom) : undefined,
     parentTransactionId: row.parent_transaction_id ?? undefined,

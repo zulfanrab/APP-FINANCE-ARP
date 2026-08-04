@@ -18,11 +18,7 @@ import { useApp } from '../context/AppContext';
 
 export function TransactionsList() {
   const { role } = useAuth();
-  const { addToast, refreshKey, triggerRefresh } = useApp();
-
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { transactions: rawTransactions, projects, loading: globalLoading, addToast, triggerRefresh } = useApp();
 
   // Selected Transaction for Detail/Edit Modal
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -34,27 +30,9 @@ export function TransactionsList() {
   const [filterKategori, setFilterKategori] = useState('semua');
   const [filterStatus, setFilterStatus] = useState<TransactionStatus | 'semua'>('semua');
 
-  useEffect(() => {
-    loadTransactions();
-  }, [refreshKey]);
-
-  const isFirstLoadRef = useRef(true);
-
-  const loadTransactions = async () => {
-    if (isFirstLoadRef.current) {
-      setLoading(true);
-    }
-    try {
-      const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
-      setTransactions(txs);
-      setProjects(projs);
-    } finally {
-      if (isFirstLoadRef.current) {
-        setLoading(false);
-        isFirstLoadRef.current = false;
-      }
-    }
-  };
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const pageSize = 30;
 
   const getProjectName = (proyekId?: string): string => {
     if (!proyekId) return '';
@@ -62,32 +40,50 @@ export function TransactionsList() {
     return p ? p.nama : 'Proyek';
   };
 
-  const categories = Array.from(new Set(transactions.map(t => t.kategori)));
+  const categories = React.useMemo(() => {
+    return Array.from(new Set(rawTransactions.map(t => t.kategori)));
+  }, [rawTransactions]);
 
-  const filtered = transactions.filter(t => {
-    const isSuntikan =
-      t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
-      t.kategori === 'Suntikan Modal Proyek' ||
-      t.kategori === 'Mutasi Internal / Transfer Kas' ||
-      t.kategori === 'Refund Dana Proyek ke Kas Utama';
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [scope, search, filterJenis, filterKategori, filterStatus]);
 
-    if (scope === 'kas_utama' && t.proyekId && !isSuntikan) return false;
-    if (scope === 'proyek' && !t.proyekId) return false;
+  const filtered = React.useMemo(() => {
+    return rawTransactions.filter(t => {
+      const isSuntikan =
+        t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
+        t.kategori === 'Suntikan Modal Proyek' ||
+        t.kategori === 'Mutasi Internal / Transfer Kas' ||
+        t.kategori === 'Refund Dana Proyek ke Kas Utama';
 
-    if (search) {
-      const q = search.toLowerCase();
-      const matchDesc = t.deskripsi.toLowerCase().includes(q);
-      const matchKat = t.kategori.toLowerCase().includes(q);
-      const matchNom = t.nominal.toString().includes(q);
-      const matchPrj = getProjectName(t.proyekId).toLowerCase().includes(q);
-      if (!matchDesc && !matchKat && !matchNom && !matchPrj) return false;
-    }
-    if (filterJenis !== 'semua' && t.jenis !== filterJenis) return false;
-    if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
-    if (filterStatus !== 'semua' && t.status !== filterStatus) return false;
-    return true;
-  });
-  const displaySorted = groupAndSortTransactions(filtered, 'desc');
+      if (scope === 'kas_utama' && t.proyekId && !isSuntikan) return false;
+      if (scope === 'proyek' && !t.proyekId) return false;
+
+      if (search) {
+        const q = search.toLowerCase();
+        const matchDesc = t.deskripsi.toLowerCase().includes(q);
+        const matchKat = t.kategori.toLowerCase().includes(q);
+        const matchNom = t.nominal.toString().includes(q);
+        const matchPrj = getProjectName(t.proyekId).toLowerCase().includes(q);
+        if (!matchDesc && !matchKat && !matchNom && !matchPrj) return false;
+      }
+      if (filterJenis !== 'semua' && t.jenis !== filterJenis) return false;
+      if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
+      if (filterStatus !== 'semua' && t.status !== filterStatus) return false;
+      return true;
+    });
+  }, [rawTransactions, scope, search, filterJenis, filterKategori, filterStatus, projects]);
+
+  const displaySorted = React.useMemo(() => {
+    return groupAndSortTransactions(filtered, 'desc');
+  }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(displaySorted.length / pageSize));
+  const paginatedSorted = React.useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return displaySorted.slice(start, start + pageSize);
+  }, [displaySorted, page, pageSize]);
 
   // Drag & Drop / Reorder State
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -166,7 +162,7 @@ export function TransactionsList() {
     await handleReorderList(newList);
   };
 
-  if (loading) return <TransactionListSkeleton />;
+  if (globalLoading) return <TransactionListSkeleton />;
 
   return (
     <div className="space-y-6 animate-fade-in pb-16">
@@ -277,7 +273,7 @@ export function TransactionsList() {
           <>
             {/* MOBILE CARD VIEW WITH DRAG & DROP & UP/DOWN REORDER CONTROLS */}
             <div className="md:hidden space-y-3.5">
-              {displaySorted.map((tx, idx) => {
+              {paginatedSorted.map((tx, idx) => {
                 const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                 const isKas = !tx.proyekId || isSuntikan;
                 const prjName = getProjectName(tx.proyekId);
@@ -391,7 +387,7 @@ export function TransactionsList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {displaySorted.map((tx, idx) => {
+                  {paginatedSorted.map((tx, idx) => {
                     const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
                     const isKas = !tx.proyekId || isSuntikan;
                     const prjName = getProjectName(tx.proyekId);
@@ -474,6 +470,36 @@ export function TransactionsList() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-100 text-xs font-semibold text-gray-600">
+                <p>
+                  Menampilkan {((page - 1) * pageSize) + 1} - {Math.min(page * pageSize, displaySorted.length)} dari {displaySorted.length} transaksi
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    Sebelumnya
+                  </Button>
+                  <span className="px-3 py-1 bg-gray-100 rounded-lg text-gray-800 font-bold">
+                    Halaman {page} dari {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    Selanjutnya
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </Card>
@@ -484,7 +510,7 @@ export function TransactionsList() {
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         onUpdate={(updated) => {
-          loadTransactions();
+          triggerRefresh();
           if (updated) setSelectedTx(updated);
         }}
       />

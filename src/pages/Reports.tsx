@@ -39,20 +39,12 @@ const RUPIAH_TOOLTIP = ({ active, payload }: any) => {
 };
 
 export function Reports() {
-  const { addToast } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { transactions: allTransactions, projects, loading: globalLoading, addToast } = useApp();
 
   // Period
   const [period, setPeriod] = useState<PeriodType>('bulan_ini');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-
-  // Computed data
-  const [categoryData, setCategoryData] = useState<any[]>([]);
-  const [cashflowData, setCashflowData] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
 
   // AI & PDF
   const [aiLoading, setAiLoading] = useState(false);
@@ -84,25 +76,9 @@ export function Reports() {
     };
   }, [period, customFrom, customTo]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [txns, projs] = await Promise.all([getTransactions(), getProjects()]);
-      setAllTransactions(txns);
-      setProjects(projs);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  useEffect(() => {
-    if (allTransactions.length === 0 && !loading) {
-      setCategoryData([]);
-      setCashflowData([]);
-      setSummary(null);
-      return;
+  const { categoryData, cashflowData, summary } = React.useMemo(() => {
+    if (allTransactions.length === 0) {
+      return { categoryData: [], cashflowData: [], summary: null };
     }
 
     const { from, to } = getPeriodDates();
@@ -138,18 +114,6 @@ export function Reports() {
         const proj = projects.find(p => p.id === t.proyekId);
         const isKasUtamaOrOps = !t.proyekId || proj?.tipe === 'operasional_kantor';
         
-        if (isKasUtamaOrOps && t.divisi) {
-          if (t.divisi === 'admin') adminDivisiBiaya += t.nominal;
-          else if (t.divisi === 'it') itDivisiBiaya += t.nominal;
-          else if (t.divisi === 'ahli') ahliDivisiBiaya += t.nominal;
-        }
-      }
-    }
-
-    // Formula Laba Bersih (P&L) = Omzet Klien - Total Pengeluaran Operasional
-    // (DILARANG Memasukkan Drop Dana / Modal Injection ke dalam P&L!)
-    const netPnL = omzetKlien - totalKeluar;
-
     setCategoryData(cats);
     setCashflowData(cashflow);
     setSummary({
@@ -239,7 +203,7 @@ ${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokas
     addToast('success', 'Jurnal Akuntansi Excel Konsolidasi (74 Transaksi Lengkap) berhasil didownload!');
   };
 
-  if (loading) return <LoadingSpinner size={32} />;
+  if (globalLoading) return <LoadingSpinner size={32} />;
 
   const { from, to } = getPeriodDates();
   const periodTextStr = `${formatDate(from.toISOString())} - ${formatDate(to.toISOString())}`;

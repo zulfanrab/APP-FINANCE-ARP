@@ -129,11 +129,16 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  const { addToast, refreshKey } = useApp();
+  const { transactions: allTransactions, projects: allProjects, loading: globalLoading, addToast, triggerRefresh } = useApp();
 
-  const [loading, setLoading] = useState(true);
-  const [project, setProject] = useState<Project | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const project = React.useMemo(() => {
+    return allProjects.find(p => p.id === id) || null;
+  }, [allProjects, id]);
+
+  const transactions = React.useMemo(() => {
+    return allTransactions.filter(t => t.proyekId === id);
+  }, [allTransactions, id]);
+
   const [filterType, setFilterType] = useState<'semua' | 'masuk' | 'keluar'>('semua');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
@@ -142,6 +147,14 @@ export function ProjectDetail() {
   const [editNama, setEditNama] = useState('');
   const [editKlien, setEditKlien] = useState('');
   const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (project) {
+      setEditNama(project.nama);
+      setEditKlien(project.klien);
+      setEditPdfFile(null);
+    }
+  }, [project]);
 
   // Procurement Checklist
   const [newChecklistItem, setNewChecklistItem] = useState('');
@@ -213,40 +226,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     }
   };
 
-  const isFirstLoadRef = useRef(true);
-
-  const loadProjectData = useCallback(async () => {
-    if (!id) return;
-    if (isFirstLoadRef.current) {
-      setLoading(true);
-    }
-    try {
-      const [prj, txs] = await Promise.all([
-        getProjectById(id),
-        getTransactionsByProject(id),
-      ]);
-      setProject(prj);
-      setTransactions(txs);
-      if (prj) {
-        setEditNama(prj.nama);
-        setEditKlien(prj.klien);
-        setEditPdfFile(null);
-      }
-    } catch {
-      addToast('error', 'Gagal memuat data proyek');
-    } finally {
-      if (isFirstLoadRef.current) {
-        setLoading(false);
-        isFirstLoadRef.current = false;
-      }
-    }
-  }, [id, addToast]);
-
-  useEffect(() => {
-    loadProjectData();
-  }, [loadProjectData, refreshKey]);
-
-  if (loading) return <LoadingSpinner size={32} />;
+  if (globalLoading) return <LoadingSpinner size={32} />;
 
   if (!project) {
     return (
@@ -298,7 +278,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       });
       addToast('success', 'Detail proyek berhasil diperbarui');
       setEditModalOpen(false);
-      loadProjectData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal mengupdate proyek');
     }
@@ -324,7 +304,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       setNewChecklistKuantitas('1');
       setNewChecklistSatuan('');
       setNewChecklistHargaRencana('');
-      loadProjectData();
+      triggerRefresh();
       addToast('success', 'Item berhasil ditambahkan');
     } catch {
       addToast('error', 'Gagal menambahkan checklist');
@@ -342,7 +322,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           item.id === itemId ? { ...item, isPurchased: false, hargaAktual: undefined } : item
         );
         await updateProject(project.id, { procurementItems: items });
-        loadProjectData();
+        triggerRefresh();
       } catch {
         addToast('error', 'Gagal memperbarui status checklist');
       }
@@ -359,7 +339,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       await updateProject(project.id, { procurementItems: items });
       setEditingHargaAktual(null);
       setAktualHargaValue('');
-      loadProjectData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal menyimpan harga aktual');
     }
@@ -381,7 +361,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       });
       setImportText('');
       setImportModalOpen(false);
-      loadProjectData();
+      triggerRefresh();
       addToast('success', `${parsedItems.length} item pengadaan berhasil di-import!`);
     } catch {
       addToast('error', 'Gagal memproses import teks');
@@ -395,7 +375,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     try {
       const items = (project.procurementItems || []).filter(item => item.id !== itemId);
       await updateProject(project.id, { procurementItems: items });
-      loadProjectData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal menghapus checklist');
     }
@@ -405,8 +385,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     if (window.confirm(`Yakin ingin menghapus proyek "${project.nama}"?`)) {
       try {
         await deleteProject(project.id);
-        addToast('success', 'Proyek berhasil dihapus');
+        addToast('success', `Proyek "${project.nama}" dihapus`);
         navigate('/proyek');
+        triggerRefresh();
       } catch {
         addToast('error', 'Gagal menghapus proyek');
       }

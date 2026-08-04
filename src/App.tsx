@@ -2,24 +2,26 @@
 // ARKA Finance — Main App Router
 // ============================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { Layout } from './components/layout/Layout';
-import { SetupPin } from './pages/SetupPin';
-import { Login } from './pages/Login';
-import { OwnerDashboard } from './pages/OwnerDashboard';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { TransactionForm } from './pages/TransactionForm';
-import { TransactionsList } from './pages/TransactionsList';
-import { Projects } from './pages/Projects';
-import { ProjectDetail } from './pages/ProjectDetail';
-import { Reports } from './pages/Reports';
 import { hasPin } from './services/authService';
 import { initAutoUpdateEngine } from './services/autoUpdateService';
 import { LoadingSpinner, AutoUpdateBanner } from './components/ui';
 import { ToastContainer } from './components/ui/Toast';
+
+// Lazy loaded page components
+const SetupPin = lazy(() => import('./pages/SetupPin').then(m => ({ default: m.SetupPin })));
+const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then(m => ({ default: m.OwnerDashboard })));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const TransactionForm = lazy(() => import('./pages/TransactionForm').then(m => ({ default: m.TransactionForm })));
+const TransactionsList = lazy(() => import('./pages/TransactionsList').then(m => ({ default: m.TransactionsList })));
+const Projects = lazy(() => import('./pages/Projects').then(m => ({ default: m.Projects })));
+const ProjectDetail = lazy(() => import('./pages/ProjectDetail').then(m => ({ default: m.ProjectDetail })));
+const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
 
 // ---- Protected Route ----
 function ProtectedRoute({
@@ -80,83 +82,89 @@ function AppInner() {
 
   return (
     <>
-    <Routes>
-      {/* Public */}
-      <Route
-        path="/login"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
-      />
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size={32} />
+      </div>
+    }>
+      <Routes>
+        {/* Public */}
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+        />
 
-      {/* Protected */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <DashboardPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/transaksi"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <TransactionsList />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/transaksi/baru"
-        element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <Layout>
-              <TransactionForm />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/proyek"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Projects />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/proyek/:id"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <ProjectDetail />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/laporan"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Reports />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
+        {/* Protected */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DashboardPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transaksi"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TransactionsList />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/transaksi/baru"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Layout>
+                <TransactionForm />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proyek"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Projects />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/proyek/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProjectDetail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/laporan"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
 
-      {/* Fallback */}
-      <Route
-        path="*"
-        element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-        }
-      />
-    </Routes>
+        {/* Fallback */}
+        <Route
+          path="*"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+          }
+        />
+      </Routes>
+    </Suspense>
     <AutoUpdateBanner />
     </>
   );

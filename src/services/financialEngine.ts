@@ -186,7 +186,7 @@ export function calculateCompanyLedger(
       if (t.jenis === 'masuk') {
         accountBalances[t.rekeningId || 'bca_utama'] += t.nominal;
       } else {
-        accountBalances[t.rekeningId || 'kas_admin'] -= t.nominal;
+        accountBalances[t.rekeningId || (t.proyekId ? 'kas_admin' : 'bca_utama')] -= t.nominal;
       }
     }
   }

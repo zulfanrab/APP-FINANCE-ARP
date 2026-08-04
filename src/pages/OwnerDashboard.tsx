@@ -69,13 +69,25 @@ const RUPIAH_TOOLTIP = ({ active, payload, label }: any) => {
 };
 
 export function OwnerDashboard() {
-  const { addToast, refreshKey } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [chartData, setChartData] = useState<MonthlyChartData[]>([]);
-  const [pendingApproval, setPendingApproval] = useState<Transaction[]>([]);
-  const [pendingTransfer, setPendingTransfer] = useState<Transaction[]>([]);
-  const [projectsList, setProjectsList] = useState<Project[]>([]);
+  const { transactions: allTransactions, projects: projectsList, loading: globalLoading, addToast, triggerRefresh } = useApp();
+
+  // Memoized Derived State
+  const summary = React.useMemo(() => {
+    const activePrjCount = projectsList.filter(p => p.status === 'aktif').length;
+    return getDashboardSummary(allTransactions, activePrjCount, projectsList);
+  }, [allTransactions, projectsList]);
+
+  const chartData = React.useMemo(() => {
+    return getMonthlyChartData(allTransactions);
+  }, [allTransactions]);
+
+  const pendingApproval = React.useMemo(() => {
+    return allTransactions.filter(t => t.status === 'menunggu_approval');
+  }, [allTransactions]);
+
+  const pendingTransfer = React.useMemo(() => {
+    return allTransactions.filter(t => t.status === 'disetujui');
+  }, [allTransactions]);
 
   // Reject modal state
   const [rejectModal, setRejectModal] = useState<{ open: boolean; txId: string }>({ open: false, txId: '' });
@@ -104,38 +116,12 @@ export function OwnerDashboard() {
   const [quickAttachments, setQuickAttachments] = useState<Attachment[]>([]);
   const [quickSaving, setQuickSaving] = useState(false);
 
-  const isFirstLoadRef = useRef(true);
-
-  const loadData = useCallback(async () => {
-    if (isFirstLoadRef.current) {
-      setLoading(true);
-    }
-    try {
-      const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
-      setProjectsList(prjs);
-      const activePrjCount = prjs.filter(p => p.status === 'aktif').length;
-      setSummary(getDashboardSummary(txns, activePrjCount, prjs));
-      setChartData(getMonthlyChartData(txns));
-      setPendingApproval(txns.filter(t => t.status === 'menunggu_approval'));
-      setPendingTransfer(txns.filter(t => t.status === 'disetujui'));
-    } catch {
-      addToast('error', 'Gagal memuat data dashboard');
-    } finally {
-      if (isFirstLoadRef.current) {
-        setLoading(false);
-        isFirstLoadRef.current = false;
-      }
-    }
-  }, [addToast]);
-
-  useEffect(() => { loadData(); }, [loadData, refreshKey]);
-
   const handleApprove = async (txId: string) => {
     try {
       await updateTransactionStatus(txId, 'disetujui');
       addToast('success', 'Transaksi disetujui');
       setSelectedApprovalIds(prev => prev.filter(id => id !== txId));
-      loadData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal memproses persetujuan');
     }
@@ -163,7 +149,7 @@ export function OwnerDashboard() {
       await Promise.all(selectedApprovalIds.map(id => updateTransactionStatus(id, 'disetujui')));
       addToast('success', `✨ ${selectedApprovalIds.length} transaksi berhasil disetujui sekaligus!`);
       setSelectedApprovalIds([]);
-      loadData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal memproses persetujuan masal');
     } finally {
@@ -193,7 +179,7 @@ export function OwnerDashboard() {
       await Promise.all(selectedTransferIds.map(id => updateTransactionStatus(id, 'selesai')));
       addToast('success', `✨ ${selectedTransferIds.length} transaksi berhasil ditandai sudah transfer!`);
       setSelectedTransferIds([]);
-      loadData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal memproses status transfer masal');
     } finally {
@@ -208,7 +194,7 @@ export function OwnerDashboard() {
       addToast('success', 'Transaksi ditolak');
       setRejectModal({ open: false, txId: '' });
       setRejectNote('');
-      loadData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal menolak transaksi');
     }
@@ -242,7 +228,7 @@ export function OwnerDashboard() {
       setTransferModal({ open: false, txId: '' });
       setTransferFile(null);
       setTransferFileName('');
-      loadData();
+      triggerRefresh();
     } finally {
       setTransferLoading(false);
     }
@@ -400,7 +386,7 @@ export function OwnerDashboard() {
       setQuickModalOpen(false);
       setQuickForm({ mode: 'prive', nominalStr: '', deskripsi: '', proyekId: '' });
       setQuickAttachments([]);
-      loadData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal mencatat transaksi');
     } finally {
@@ -408,7 +394,7 @@ export function OwnerDashboard() {
     }
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (globalLoading) return <DashboardSkeleton />;
 
   const getDaysPending = (dateStr: string): number => {
     const txDate = new Date(dateStr).getTime();

@@ -37,14 +37,28 @@ function parseRupiahInput(value: string): number {
 
 export function Projects() {
   const navigate = useNavigate();
-  const { addToast, triggerRefresh, refreshKey } = useApp();
-  const [projects, setProjects] = useState<ProjectWithStats[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { transactions: allTransactions, projects: rawProjects, loading: globalLoading, addToast, triggerRefresh } = useApp();
+
+  const projects = React.useMemo(() => {
+    return rawProjects.map(p => {
+      const txns = allTransactions.filter(t => t.proyekId === p.id);
+      const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
+      return { 
+        ...p, 
+        anggaran: financials.modalDisuntikkan,
+        totalPemasukan: financials.pemasukanKlien, 
+        totalPengeluaran: financials.totalPengeluaran, 
+        profit: financials.labaRugiProyek,
+        sisaKas: financials.sisaDanaProyek
+      };
+    });
+  }, [rawProjects, allTransactions]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);  const [tabFilter, setTabFilter] = useState<'semua' | 'proyek_klien' | 'operasional_kantor'>('semua');
+  const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
+  const [tabFilter, setTabFilter] = useState<'semua' | 'proyek_klien' | 'operasional_kantor'>('semua');
 
   // Form
   const [form, setForm] = useState({
@@ -56,39 +70,6 @@ export function Projects() {
     deskripsi: '',
   });
   const [saving, setSaving] = useState(false);
-
-  const isFirstLoadRef = useRef(true);
-
-  const loadProjects = useCallback(async () => {
-    if (isFirstLoadRef.current) {
-      setLoading(true);
-    }
-    try {
-      const raw = await getProjects();
-      const withStats = await Promise.all(
-        raw.map(async p => {
-          const txns = await getTransactionsByProject(p.id);
-          const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
-          return { 
-            ...p, 
-            anggaran: financials.modalDisuntikkan,
-            totalPemasukan: financials.pemasukanKlien, 
-            totalPengeluaran: financials.totalPengeluaran, 
-            profit: financials.labaRugiProyek,
-            sisaKas: financials.sisaDanaProyek
-          };
-        })
-      );
-      setProjects(withStats);
-    } finally {
-      if (isFirstLoadRef.current) {
-        setLoading(false);
-        isFirstLoadRef.current = false;
-      }
-    }
-  }, []);
-
-  useEffect(() => { loadProjects(); }, [loadProjects, refreshKey]);
 
   const openAdd = (defaultTipe: 'proyek_klien' | 'operasional_kantor' = 'proyek_klien') => {
     setEditingProject(null);
@@ -143,7 +124,7 @@ export function Projects() {
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
-        addToast('success', 'Alokasi berhasil diperbarui');
+        addToast('success', 'Proyek berhasil diperbarui!');
       } else {
         await addProject({
           nama: form.nama.trim(),
@@ -154,11 +135,11 @@ export function Projects() {
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
-        addToast('success', 'Alokasi baru berhasil ditambahkan');
+        addToast('success', 'Proyek berhasil ditambahkan!');
       }
       setModalOpen(false);
       triggerRefresh();
-      loadProjects();
+    } catch {
     } finally {
       setSaving(false);
     }
@@ -166,21 +147,23 @@ export function Projects() {
 
   const handleComplete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await completeProject(id);
-    addToast('success', 'Ditandai selesai');
-    loadProjects();
-    triggerRefresh();
+    try {
+      await completeProject(id);
+      addToast('success', 'Proyek ditandai selesai');
+      triggerRefresh();
+    } catch {}
   };
 
   const handleDelete = async (p: Project) => {
-    await deleteProject(p.id);
-    addToast('success', `Alokasi "${p.nama}" dihapus`);
-    setDeleteConfirm(null);
-    loadProjects();
-    triggerRefresh();
+    try {
+      await deleteProject(p.id);
+      addToast('success', 'Proyek berhasil dihapus');
+      setDeleteConfirm(null);
+      triggerRefresh();
+    } catch {}
   };
 
-  if (loading) return <ProjectsSkeleton />;
+  if (globalLoading) return <ProjectsSkeleton />;
 
   const filteredProjects = projects.filter(p => {
     if (tabFilter === 'proyek_klien') return (p.tipe ?? 'proyek_klien') === 'proyek_klien';

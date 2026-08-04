@@ -11,8 +11,10 @@ import React, {
   useRef,
   type ReactNode,
 } from 'react';
-import { type ToastMessage } from '../types';
+import { type ToastMessage, type Transaction, type Project } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
+import { getTransactions } from '../services/transactionService';
+import { getProjects } from '../services/projectService';
 
 interface AppContextType {
   toasts: ToastMessage[];
@@ -21,6 +23,11 @@ interface AppContextType {
   // Refresh trigger — components subscribe to this to know when to refetch
   refreshKey: number;
   triggerRefresh: () => void;
+  // Global Cached State
+  transactions: Transaction[];
+  projects: Project[];
+  loading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -28,7 +35,23 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const refreshData = useCallback(async () => {
+    try {
+      const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
+      setTransactions(txs);
+      setProjects(projs);
+    } catch (err) {
+      console.error('Failed to load global data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const addToast = useCallback((type: ToastMessage['type'], message: string) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -50,8 +73,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     refreshTimerRef.current = setTimeout(() => {
       setRefreshKey(k => k + 1);
+      refreshData();
     }, 250);
-  }, []);
+  }, [refreshData]);
+
+  // Initial load
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   // 1. REALTIME CROSS-DEVICE SYNC WITH SUPABASE REALTIME CHANNEL
   useEffect(() => {
@@ -86,7 +115,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ toasts, addToast, removeToast, refreshKey, triggerRefresh }}
+      value={{
+        toasts,
+        addToast,
+        removeToast,
+        refreshKey,
+        triggerRefresh,
+        transactions,
+        projects,
+        loading,
+        refreshData,
+      }}
     >
       {children}
     </AppContext.Provider>

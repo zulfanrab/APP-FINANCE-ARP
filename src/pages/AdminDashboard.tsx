@@ -43,12 +43,8 @@ function SummaryCard({ label, value, icon, color, sub }: {
 }
 
 export function AdminDashboard() {
-  const { addToast, refreshKey } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
-  const [filtered, setFiltered] = useState<Transaction[]>([]);
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-
+  const { transactions: allTransactions, projects: projectsList, loading: globalLoading, addToast, triggerRefresh } = useApp();
+  
   // Selected Transaction Modal
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
@@ -62,29 +58,11 @@ export function AdminDashboard() {
   const [sortField, setSortField] = useState<SortField>('tanggal');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const [projectsList, setProjectsList] = useState<any[]>([]);
-
-  const isFirstLoadRef = useRef(true);
-
-  const loadData = useCallback(async () => {
-    if (isFirstLoadRef.current) {
-      setLoading(true);
-    }
-    try {
-      const [txns, prjs] = await Promise.all([getTransactions(), getProjects()]);
-      setAllTransactions(txns);
-      setProjectsList(prjs);
-      const activeProjects = prjs.filter(p => p.status === 'aktif').length;
-      setSummary(getDashboardSummary(txns, activeProjects, prjs));
-    } finally {
-      if (isFirstLoadRef.current) {
-        setLoading(false);
-        isFirstLoadRef.current = false;
-      }
-    }
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData, refreshKey]);
+  // Memoized Summary Calculation
+  const summary: DashboardSummary = React.useMemo(() => {
+    const activeProjects = projectsList.filter(p => p.status === 'aktif').length;
+    return getDashboardSummary(allTransactions, activeProjects, projectsList);
+  }, [allTransactions, projectsList]);
 
   const getProjectName = (id?: string) => {
     if (!id) return '';
@@ -92,8 +70,8 @@ export function AdminDashboard() {
     return p ? p.nama : 'Proyek';
   };
 
-  // Apply filters + search
-  useEffect(() => {
+  // Memoized Filtered & Sorted Transactions
+  const filtered = React.useMemo(() => {
     let result = [...allTransactions];
 
     if (filters.jenis && filters.jenis !== 'semua') result = result.filter(t => t.jenis === filters.jenis);
@@ -125,7 +103,7 @@ export function AdminDashboard() {
       });
     }
 
-    setFiltered(result);
+    return result;
   }, [allTransactions, filters, search, dateFrom, dateTo, sortField, sortDir]);
 
   const handleSort = (field: SortField) => {
@@ -159,7 +137,7 @@ export function AdminDashboard() {
     return sortDir === 'asc' ? <ChevronUp size={12} className="text-primary" /> : <ChevronDown size={12} className="text-primary" />;
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (globalLoading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6 animate-fade-in">

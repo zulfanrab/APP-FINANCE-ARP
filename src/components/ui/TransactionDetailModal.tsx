@@ -71,7 +71,7 @@ export function TransactionDetailModal({
   onUpdate,
 }: TransactionDetailModalProps) {
   const { role } = useAuth();
-  const { addToast, triggerRefresh } = useApp();
+  const { projects: cachedProjects, transactions: cachedTransactions, addToast, triggerRefresh } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -82,7 +82,6 @@ export function TransactionDetailModal({
   const [currentTx, setCurrentTx] = useState<Transaction | null>(null);
   const prevTxIdRef = useRef<string | null>(null);
 
-  const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
 
@@ -170,13 +169,7 @@ export function TransactionDetailModal({
         if (isNewTx) setIsEditing(false);
         populateFormAndAttachments(transaction);
 
-        Promise.all([getProjects(), getCategories(transaction.jenis), getTransactions()]).then(
-          ([projs, cats, txs]) => {
-            setProjects(projs);
-            setCategories(cats);
-            setHistoricalRecipients(extractHistoricalRecipients(txs));
-          }
-        );
+        getCategories(transaction.jenis).then(setCategories);
       }
     }
     if (!isOpen) {
@@ -185,11 +178,17 @@ export function TransactionDetailModal({
     }
   }, [transaction, isOpen]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setHistoricalRecipients(extractHistoricalRecipients(cachedTransactions));
+    }
+  }, [isOpen, cachedTransactions]);
+
   // Use currentTx for display; fallback to prop
   const displayTx = currentTx || transaction;
   if (!displayTx) return null;
 
-  const projectObj = projects.find(p => p.id === displayTx.proyekId);
+  const projectObj = cachedProjects.find(p => p.id === displayTx.proyekId);
   const isKasUtama = !displayTx.proyekId;
 
   // Instant zero-lag Blob Object URL file staging for mobile HP
@@ -265,7 +264,7 @@ export function TransactionDetailModal({
     await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
       const finalAttachments = [];
-      const currentProject = projects.find(p => p.id === editForm.proyekId);
+      const currentProject = cachedProjects.find(p => p.id === editForm.proyekId);
 
       for (const att of stagedAttachments) {
         if (att.fileObj) {
@@ -770,7 +769,7 @@ export function TransactionDetailModal({
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
                 >
                   <option value="">-- Tanpa Proyek (Kas Utama) --</option>
-                  {projects.map(p => (
+                  {cachedProjects.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.tipe === 'operasional_kantor' ? '💼 Pos: ' : '🏢 Proyek: '}{p.nama}
                     </option>
