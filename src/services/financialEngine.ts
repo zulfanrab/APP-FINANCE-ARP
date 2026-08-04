@@ -3,7 +3,7 @@
 // Domain-Driven Accounting & Net-Zero Balancing Architecture
 // ============================================================
 
-import { type Transaction, type Project } from '../types';
+import { type Transaction, type Project, type AccountId } from '../types';
 
 /**
  * Grup 1: Modal Eksternal Murni (Menambah Kas Utama / Likuiditas Total)
@@ -50,6 +50,7 @@ export interface UnifiedCompanyLedger {
   totalKasProyek: number;    // Total Saldo Kas di Seluruh Pool Proyek
   sisaKasTotal: number;      // Likuiditas Konsolidasi (Net-Zero Balanced)
   projectCashMap: Record<string, number>; // Saldo Kas per Proyek
+  accountBalances: Record<AccountId, number>; // Saldo riil per Saku/Rekening
 }
 
 export function isApproved(t: Transaction): boolean {
@@ -72,9 +73,9 @@ export function classifyTransaction(t: Transaction, _projects: Project[] = []): 
   // WAJIB terdaftar di EXTERNAL_CAPITAL_CATEGORIES_SET
   const isExternalCapital = EXTERNAL_CAPITAL_CATEGORIES_SET.has(categoryNormalized);
 
-  // 2. Internal Transfer (Kas Utama -> Kas Proyek)
-  // WAJIB terdaftar di INTERNAL_TRANSFER_CATEGORIES_SET dan memiliki proyekId
-  const isInternalTransfer = hasProject && INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized);
+  // 2. Internal Transfer (Kas Utama -> Kas Proyek ATAU Antar Saku)
+  const isMutasiKategori = INTERNAL_TRANSFER_CATEGORIES_SET.has(categoryNormalized);
+  const isCapitalInjectionToProject = hasProject && isMutasiKategori;
 
   // 3. Refund to Kas Utama (Proyek mengembalikan sisa dana ke Kas Utama)
   const isRefundToKasUtama = hasProject && REFUND_TO_KAS_UTAMA_CATEGORIES_SET.has(categoryNormalized);
@@ -87,7 +88,7 @@ export function classifyTransaction(t: Transaction, _projects: Project[] = []): 
 
   // 6. Direct Kas Utama Transaction
   const isKasUtamaTransaction = !hasProject || isExternalCapital || isRefundToKasUtama || isAdminFee;
-  const isMutasiInternal = isInternalTransfer || isRefundToKasUtama;
+  const isMutasiInternal = isMutasiKategori || isRefundToKasUtama;
 
   const isKasUtamaInflow = approved && isKasUtamaTransaction && t.jenis === 'masuk' && !isMutasiInternal;
   const isKasUtamaOutflow = approved && isKasUtamaTransaction && t.jenis === 'keluar' && !isMutasiInternal;
@@ -98,7 +99,7 @@ export function classifyTransaction(t: Transaction, _projects: Project[] = []): 
     isKasUtamaTransaction,
     isKasUtamaInflow,
     isKasUtamaOutflow,
-    isCapitalInjectionToProject: isInternalTransfer,
+    isCapitalInjectionToProject,
     isExternalCapital,
     isRefundToKasUtama,
     isVendorRefund,
@@ -116,6 +117,11 @@ export function calculateCompanyLedger(
 ): UnifiedCompanyLedger {
   let sisaKasUtama = 0;
   const projectCashMap: Record<string, number> = {};
+  const accountBalances: Record<AccountId, number> = {
+    bca_utama: 0,
+    bri_utama: 0,
+    kas_admin: 0
+  };
 
   for (const p of projects) {
     projectCashMap[p.id] = 0;
@@ -167,6 +173,22 @@ export function calculateCompanyLedger(
         }
       }
     }
+    
+    // ---- C. ACCOUNT BALANCING (PHYSICAL POCKETS) ----
+    if (classification.isMutasiInternal) {
+      // Mutasi Internal: uang berpindah antar saku
+      const sourceAcc = t.rekeningId || 'bca_utama';
+      const destAcc = t.rekeningTujuanId || 'kas_admin';
+      
+      accountBalances[sourceAcc] -= t.nominal;
+      accountBalances[destAcc] += t.nominal;
+    } else {
+      if (t.jenis === 'masuk') {
+        accountBalances[t.rekeningId || 'bca_utama'] += t.nominal;
+      } else {
+        accountBalances[t.rekeningId || 'kas_admin'] -= t.nominal;
+      }
+    }
   }
 
   let totalKasProyek = 0;
@@ -181,5 +203,6 @@ export function calculateCompanyLedger(
     totalKasProyek,
     sisaKasTotal,
     projectCashMap,
+    accountBalances,
   };
 }

@@ -5,6 +5,7 @@
 export type TransactionType = 'masuk' | 'keluar';
 export type TransactionTag = 'operasional' | 'pribadi';
 export type JalurTransfer = 'sesama_bca' | 'ewallet' | 'bi_fast' | 'online_rtgs' | 'custom';
+export type AccountId = 'bca_utama' | 'bri_utama' | 'kas_admin';
 export type TransactionStatus =
   | 'menunggu_approval'
   | 'disetujui'
@@ -33,6 +34,8 @@ export interface Transaction {
   penerimaDetail?: string; // "[Nama Penerima] - [Nama Bank] [Nomor Rekening]"
   jalurTransfer?: JalurTransfer; // 'sesama_bca' | 'ewallet' | 'bi_fast' | 'online_rtgs' | 'custom'
   adminNominalCustom?: number; // Nominal admin custom untuk pilihan 'custom'
+  rekeningId?: AccountId; // Saku asal / saku utama yang terpengaruh
+  rekeningTujuanId?: AccountId; // Saku tujuan khusus transaksi mutasi internal
   parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
   divisi?: 'admin' | 'ahli' | 'it' | 'umum'; // Sub-Divisi pengaju (Divisi Admin, Divisi Ahli, Divisi IT, Umum)
   urutan?: number; // Custom drag-and-drop order index
@@ -86,6 +89,7 @@ export interface DashboardSummary {
   totalPribadiOwnerBulanIni: number; // Prive Owner
   labaBersihBulanIni: number; // Formula: totalOmzetBulanIni - totalPengeluaranOperasionalBulanIni
   proyekAktif: number;
+  accountBalances: Record<AccountId, number>; // Saldo riil per Saku/Rekening
 }
 
 export interface MonthlyChartData {

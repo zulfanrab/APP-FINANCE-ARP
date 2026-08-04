@@ -154,6 +154,7 @@ export function getDashboardSummary(
     totalPribadiOwnerBulanIni: pribadiOwnerBulanIni,
     labaBersihBulanIni,
     proyekAktif: proyekAktifCount,
+    accountBalances: ledger.accountBalances,
   };
 }
 

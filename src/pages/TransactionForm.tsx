@@ -15,7 +15,7 @@ import { addTransaction, getTransactions } from '../services/transactionService'
 import { getProjects } from '../services/projectService';
 import { getCategories, addCategory, deleteCategory } from '../services/categoryService';
 import { uploadAttachmentFile, compressFileToAttachment } from '../services/storageService';
-import { type Project, type Attachment, type JalurTransfer } from '../types';
+import { type Project, type Attachment, type JalurTransfer, type AccountId } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
 import { Modal } from '../components/ui/Modal';
@@ -70,6 +70,8 @@ export function TransactionForm() {
     jalurTransfer: 'sesama_bca' as JalurTransfer,
     adminNominalCustomStr: '1.000',
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
+    rekeningId: 'kas_admin' as AccountId,
+    rekeningTujuanId: 'kas_admin' as AccountId,
   });
 
   // Approval Flow Switch
@@ -272,6 +274,8 @@ export function TransactionForm() {
         jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
         adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
         divisi: form.divisi || undefined,
+        rekeningId: form.rekeningId,
+        rekeningTujuanId: form.kategori === 'Mutasi Internal / Transfer Kas' ? form.rekeningTujuanId : undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -336,7 +340,11 @@ export function TransactionForm() {
                   <button
                     key={j}
                     type="button"
-                    onClick={() => setField('jenis', j)}
+                    onClick={() => setForm(f => ({
+                      ...f, 
+                      jenis: j, 
+                      rekeningId: j === 'masuk' ? 'bca_utama' : 'kas_admin'
+                    }))}
                     className={`py-2.5 px-3 rounded-xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 truncate
                       ${form.jenis === j
                         ? j === 'masuk' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-red-500 bg-red-50 text-red-700 shadow-sm'
@@ -585,6 +593,42 @@ export function TransactionForm() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Rekening Sumber */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                {form.jenis === 'masuk' ? 'Saku / Rekening Penerima *' : 'Saku / Rekening Sumber *'}
+              </label>
+              <select
+                value={form.rekeningId}
+                onChange={e => setField('rekeningId', e.target.value as AccountId)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                required
+              >
+                <option value="bca_utama">BCA Utama (Holding/Bos)</option>
+                <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                <option value="kas_admin">Kas Operasional Admin</option>
+              </select>
+            </div>
+
+            {/* Rekening Tujuan (Khusus Mutasi Internal) */}
+            {form.kategori === 'Mutasi Internal / Transfer Kas' && (
+              <div className="sm:col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-xl animate-fade-in mb-4">
+                <label className="block text-xs font-semibold text-blue-900 mb-1">
+                  Saku / Rekening Tujuan *
+                </label>
+                <select
+                  value={form.rekeningTujuanId}
+                  onChange={e => setField('rekeningTujuanId', e.target.value as AccountId)}
+                  className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium text-blue-900"
+                  required
+                >
+                  <option value="bca_utama">BCA Utama (Holding/Bos)</option>
+                  <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                  <option value="kas_admin">Kas Operasional Admin</option>
+                </select>
               </div>
             )}
 

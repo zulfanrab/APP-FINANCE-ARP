@@ -102,6 +102,8 @@ function mapRowToTransaction(row: any): Transaction {
     catatanPenolakan: row.catatan_penolakan ?? undefined,
     penerimaDetail: row.penerima_detail ?? undefined,
     jalurTransfer: row.jalur_transfer ?? undefined,
+    rekeningId: row.rekening_id ?? (row.jenis === 'masuk' ? 'bca_utama' : 'kas_admin'),
+    rekeningTujuanId: row.rekening_tujuan_id ?? undefined,
     adminNominalCustom: row.admin_nominal_custom ? Number(row.admin_nominal_custom) : undefined,
     parentTransactionId: row.parent_transaction_id ?? undefined,
     divisi: row.divisi ?? undefined,
@@ -127,6 +129,8 @@ function mapTransactionToRow(t: Transaction): any {
     catatan_penolakan: t.catatanPenolakan ?? null,
     penerima_detail: t.penerimaDetail ?? null,
     jalur_transfer: t.jalurTransfer ?? null,
+    rekening_id: t.rekeningId ?? null,
+    rekening_tujuan_id: t.rekeningTujuanId ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
     urutan: t.urutan ?? null,
     dibuat_pada: t.dibuatPada,
@@ -302,24 +306,23 @@ export async function addTransaction(
       else if (newTransaction.jalurTransfer === 'custom') feeNominalPreview = newTransaction.adminNominalCustom || 0;
     }
 
+    const sourceRekening = newTransaction.rekeningId || 'kas_admin';
+    const sakuBalance = currentLedger.accountBalances[sourceRekening] || 0;
+    
+    // PHYSICAL CASH VALIDATION (Primary Guardrail)
+    if (newTransaction.jenis === 'keluar' || classification.isMutasiInternal) {
+       const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
+       if (Math.round(totalOutflowRequired) > Math.round(sakuBalance)) {
+         const namaSaku = sourceRekening === 'bca_utama' ? 'BCA Utama' : sourceRekening === 'bri_utama' ? 'BRI Utama' : 'Kas Admin';
+         throw new Error(`Saldo ${namaSaku} Tidak Mencukupi!`);
+       }
+    }
+
+    // VIRTUAL BUDGET VALIDATION (Dual Deduction for Projects)
     if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
-      // PROYEK EXPENSE: Validate ONLY against target project wallet
       const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
-      
-      // Biaya admin dipotong dari Kas Utama, jadi kas proyek hanya menanggung nominal utama
       if (Math.round(newTransaction.nominal) > Math.round(projectBalance)) {
         throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
-      }
-      
-      // Pastikan Kas Utama sanggup membayar biaya admin
-      if (feeNominalPreview > 0 && Math.round(feeNominalPreview) > Math.round(currentLedger.sisaKasUtama)) {
-        throw new Error('Saldo Kas Utama Tidak Mencukupi untuk membayar Biaya Admin Bank!');
-      }
-    } else if (classification.isCapitalInjectionToProject || (!newTransaction.proyekId && newTransaction.jenis === 'keluar')) {
-      // MAIN CASH OUTFLOW or INTERNAL TRANSFER TO PROJECT: Validate against sisaKasUtama
-      const totalOutflowRequired = newTransaction.nominal + feeNominalPreview;
-      if (Math.round(totalOutflowRequired) > Math.round(currentLedger.sisaKasUtama)) {
-        throw new Error('Saldo Kas Utama Tidak Mencukupi!');
       }
     }
   }
@@ -366,6 +369,7 @@ export async function addTransaction(
         nominal: feeNominal,
         kategori: 'Biaya Admin Bank',
         tag: newTransaction.tag,
+        rekeningId: newTransaction.rekeningId, // CRITICAL: Bound to the SAME pocket!
         proyekId: newTransaction.proyekId, // CRITICAL: Bound to the SAME project allocation!
         divisi: newTransaction.divisi, // CRITICAL: Inherit the SAME division
         lampiran: [], // Admin fee entry does not require separate attachments
@@ -473,6 +477,7 @@ export async function updateTransaction(
           nominal: feeNominal,
           kategori: 'Biaya Admin Bank',
           tag: updated.tag,
+          rekeningId: updated.rekeningId, // CRITICAL: Sync pocket allocation!
           proyekId: updated.proyekId, // CRITICAL: Sync project allocation!
           penerimaDetail: updated.penerimaDetail,
           jalurTransfer: updated.jalurTransfer,
@@ -490,6 +495,7 @@ export async function updateTransaction(
           nominal: feeNominal,
           kategori: 'Biaya Admin Bank',
           tag: updated.tag,
+          rekeningId: updated.rekeningId,
           proyekId: updated.proyekId, // CRITICAL: Same project allocation!
           lampiran: [],
           status: updated.status,
