@@ -59,8 +59,8 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
     const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
     if (match && match[1]) {
       const missingCol = match[1];
-      // PROTECT CORE COLUMNS: Never delete lampiran, nominal, deskripsi, or status!
-      if (['lampiran', 'nominal', 'deskripsi', 'status', 'tanggal', 'kategori'].includes(missingCol)) {
+      // PROTECT CORE COLUMNS: Never delete lampiran, nominal, deskripsi, status, or account IDs!
+      if (['lampiran', 'nominal', 'deskripsi', 'status', 'tanggal', 'kategori', 'rekening_id', 'rekening_tujuan_id'].includes(missingCol)) {
         console.error(`Cannot strip core column "${missingCol}" from Supabase update payload!`);
         break;
       }
@@ -87,6 +87,10 @@ function parseLampiranField(raw: any): Attachment[] {
 }
 
 function mapRowToTransaction(row: any): Transaction {
+  const recId = (row.rekening_id && typeof row.rekening_id === 'string' && row.rekening_id.trim()) 
+    ? row.rekening_id 
+    : (row.jenis === 'masuk' ? 'bca_utama' : (row.proyek_id ? 'kas_admin' : 'bca_utama'));
+
   return {
     id: row.id,
     tanggal: row.tanggal,
@@ -102,7 +106,7 @@ function mapRowToTransaction(row: any): Transaction {
     catatanPenolakan: row.catatan_penolakan ?? undefined,
     penerimaDetail: row.penerima_detail ?? undefined,
     jalurTransfer: row.jalur_transfer ?? undefined,
-    rekeningId: row.rekening_id ?? (row.jenis === 'masuk' ? 'bca_utama' : (row.proyek_id ? 'kas_admin' : 'bca_utama')),
+    rekeningId: recId,
     rekeningTujuanId: row.rekening_tujuan_id ?? undefined,
     adminNominalCustom: row.admin_nominal_custom ? Number(row.admin_nominal_custom) : undefined,
     parentTransactionId: row.parent_transaction_id ?? undefined,
@@ -129,7 +133,7 @@ function mapTransactionToRow(t: Transaction): any {
     catatan_penolakan: t.catatanPenolakan ?? null,
     penerima_detail: t.penerimaDetail ?? null,
     jalur_transfer: t.jalurTransfer ?? null,
-    rekening_id: t.rekeningId ?? null,
+    rekening_id: t.rekeningId ?? (t.jenis === 'masuk' ? 'bca_utama' : (t.proyekId ? 'kas_admin' : 'bca_utama')),
     rekening_tujuan_id: t.rekeningTujuanId ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
     urutan: t.urutan ?? null,

@@ -177,16 +177,23 @@ export function calculateCompanyLedger(
     // ---- C. ACCOUNT BALANCING (PHYSICAL POCKETS) ----
     if (classification.isMutasiInternal) {
       // Mutasi Internal: uang berpindah antar saku
-      const sourceAcc = t.rekeningId || 'bca_utama';
-      const destAcc = t.rekeningTujuanId || 'kas_admin';
+      const sourceAcc = (t.rekeningId as AccountId) || 'bca_utama';
+      const destAcc = (t.rekeningTujuanId as AccountId) || 'kas_admin';
       
+      if (accountBalances[sourceAcc] === undefined) accountBalances[sourceAcc] = 0;
+      if (accountBalances[destAcc] === undefined) accountBalances[destAcc] = 0;
+
       accountBalances[sourceAcc] -= t.nominal;
       accountBalances[destAcc] += t.nominal;
     } else {
       if (t.jenis === 'masuk') {
-        accountBalances[t.rekeningId || 'bca_utama'] += t.nominal;
+        const accId = (t.rekeningId as AccountId) || 'bca_utama';
+        if (accountBalances[accId] === undefined) accountBalances[accId] = 0;
+        accountBalances[accId] += t.nominal;
       } else {
-        accountBalances[t.rekeningId || (t.proyekId ? 'kas_admin' : 'bca_utama')] -= t.nominal;
+        const accId = (t.rekeningId as AccountId) || (t.proyekId ? 'kas_admin' : 'bca_utama');
+        if (accountBalances[accId] === undefined) accountBalances[accId] = 0;
+        accountBalances[accId] -= t.nominal;
       }
     }
   }

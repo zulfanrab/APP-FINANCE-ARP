@@ -760,6 +760,36 @@ export function TransactionForm() {
               </div>
             ) : null}
 
+            {/* Saku / Rekening Sumber */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Sumber</label>
+              <select
+                value={form.rekeningId}
+                onChange={e => setField('rekeningId', e.target.value as AccountId)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+              >
+                <option value="bca_utama">🏦 BCA Utama</option>
+                <option value="bri_utama">🏦 BRI Utama</option>
+                <option value="kas_admin">💵 Kas Operasional Admin</option>
+              </select>
+            </div>
+
+            {/* Saku / Rekening Tujuan (hanya untuk Mutasi Internal) */}
+            {form.kategori === 'Mutasi Internal / Transfer Kas' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Tujuan</label>
+                <select
+                  value={form.rekeningTujuanId}
+                  onChange={e => setField('rekeningTujuanId', e.target.value as AccountId)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                >
+                  <option value="bca_utama">🏦 BCA Utama</option>
+                  <option value="bri_utama">🏦 BRI Utama</option>
+                  <option value="kas_admin">💵 Kas Operasional Admin</option>
+                </select>
+              </div>
+            )}
+
             {/* Conditional Sub-Divisi Selector (Admin, IT, Ahli) */}
             {(() => {
               const selectedProject = projects.find(p => p.id === form.proyekId);
