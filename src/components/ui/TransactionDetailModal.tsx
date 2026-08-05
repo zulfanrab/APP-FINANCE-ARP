@@ -766,27 +766,42 @@ export function TransactionDetailModal({
                 </select>
               </div>
 
-              {/* Saku / Rekening Sumber */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Sumber</label>
-                <select
-                  value={editForm.rekeningId}
-                  onChange={e => setEditForm(f => ({ ...f, rekeningId: e.target.value as AccountId }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
-                >
-                  <option value="bca_utama">🏦 BCA Utama</option>
-                  <option value="bri_utama">🏦 BRI Utama</option>
-                  <option value="kas_admin">💵 Kas Operasional Admin</option>
-                </select>
-              </div>
-
-              {/* Saku / Rekening Tujuan (hanya untuk Mutasi Internal) */}
-              {editForm.kategori === 'Mutasi Internal / Transfer Kas' && (
+              {/* Saku / Rekening Conditional Selector */}
+              {editForm.kategori === 'Mutasi Internal / Transfer Kas' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Asal (Dari)</label>
+                    <select
+                      value={editForm.rekeningId}
+                      onChange={e => setEditForm(f => ({ ...f, rekeningId: e.target.value as AccountId }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                    >
+                      <option value="bca_utama">🏦 BCA Utama</option>
+                      <option value="bri_utama">🏦 BRI Utama</option>
+                      <option value="kas_admin">💵 Kas Operasional Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Tujuan (Ke)</label>
+                    <select
+                      value={editForm.rekeningTujuanId}
+                      onChange={e => setEditForm(f => ({ ...f, rekeningTujuanId: e.target.value as AccountId }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                    >
+                      <option value="bca_utama">🏦 BCA Utama</option>
+                      <option value="bri_utama">🏦 BRI Utama</option>
+                      <option value="kas_admin">💵 Kas Operasional Admin</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Tujuan</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    {editForm.jenis === 'masuk' ? 'Saku / Rekening Penerima' : 'Saku / Rekening Sumber'}
+                  </label>
                   <select
-                    value={editForm.rekeningTujuanId}
-                    onChange={e => setEditForm(f => ({ ...f, rekeningTujuanId: e.target.value as AccountId }))}
+                    value={editForm.rekeningId}
+                    onChange={e => setEditForm(f => ({ ...f, rekeningId: e.target.value as AccountId }))}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
                   >
                     <option value="bca_utama">🏦 BCA Utama</option>
