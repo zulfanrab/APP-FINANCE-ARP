@@ -361,7 +361,7 @@ export function AdminDashboard() {
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         onUpdate={(updated) => {
-          loadData();
+          triggerRefresh();
           if (updated) setSelectedTx(updated);
         }}
       />

@@ -37,7 +37,7 @@ export function TransactionForm() {
   const [searchParams] = useSearchParams();
   const urlProyekId = searchParams.get('proyekId');
 
-  const { addToast, triggerRefresh } = useApp();
+  const { projects: cachedProjects, transactions: cachedTransactions, addToast, triggerRefresh } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,8 +76,6 @@ export function TransactionForm() {
 
   // Approval Flow Switch
   const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
-
-  const { projects: cachedProjects, transactions: cachedTransactions, addToast, triggerRefresh } = useApp();
 
   useEffect(() => {
     setProjects(cachedProjects);

@@ -95,11 +95,6 @@ export function TransactionsList() {
       urutan: idx + 1,
     }));
 
-    setTransactions(prev => {
-      const remaining = prev.filter(t => !withUrutan.some(n => n.id === t.id));
-      return [...withUrutan, ...remaining];
-    });
-
     const orderedIds = withUrutan.map(t => t.id);
     await saveTransactionCustomOrder(orderedIds);
     addToast('success', 'Urutan posisi transaksi diperbarui!');

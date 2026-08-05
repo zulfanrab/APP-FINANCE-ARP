@@ -114,9 +114,17 @@ export function Reports() {
         const proj = projects.find(p => p.id === t.proyekId);
         const isKasUtamaOrOps = !t.proyekId || proj?.tipe === 'operasional_kantor';
         
-    setCategoryData(cats);
-    setCashflowData(cashflow);
-    setSummary({
+        if (isKasUtamaOrOps) {
+          if (t.divisi === 'admin' || proj?.nama.toLowerCase().includes('admin')) adminDivisiBiaya += t.nominal;
+          else if (t.divisi === 'it' || proj?.nama.toLowerCase().includes('it')) itDivisiBiaya += t.nominal;
+          else if (t.divisi === 'ahli' || proj?.nama.toLowerCase().includes('ahli')) ahliDivisiBiaya += t.nominal;
+        }
+      }
+    }
+
+    const netPnL = omzetKlien - totalKeluar;
+
+    const summaryObj = {
       totalMasuk,
       dropDanaOwner,
       omzetKlien,
@@ -128,9 +136,10 @@ export function Reports() {
       ahliDivisiBiaya,
       net: netPnL,
       count: periodTx.length,
-    });
-    setAiResult('');
-  }, [allTransactions, period, customFrom, customTo, loading, getPeriodDates]);
+    };
+
+    return { categoryData: cats, cashflowData: cashflow, summary: summaryObj };
+  }, [allTransactions, projects, getPeriodDates]);
 
   const handleAiSummary = async () => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -163,23 +172,30 @@ export function Reports() {
       }
 
       // Smart Fallback Financial AI Engine (Clean Text without Markdown Symbols)
-      const margin = summary.totalMasuk > 0 ? Math.round(((summary.totalMasuk - summary.totalKeluar) / summary.totalMasuk) * 100) : 0;
+      const sum = summary || {
+        totalMasuk: 0,
+        totalKeluar: 0,
+        opsBiaya: 0,
+        privBiaya: 0,
+        net: 0,
+      };
+      const margin = sum.totalMasuk > 0 ? Math.round(((sum.totalMasuk - sum.totalKeluar) / sum.totalMasuk) * 100) : 0;
       const topCat = categoryData.length > 0 ? categoryData[0] : null;
-      const privePercent = summary.totalKeluar > 0 ? Math.round((summary.privBiaya / summary.totalKeluar) * 100) : 0;
+      const privePercent = sum.totalKeluar > 0 ? Math.round((sum.privBiaya / sum.totalKeluar) * 100) : 0;
 
       const fallbackText = `Analisis & Executive Summary Keuangan PT Aksara Riksa Perdana
 
 1. Kinerja & Kesehatan Arus Kas:
-- Total Pemasukan Kas Utama: ${formatRupiah(summary.totalMasuk)}
-- Total Pengeluaran Kas Utama: ${formatRupiah(summary.totalKeluar)} (Operasional: ${formatRupiah(summary.opsBiaya)} | Prive Owner: ${formatRupiah(summary.privBiaya)})
-- Arus Kas Bersih (Net Cashflow): ${summary.net >= 0 ? '+' : ''}${formatRupiah(summary.net)} (${margin}% Net Margin)
+- Total Pemasukan Kas Utama: ${formatRupiah(sum.totalMasuk)}
+- Total Pengeluaran Kas Utama: ${formatRupiah(sum.totalKeluar)} (Operasional: ${formatRupiah(sum.opsBiaya)} | Prive Owner: ${formatRupiah(sum.privBiaya)})
+- Arus Kas Bersih (Net Cashflow): ${sum.net >= 0 ? '+' : ''}${formatRupiah(sum.net)} (${margin}% Net Margin)
 
 2. Sorotan Utama & Pengeluaran Terbesar:
-${topCat ? `- Pengeluaran terbesar tercatat pada kategori ${topCat.kategori} sebesar ${formatRupiah(topCat.total)} (${topCat.persentase}% dari total pengeluaran).` : '- Belum ada pengeluaran signifikan tercatat pada periode ini.'}
+${topCat ? `- Pengeluaran terbesar tercatat pada kategori ${topCat.kategori} sebesar ${formatRupiah(topCat.nominal)} (${topCat.percentage}% dari total pengeluaran).` : '- Belum ada pengeluaran signifikan tercatat pada periode ini.'}
 - Pengambilan Prive Owner menyerap ${privePercent}% dari total pengeluaran periode ini.
 
 3. Rekomendasi Strategis:
-${summary.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi modal operasional proyek dan pertahankan rasio prive di bawah 20% agar modal kerja tetap kuat.' : 'Arus kas defisit pada periode ini. Disarankan pengetatan pengeluaran non-operasional dan mempercepat pencairan termin dari klien.'}`;
+${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi modal operasional proyek dan pertahankan rasio prive di bawah 20% agar modal kerja tetap kuat.' : 'Arus kas defisit pada periode ini. Disarankan pengetatan pengeluaran non-operasional dan mempercepat pencairan termin dari klien.'}`;
 
       setAiResult(cleanTextPunctuation(fallbackText));
       addToast('success', 'Ringkasan Analisis Keuangan berhasil dibuat!');

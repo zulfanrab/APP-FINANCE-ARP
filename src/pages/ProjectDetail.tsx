@@ -399,7 +399,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       try {
         await deleteTransaction(txId);
         addToast('success', 'Transaksi berhasil dihapus');
-        loadProjectData();
+        triggerRefresh();
       } catch {
         addToast('error', 'Gagal menghapus transaksi');
       }
@@ -443,7 +443,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
       addToast('success', `✅ Sisa dana ${formatRupiah(sisaDana)} berhasil ditarik ke Kas Utama!`);
       setRefundModalOpen(false);
-      loadProjectData();
+      triggerRefresh();
     } catch {
       addToast('error', 'Gagal menarik sisa dana ke Kas Utama');
     } finally {
@@ -1084,7 +1084,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
         onUpdate={(updated) => {
-          loadProjectData();
+          triggerRefresh();
           if (updated) setSelectedTx(updated);
         }}
       />
