@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { AttachmentViewer } from './AttachmentViewer';
-import { type Transaction, type Project, type JalurTransfer } from '../../types';
+import { type Transaction, type Project, type JalurTransfer, type AccountId } from '../../types';
 import { updateTransaction, deleteTransaction, getTransactions } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
@@ -101,6 +101,8 @@ export function TransactionDetailModal({
     jalurTransfer: 'sesama_bca' as JalurTransfer,
     adminNominalCustomStr: '1.000',
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
+    rekeningId: 'bca_utama' as AccountId,
+    rekeningTujuanId: 'kas_admin' as AccountId,
   });
 
   const populateFormAndAttachments = (targetTx: Transaction) => {
@@ -116,6 +118,8 @@ export function TransactionDetailModal({
       jalurTransfer: targetTx.jalurTransfer || 'sesama_bca',
       adminNominalCustomStr: targetTx.adminNominalCustom ? formatRupiahInput(targetTx.adminNominalCustom.toString()) : '1.000',
       divisi: targetTx.divisi || undefined,
+      rekeningId: targetTx.rekeningId || 'bca_utama',
+      rekeningTujuanId: targetTx.rekeningTujuanId || 'kas_admin',
     });
 
     const parsedLampiran = normalizeAttachments(targetTx.lampiran);
@@ -316,6 +320,8 @@ export function TransactionDetailModal({
         jalurTransfer: editForm.jenis === 'keluar' ? editForm.jalurTransfer : undefined,
         adminNominalCustom: editForm.jenis === 'keluar' && editForm.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
         divisi: editForm.divisi || undefined,
+        rekeningId: editForm.rekeningId,
+        rekeningTujuanId: editForm.kategori === 'Mutasi Internal / Transfer Kas' ? editForm.rekeningTujuanId : undefined,
       });
 
       // Update internal state so the view mode immediately reflects the saved data
@@ -759,6 +765,36 @@ export function TransactionDetailModal({
                   )}
                 </select>
               </div>
+
+              {/* Saku / Rekening Sumber */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Sumber</label>
+                <select
+                  value={editForm.rekeningId}
+                  onChange={e => setEditForm(f => ({ ...f, rekeningId: e.target.value as AccountId }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                >
+                  <option value="bca_utama">🏦 BCA Utama</option>
+                  <option value="bri_utama">🏦 BRI Utama</option>
+                  <option value="kas_admin">💵 Kas Operasional Admin</option>
+                </select>
+              </div>
+
+              {/* Saku / Rekening Tujuan (hanya untuk Mutasi Internal) */}
+              {editForm.kategori === 'Mutasi Internal / Transfer Kas' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Saku / Rekening Tujuan</label>
+                  <select
+                    value={editForm.rekeningTujuanId}
+                    onChange={e => setEditForm(f => ({ ...f, rekeningTujuanId: e.target.value as AccountId }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                  >
+                    <option value="bca_utama">🏦 BCA Utama</option>
+                    <option value="bri_utama">🏦 BRI Utama</option>
+                    <option value="kas_admin">💵 Kas Operasional Admin</option>
+                  </select>
+                </div>
+              )}
 
               {/* Proyek Link */}
               <div>
