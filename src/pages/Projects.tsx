@@ -516,8 +516,8 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
             <TrendingUp size={12} className="text-emerald-500" />
             <p className="text-[11px] text-gray-500 font-medium">{isKantor ? 'Pagu Modal' : 'Target Invoice'}</p>
           </div>
-          <p className="text-[11px] sm:text-xs font-extrabold text-emerald-600 whitespace-nowrap overflow-x-auto scrollbar-none">
-            {formatRupiah(project.anggaran || 0)}
+          <p className={`text-[11px] sm:text-xs font-extrabold whitespace-nowrap overflow-x-auto scrollbar-none ${project.anggaran && project.anggaran > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+            {project.anggaran && project.anggaran > 0 ? formatRupiah(project.anggaran) : 'Belum Set'}
           </p>
         </div>
       </div>

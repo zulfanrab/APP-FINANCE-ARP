@@ -815,7 +815,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                     {project.anggaran ? 'Target Invoice' : 'Invoice / Termin Klien'}
                   </p>
                   <p className="text-xs sm:text-sm lg:text-base font-extrabold text-blue-700 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">
-                    +{formatRupiah(project.anggaran || financials.pemasukanKlien)}
+                    {project.anggaran && project.anggaran > 0 ? formatRupiah(project.anggaran) : financials.pemasukanKlien > 0 ? `+${formatRupiah(financials.pemasukanKlien)}` : 'Belum Set'}
                   </p>
                   <p className="text-[10px] text-blue-600 truncate mt-0.5">
                     {project.anggaran ? 'Acuan Tagihan Pekerjaan' : 'Omzet Riil Klien'}
@@ -830,9 +830,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                 {project.tipe === 'operasional_kantor' ? 'Pagu Modal Kantor' : 'Alokasi Modal Operasional'}
               </p>
               <p className="text-xs sm:text-sm lg:text-base font-extrabold text-purple-800 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">
-                {formatRupiah(project.anggaran || financials.modalDisuntikkan || 0)}
+                {formatRupiah(financials.modalDisuntikkan)}
               </p>
-              <p className="text-[10px] text-purple-600 truncate mt-0.5">Alokasi Modal</p>
+              <p className="text-[10px] text-purple-600 truncate mt-0.5">Drop Modal Kas Admin</p>
             </div>
 
             {/* 5. Total Pengeluaran Riil */}
@@ -904,16 +904,16 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div>
               <p className="text-xs text-slate-400 mb-1">Total Pemasukan Klien</p>
-              <p className="text-2xl font-extrabold text-white">{formatRupiah(pemasukanKlien)}</p>
+              <p className="text-2xl font-extrabold text-white">{formatRupiah(financials.pemasukanKlien)}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400 mb-1">Realisasi Pengeluaran</p>
-              <p className="text-2xl font-extrabold text-amber-400">{formatRupiah(financials.realisasiBersih)}</p>
+              <p className="text-2xl font-extrabold text-amber-400">{formatRupiah(financials.totalPengeluaran)}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1">Profit Bersih (Cuan)</p>
-              <p className={`text-2xl font-extrabold ${profitNetto >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {profitNetto >= 0 ? '+' : ''}{formatRupiah(profitNetto)}
+              <p className="text-xs text-slate-400 mb-1">Profit Proyek (P&L)</p>
+              <p className={`text-2xl font-extrabold ${labaProyeksi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {labaProyeksi >= 0 ? '+' : ''}{formatRupiah(labaProyeksi)}
               </p>
             </div>
           </div>
