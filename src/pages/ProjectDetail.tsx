@@ -249,13 +249,13 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   const financials = getProjectFinancialSummary(transactions, anggaranModal);
   const categoryBreakdown = getProjectCategoryBreakdown(transactions);
 
-  // Legacy compatibility
-  const pemasukanKlien = transactions
-    .filter(t => t.jenis === 'masuk' && t.status !== 'ditolak')
-    .reduce((sum, t) => sum + t.nominal, 0);
-  const profitNetto = pemasukanKlien - financials.realisasiBersih;
-  const totalModalDinamis = financials.modalDisuntikkan || project.anggaran || 0;
-  const usagePercentage = totalModalDinamis > 0 ? Math.min(Math.round((financials.realisasiBersih / totalModalDinamis) * 100), 100) : 0;
+  // Target Invoice / Pagu Acuan
+  const totalModalDinamis = project.anggaran || financials.modalDisuntikkan || 0;
+  const labaProyeksi = (project.anggaran && project.anggaran > 0)
+    ? (project.anggaran - financials.totalPengeluaran)
+    : financials.labaRugiProyek;
+
+  const usagePercentage = totalModalDinamis > 0 ? Math.min(Math.round((financials.totalPengeluaran / totalModalDinamis) * 100), 100) : 0;
 
   const filteredTx = transactions.filter(t => {
     if (filterType === 'masuk') return t.jenis === 'masuk';
@@ -798,18 +798,28 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               <>
                 {/* 2. Laba - Rugi Proyek (P&L) */}
                 <div className="p-3.5 bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/40 rounded-2xl min-w-0 shadow-sm">
-                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Laba - Rugi Proyek (P&L)</p>
-                  <p className={`text-xs sm:text-sm lg:text-base font-extrabold tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none ${financials.labaRugiProyek >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
-                    {financials.labaRugiProyek >= 0 ? '+' : ''}{formatRupiah(financials.labaRugiProyek)}
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">
+                    {project.anggaran ? 'Proyeksi Laba (P&L)' : 'Laba - Rugi Proyek (P&L)'}
                   </p>
-                  <p className="text-[10px] text-emerald-700 truncate mt-0.5">Omzet Klien - Pengeluaran</p>
+                  <p className={`text-xs sm:text-sm lg:text-base font-extrabold tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none ${labaProyeksi >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                    {labaProyeksi >= 0 ? '+' : ''}{formatRupiah(labaProyeksi)}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 truncate mt-0.5">
+                    {project.anggaran ? 'Target Invoice - Belanja' : 'Omzet Klien - Belanja'}
+                  </p>
                 </div>
 
-                {/* 3. Pendapatan Riil Klien */}
+                {/* 3. Target Invoice / Pendapatan Riil Klien */}
                 <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
-                  <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Invoice / Termin Klien</p>
-                  <p className="text-xs sm:text-sm lg:text-base font-extrabold text-blue-700 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">+{formatRupiah(financials.pemasukanKlien)}</p>
-                  <p className="text-[10px] text-blue-600 truncate mt-0.5">Omzet Riil Klien</p>
+                  <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">
+                    {project.anggaran ? 'Target Invoice' : 'Invoice / Termin Klien'}
+                  </p>
+                  <p className="text-xs sm:text-sm lg:text-base font-extrabold text-blue-700 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">
+                    +{formatRupiah(project.anggaran || financials.pemasukanKlien)}
+                  </p>
+                  <p className="text-[10px] text-blue-600 truncate mt-0.5">
+                    {project.anggaran ? 'Acuan Tagihan Pekerjaan' : 'Omzet Riil Klien'}
+                  </p>
                 </div>
               </>
             )}
@@ -820,7 +830,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                 {project.tipe === 'operasional_kantor' ? 'Pagu Modal Kantor' : 'Alokasi Modal Operasional'}
               </p>
               <p className="text-xs sm:text-sm lg:text-base font-extrabold text-purple-800 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">
-                {formatRupiah(financials.modalDisuntikkan || project.anggaran || 0)}
+                {formatRupiah(project.anggaran || financials.modalDisuntikkan || 0)}
               </p>
               <p className="text-[10px] text-purple-600 truncate mt-0.5">Alokasi Modal</p>
             </div>

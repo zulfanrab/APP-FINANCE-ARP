@@ -43,12 +43,16 @@ export function Projects() {
     return rawProjects.map(p => {
       const txns = allTransactions.filter(t => t.proyekId === p.id);
       const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
+      const targetInvoice = p.anggaran || 0;
+      const profitDinamis = targetInvoice > 0 ? (targetInvoice - financials.totalPengeluaran) : financials.labaRugiProyek;
+
       return { 
         ...p, 
-        anggaran: financials.modalDisuntikkan,
+        anggaran: targetInvoice,
+        modalDisuntikkan: financials.modalDisuntikkan,
         totalPemasukan: financials.pemasukanKlien, 
         totalPengeluaran: financials.totalPengeluaran, 
-        profit: financials.labaRugiProyek,
+        profit: profitDinamis,
         sisaKas: financials.sisaDanaProyek
       };
     });
