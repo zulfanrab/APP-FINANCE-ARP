@@ -777,37 +777,48 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
         <div className="p-5 space-y-5">
           {/* Summary Cards Row — P&L vs Cash Flow */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className={`grid gap-3 ${project.tipe === 'operasional_kantor' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'}`}>
             {/* 1. Saldo Kas Proyek Saat Ini */}
             <div className="p-3.5 bg-slate-900 border border-slate-700 rounded-2xl min-w-0 shadow-sm">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 truncate">Sisa Saldo Kas Proyek</p>
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1 truncate">
+                {project.tipe === 'operasional_kantor' ? 'Sisa Saldo Kas Ops' : 'Sisa Saldo Kas Proyek'}
+              </p>
               <p className={`text-xs sm:text-sm lg:text-base font-extrabold tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none ${financials.sisaDanaProyek >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatRupiah(financials.sisaDanaProyek)}
               </p>
               <p className="text-[10px] text-slate-400 truncate mt-0.5">Arus Kas / Likuiditas</p>
             </div>
 
-            {/* 2. Laba - Rugi Proyek (P&L) */}
-            <div className="p-3.5 bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/40 rounded-2xl min-w-0 shadow-sm">
-              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Laba - Rugi Proyek (P&L)</p>
-              <p className={`text-xs sm:text-sm lg:text-base font-extrabold tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none ${financials.labaRugiProyek >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
-                {financials.labaRugiProyek >= 0 ? '+' : ''}{formatRupiah(financials.labaRugiProyek)}
-              </p>
-              <p className="text-[10px] text-emerald-700 truncate mt-0.5">Omzet Klien - Pengeluaran</p>
-            </div>
+            {/* Render Omset & P&L ONLY for Proyek Klien */}
+            {project.tipe !== 'operasional_kantor' && (
+              <>
+                {/* 2. Laba - Rugi Proyek (P&L) */}
+                <div className="p-3.5 bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/40 rounded-2xl min-w-0 shadow-sm">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1 truncate">Laba - Rugi Proyek (P&L)</p>
+                  <p className={`text-xs sm:text-sm lg:text-base font-extrabold tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none ${financials.labaRugiProyek >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                    {financials.labaRugiProyek >= 0 ? '+' : ''}{formatRupiah(financials.labaRugiProyek)}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 truncate mt-0.5">Omzet Klien - Pengeluaran</p>
+                </div>
 
-            {/* 3. Pendapatan Riil Klien */}
-            <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Invoice / Termin Klien</p>
-              <p className="text-xs sm:text-sm lg:text-base font-extrabold text-blue-700 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">+{formatRupiah(financials.pemasukanKlien)}</p>
-              <p className="text-[10px] text-blue-600 truncate mt-0.5">Omzet Riil Klien</p>
-            </div>
+                {/* 3. Pendapatan Riil Klien */}
+                <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl min-w-0">
+                  <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1 truncate">Invoice / Termin Klien</p>
+                  <p className="text-xs sm:text-sm lg:text-base font-extrabold text-blue-700 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">+{formatRupiah(financials.pemasukanKlien)}</p>
+                  <p className="text-[10px] text-blue-600 truncate mt-0.5">Omzet Riil Klien</p>
+                </div>
+              </>
+            )}
 
             {/* 4. Alokasi Modal Operasional (Transfer Internal) */}
             <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl min-w-0">
-              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1 truncate">Alokasi Modal Operasional</p>
-              <p className="text-xs sm:text-sm lg:text-base font-extrabold text-purple-800 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">{formatRupiah(financials.modalDisuntikkan)}</p>
-              <p className="text-[10px] text-purple-600 truncate mt-0.5">Transfer Internal</p>
+              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1 truncate">
+                {project.tipe === 'operasional_kantor' ? 'Pagu Modal Kantor' : 'Alokasi Modal Operasional'}
+              </p>
+              <p className="text-xs sm:text-sm lg:text-base font-extrabold text-purple-800 tabular-nums whitespace-nowrap overflow-x-auto scrollbar-none">
+                {formatRupiah(financials.modalDisuntikkan || project.anggaran || 0)}
+              </p>
+              <p className="text-[10px] text-purple-600 truncate mt-0.5">Alokasi Modal</p>
             </div>
 
             {/* 5. Total Pengeluaran Riil */}

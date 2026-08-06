@@ -322,11 +322,17 @@ export async function addTransaction(
        }
     }
 
-    // VIRTUAL BUDGET VALIDATION (Dual Deduction for Projects)
+    // VIRTUAL BUDGET VALIDATION (Dual Deduction for Real Field/Contract Projects ONLY)
     if (newTransaction.proyekId && newTransaction.jenis === 'keluar' && !classification.isMutasiInternal) {
-      const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
-      if (Math.round(newTransaction.nominal) > Math.round(projectBalance)) {
-        throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+      const targetProj = projects.find(p => p.id === newTransaction.proyekId);
+      const isOperasionalKantor = targetProj?.tipe === 'operasional_kantor';
+      
+      // Skip project balance check for internal office/division operations!
+      if (!isOperasionalKantor) {
+        const projectBalance = currentLedger.projectCashMap[newTransaction.proyekId] || 0;
+        if (Math.round(newTransaction.nominal) > Math.round(projectBalance)) {
+          throw new Error('Saldo Kas Proyek Tidak Mencukupi!');
+        }
       }
     }
   }

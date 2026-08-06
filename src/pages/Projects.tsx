@@ -468,7 +468,7 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <Wallet size={12} className="text-blue-500" />
-            <p className="text-[11px] text-gray-500 font-medium">Sisa Kas</p>
+            <p className="text-[11px] text-gray-500 font-medium">{isKantor ? 'Sisa Kas Ops' : 'Sisa Kas'}</p>
           </div>
           <p className={`text-[11px] sm:text-xs font-extrabold whitespace-nowrap overflow-x-auto scrollbar-none ${sisaModal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             {formatRupiah(sisaModal)}
@@ -484,10 +484,10 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
         <div className="text-center">
           <div className="flex items-center justify-center gap-1 mb-1">
             <TrendingUp size={12} className="text-emerald-500" />
-            <p className="text-[11px] text-gray-500 font-medium">{isKantor ? 'Drop Dana' : 'Profit'}</p>
+            <p className="text-[11px] text-gray-500 font-medium">{isKantor ? 'Pagu Modal' : 'Target Invoice'}</p>
           </div>
-          <p className={`text-[11px] sm:text-xs font-extrabold whitespace-nowrap overflow-x-auto scrollbar-none ${isKantor || project.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-            {isKantor ? formatRupiah(project.anggaran || 0) : formatRupiah(project.profit)}
+          <p className="text-[11px] sm:text-xs font-extrabold text-emerald-600 whitespace-nowrap overflow-x-auto scrollbar-none">
+            {formatRupiah(project.anggaran || 0)}
           </p>
         </div>
       </div>
