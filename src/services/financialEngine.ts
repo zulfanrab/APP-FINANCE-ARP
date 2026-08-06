@@ -130,6 +130,15 @@ export function calculateCompanyLedger(
   for (const t of transactions) {
     if (!isApproved(t)) continue;
 
+    // ---- LEGACY BUGGED TRANSACTION QUARANTINE ----
+    // txn_1785582926565_3ze8jau0j is stored in Supabase as jenis='masuk', kategori='Mutasi Internal',
+    // rekening_id=null, rekening_tujuan_id='kas_admin', proyek_id=Sulawesi.
+    // This is a bugged entry that must NOT affect sisaKasUtama, accountBalances, or projectCashMap.
+    // Its project cash effect is already handled separately via the txn_1785037639678 patch below.
+    if (t.id === 'txn_1785582926565_3ze8jau0j') {
+      continue;
+    }
+
     const classification = classifyTransaction(t, projects);
     const targetProjId = classification.resolvedProjectId;
 
@@ -184,13 +193,6 @@ export function calculateCompanyLedger(
     // ---- C. ACCOUNT BALANCING (PHYSICAL POCKETS) ----
     // Skip virtual fix entries from physical pockets
     if (t.id.endsWith('_sul_fix')) {
-      continue;
-    }
-
-    // Overwrite legacy reimbursement transaction (txn_1785582926565_3ze8jau0j):
-    // In physical pockets, this transaction is ALWAYS a Kas Admin outflow of Rp 4.282.981!
-    if (t.id === 'txn_1785582926565_3ze8jau0j') {
-      accountBalances.kas_admin -= 4282981;
       continue;
     }
 
