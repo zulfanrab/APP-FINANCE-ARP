@@ -146,7 +146,9 @@ export function OwnerDashboard() {
     if (selectedApprovalIds.length === 0) return;
     setBulkProcessing(true);
     try {
-      await Promise.all(selectedApprovalIds.map(id => updateTransactionStatus(id, 'disetujui')));
+      for (const id of selectedApprovalIds) {
+        await updateTransactionStatus(id, 'disetujui');
+      }
       addToast('success', `✨ ${selectedApprovalIds.length} transaksi berhasil disetujui sekaligus!`);
       setSelectedApprovalIds([]);
       triggerRefresh();
@@ -176,7 +178,9 @@ export function OwnerDashboard() {
     if (selectedTransferIds.length === 0) return;
     setBulkProcessing(true);
     try {
-      await Promise.all(selectedTransferIds.map(id => updateTransactionStatus(id, 'selesai')));
+      for (const id of selectedTransferIds) {
+        await updateTransactionStatus(id, 'selesai');
+      }
       addToast('success', `✨ ${selectedTransferIds.length} transaksi berhasil ditandai sudah transfer!`);
       setSelectedTransferIds([]);
       triggerRefresh();
