@@ -182,6 +182,17 @@ export function calculateCompanyLedger(
     }
     
     // ---- C. ACCOUNT BALANCING (PHYSICAL POCKETS) ----
+    // Skip virtual fix entries from physical pockets
+    if (t.id.endsWith('_sul_fix')) {
+      continue;
+    }
+
+    // Force legacy bugged reimbursement outflow (txn_1785582926565_3ze8jau0j) to deduct from kas_admin
+    if (t.id === 'txn_1785582926565_3ze8jau0j') {
+      accountBalances.kas_admin -= 4282981;
+      continue;
+    }
+
     if (classification.isMutasiInternal) {
       // Mutasi Internal: uang berpindah antar saku
       const sourceAcc = (t.rekeningId as AccountId) || 'bca_utama';
@@ -194,9 +205,10 @@ export function calculateCompanyLedger(
       accountBalances[destAcc] += t.nominal;
     } else {
       if (t.jenis === 'masuk') {
-        const accId = (t.rekeningId as AccountId) || 'bca_utama';
-        if (accountBalances[accId] === undefined) accountBalances[accId] = 0;
-        accountBalances[accId] += t.nominal;
+        const accId = t.rekeningId as AccountId;
+        if (accId && accountBalances[accId] !== undefined) {
+          accountBalances[accId] += t.nominal;
+        }
       } else {
         const accId = (t.rekeningId as AccountId) || (t.proyekId ? 'kas_admin' : 'bca_utama');
         if (accountBalances[accId] === undefined) accountBalances[accId] = 0;
