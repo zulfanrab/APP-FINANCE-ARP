@@ -93,7 +93,36 @@ export function isOmzetRil(t: Transaction): boolean {
     return false;
   }
 
-  // Keyword eksplisit Omzet Klien / Pendapatan Usaha
+  // Explicit Non-Omzet categories
+  if (
+    k === 'drop dana kas utama / holding' ||
+    k === 'setoran modal owner / direksi' ||
+    k === 'saldo awal' ||
+    k === 'modal awal' ||
+    k === 'mutasi internal / transfer kas' ||
+    k === 'refund sisa dana proyek ke kas utama' ||
+    k === 'refund dana proyek ke kas utama' ||
+    k === 'pengembalian dana (refund)'
+  ) {
+    return false;
+  }
+
+  // Mandatory Omzet Categories
+  const omzetCategories = [
+    'pembayaran klien / proyek',
+    'dp / termijn proyek',
+    'pelunasan proyek',
+    'pendapatan / omzet klien (laba-rugi p&l)',
+    'pendapatan jasa & operasional',
+    'pendapatan',
+    'omzet',
+    'omzet klien'
+  ];
+
+  if (omzetCategories.includes(k)) {
+    return true;
+  }
+
   const omzetKeywords = [
     'pembayaran klien',
     'dp / termijn',
@@ -109,22 +138,11 @@ export function isOmzetRil(t: Transaction): boolean {
     'kontrak',
     'honorarium klien',
     'penjualan',
-    'tagihan'
+    'tagihan',
+    'pembayaran'
   ];
 
   if (omzetKeywords.some(kw => k.includes(kw) || d.includes(kw))) {
-    return true;
-  }
-
-  // Kategori standar omzet
-  if (
-    k === 'pembayaran klien / proyek' ||
-    k === 'dp / termijn proyek' ||
-    k === 'pelunasan proyek' ||
-    k === 'pendapatan / omzet klien (laba-rugi p&l)' ||
-    k === 'pendapatan' ||
-    k === 'omzet'
-  ) {
     return true;
   }
 

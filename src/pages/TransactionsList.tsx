@@ -15,6 +15,7 @@ import {
 } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { isOmzetRil, isOmzetSemu } from '../services/analyticsService';
 
 export function TransactionsList() {
   const { role } = useAuth();
@@ -26,13 +27,13 @@ export function TransactionsList() {
   // Filters & Scope
   const [scope, setScope] = useState<'semua' | 'kas_utama' | 'proyek'>('semua');
   const [search, setSearch] = useState('');
-  const [filterJenis, setFilterJenis] = useState<TransactionType | 'semua'>('semua');
+  const [filterJenis, setFilterJenis] = useState<TransactionType | 'semua' | 'omzet_ril' | 'omzet_semu'>('semua');
   const [filterKategori, setFilterKategori] = useState('semua');
   const [filterStatus, setFilterStatus] = useState<TransactionStatus | 'semua'>('semua');
 
   // Pagination State
   const [page, setPage] = useState(1);
-  const pageSize = 30;
+  const pageSize = 15;
 
   const getProjectName = (proyekId?: string): string => {
     if (!proyekId) return '';
@@ -68,7 +69,17 @@ export function TransactionsList() {
         const matchPrj = getProjectName(t.proyekId).toLowerCase().includes(q);
         if (!matchDesc && !matchKat && !matchNom && !matchPrj) return false;
       }
-      if (filterJenis !== 'semua' && t.jenis !== filterJenis) return false;
+      
+      if (filterJenis === 'masuk') {
+        if (t.jenis !== 'masuk') return false;
+      } else if (filterJenis === 'omzet_ril') {
+        if (t.jenis !== 'masuk' || !isOmzetRil(t)) return false;
+      } else if (filterJenis === 'omzet_semu') {
+        if (t.jenis !== 'masuk' || !isOmzetSemu(t)) return false;
+      } else if (filterJenis === 'keluar') {
+        if (t.jenis !== 'keluar') return false;
+      }
+
       if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
       if (filterStatus !== 'semua' && t.status !== filterStatus) return false;
       return true;
@@ -231,15 +242,20 @@ export function TransactionsList() {
 
           {/* Jenis Filter Pills */}
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full">
-            {(['semua', 'masuk', 'keluar'] as const).map(j => (
+            {[
+              { id: 'semua', label: 'Semua Transaksi' },
+              { id: 'omzet_ril', label: '💰 Omzet Riil Klien' },
+              { id: 'omzet_semu', label: '📥 Omzet Semu / Drop' },
+              { id: 'keluar', label: '▼ Pengeluaran' },
+            ].map(j => (
               <button
-                key={j}
-                onClick={() => setFilterJenis(j)}
-                className={`px-3 py-1.5 rounded-lg transition-all capitalize ${
-                  filterJenis === j ? 'bg-white text-gray-900 shadow-sm font-bold' : 'text-gray-500'
+                key={j.id}
+                onClick={() => setFilterJenis(j.id as any)}
+                className={`px-3 py-1.5 rounded-lg transition-all capitalize whitespace-nowrap ${
+                  filterJenis === j.id ? 'bg-white text-gray-900 shadow-sm font-bold' : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
-                {j === 'semua' ? 'Semua Jenis' : j === 'masuk' ? '▲ Pemasukan' : '▼ Pengeluaran'}
+                {j.label}
               </button>
             ))}
           </div>
@@ -281,49 +297,27 @@ export function TransactionsList() {
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDrop={(e) => handleDrop(e, idx)}
                     onClick={() => setSelectedTx(tx)}
-                    className={`p-4 border rounded-2xl space-y-2.5 shadow-sm transition-all cursor-pointer ${
-                      dragOverIdx === idx
-                        ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400'
-                        : 'bg-gray-50/90 hover:bg-emerald-50/30 border-gray-200/80 hover:border-emerald-300'
-                    } ${draggedIdx === idx ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                    className={`p-4 bg-white border rounded-2xl shadow-xs space-y-2.5 transition-all cursor-pointer ${
+                      dragOverIdx === idx ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20' : 'border-gray-100 hover:border-gray-200'
+                    } ${draggedIdx === idx ? 'opacity-40' : 'opacity-100'}`}
                   >
-                    {/* Top Drag Control Bar */}
-                    <div className="flex items-center justify-between gap-2 border-b border-gray-200/70 pb-2">
-                      <div className="flex items-center gap-1 text-gray-400 cursor-grab active:cursor-grabbing select-none" title="Geser (Drag) untuk mengubah urutan">
-                        <GripVertical size={16} className="text-gray-400 hover:text-emerald-600" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Urutan #{idx + 1}</span>
-                      </div>
-                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={(e) => handleMoveUp(e, idx)}
-                          className="p-1 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-gray-600 transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
-                          title="Pindahkan Ke Atas"
+                    {/* Top Row: Scope Badge, Date & Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {/* Drag Handle */}
+                        <span 
+                          onClick={e => e.stopPropagation()} 
+                          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-emerald-600 p-0.5" 
+                          title="Geser posisi"
                         >
-                          <ChevronUp size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={idx === displaySorted.length - 1}
-                          onClick={(e) => handleMoveDown(e, idx)}
-                          className="p-1 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-gray-600 transition-colors disabled:opacity-20 disabled:hover:bg-transparent"
-                          title="Pindahkan Ke Bawah"
-                        >
-                          <ChevronDown size={15} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Scope Badge, Date & Status */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                          <GripVertical size={14} />
+                        </span>
                         {isKas ? (
-                          <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200">
+                          <span className="text-[11px] px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200">
                             🏢 Kas Utama
                           </span>
                         ) : (
-                          <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 truncate max-w-[160px]">
+                          <span className="text-[11px] px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200">
                             🏗️ {prjName}
                           </span>
                         )}
@@ -346,6 +340,17 @@ export function TransactionsList() {
                           </p>
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5 min-w-0 max-w-full">
                             <p className="text-xs text-gray-500 font-medium whitespace-nowrap">{tx.kategori}</p>
+                            {tx.jenis === 'masuk' && (
+                              isOmzetRil(tx) ? (
+                                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                                  💰 Omzet Riil
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                  📥 Omzet Semu
+                                </span>
+                              )
+                            )}
                             {tx.penerimaDetail && (
                               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-full">
                                 🏦 {tx.penerimaDetail}
@@ -443,6 +448,17 @@ export function TransactionsList() {
                           <p className="font-bold text-gray-900 break-words">{tx.deskripsi}</p>
                           <div className="flex items-center gap-2 flex-wrap mt-0.5">
                             <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                            {tx.jenis === 'masuk' && (
+                              isOmzetRil(tx) ? (
+                                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                                  💰 Omzet Riil (Klien)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                  📥 Omzet Semu (Drop/Mutasi)
+                                </span>
+                              )
+                            )}
                             {tx.penerimaDetail && (
                               <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 truncate max-w-[280px]">
                                 🏦 {tx.penerimaDetail}
