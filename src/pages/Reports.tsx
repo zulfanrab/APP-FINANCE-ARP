@@ -15,7 +15,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import {
-  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation, isMutasiInternal, isOmzetKlien
+  getCategoryBreakdown, getCashflowTrend, buildAISummaryContext, cleanTextPunctuation, isMutasiInternal, isOmzetKlien, isOmzetRil, isOmzetSemu
 } from '../services/analyticsService';
 import { exportAccountingJournalExcel } from '../services/exportService';
 import { type Transaction, type Project } from '../types';
@@ -45,6 +45,7 @@ export function Reports() {
   const [period, setPeriod] = useState<PeriodType>('bulan_ini');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [omzetTab, setOmzetTab] = useState<'semua' | 'riil' | 'semu'>('semua');
 
   // AI & PDF
   const [aiLoading, setAiLoading] = useState(false);
@@ -76,9 +77,9 @@ export function Reports() {
     };
   }, [period, customFrom, customTo]);
 
-  const { categoryData, cashflowData, summary } = React.useMemo(() => {
+  const { categoryData, cashflowData, summary, omzetRilTx, omzetSemuTx } = React.useMemo(() => {
     if (allTransactions.length === 0) {
-      return { categoryData: [], cashflowData: [], summary: null };
+      return { categoryData: [], cashflowData: [], summary: null, omzetRilTx: [], omzetSemuTx: [] };
     }
 
     const { from, to } = getPeriodDates();
@@ -96,13 +97,18 @@ export function Reports() {
     let totalMasuk = 0, dropDanaOwner = 0, omzetKlien = 0, totalKeluar = 0, opsBiaya = 0, privBiaya = 0;
     let adminDivisiBiaya = 0, itDivisiBiaya = 0, ahliDivisiBiaya = 0;
 
+    const rList: Transaction[] = [];
+    const sList: Transaction[] = [];
+
     for (const t of periodTx) {
       if (t.jenis === 'masuk') {
         totalMasuk += t.nominal;
-        if (isOmzetKlien(t)) {
+        if (isOmzetRil(t)) {
           omzetKlien += t.nominal;
+          rList.push(t);
         } else {
           dropDanaOwner += t.nominal;
+          sList.push(t);
         }
       } else {
         if (!isMutasiInternal(t)) {
@@ -136,9 +142,17 @@ export function Reports() {
       ahliDivisiBiaya,
       net: netPnL,
       count: periodTx.length,
+      omzetRilCount: rList.length,
+      omzetSemuCount: sList.length,
     };
 
-    return { categoryData: cats, cashflowData: cashflow, summary: summaryObj };
+    return {
+      categoryData: cats,
+      cashflowData: cashflow,
+      summary: summaryObj,
+      omzetRilTx: rList,
+      omzetSemuTx: sList
+    };
   }, [allTransactions, projects, getPeriodDates]);
 
   const handleAiSummary = async () => {
@@ -174,28 +188,32 @@ export function Reports() {
       // Smart Fallback Financial AI Engine (Clean Text without Markdown Symbols)
       const sum = summary || {
         totalMasuk: 0,
+        omzetKlien: 0,
+        dropDanaOwner: 0,
         totalKeluar: 0,
         opsBiaya: 0,
         privBiaya: 0,
         net: 0,
       };
-      const margin = sum.totalMasuk > 0 ? Math.round(((sum.totalMasuk - sum.totalKeluar) / sum.totalMasuk) * 100) : 0;
+      const margin = sum.omzetKlien > 0 ? Math.round(((sum.omzetKlien - sum.totalKeluar) / sum.omzetKlien) * 100) : 0;
       const topCat = categoryData.length > 0 ? categoryData[0] : null;
       const privePercent = sum.totalKeluar > 0 ? Math.round((sum.privBiaya / sum.totalKeluar) * 100) : 0;
 
       const fallbackText = `Analisis & Executive Summary Keuangan PT Aksara Riksa Perdana
 
-1. Kinerja & Kesehatan Arus Kas:
-- Total Pemasukan Kas Utama: ${formatRupiah(sum.totalMasuk)}
-- Total Pengeluaran Kas Utama: ${formatRupiah(sum.totalKeluar)} (Operasional: ${formatRupiah(sum.opsBiaya)} | Prive Owner: ${formatRupiah(sum.privBiaya)})
-- Arus Kas Bersih (Net Cashflow): ${sum.net >= 0 ? '+' : ''}${formatRupiah(sum.net)} (${margin}% Net Margin)
+1. Kinerja & Audit Omzet Usaha:
+- Total Pemasukan Kas: ${formatRupiah(sum.totalMasuk)}
+- 💰 Omzet Riil Klien (P&L): ${formatRupiah(sum.omzetKlien)} (${sum.totalMasuk > 0 ? Math.round((sum.omzetKlien / sum.totalMasuk) * 100) : 0}% dari Total Pemasukan)
+- 📥 Omzet Semu / Drop Dana: ${formatRupiah(sum.dropDanaOwner)} (${sum.totalMasuk > 0 ? Math.round((sum.dropDanaOwner / sum.totalMasuk) * 100) : 0}% Pemasukan Non-Omzet / Transfer)
 
-2. Sorotan Utama & Pengeluaran Terbesar:
+2. Kinerja Beban & Laba Bersih P&L:
+- Total Pengeluaran: ${formatRupiah(sum.totalKeluar)} (Operasional: ${formatRupiah(sum.opsBiaya)} | Prive Owner: ${formatRupiah(sum.privBiaya)})
+- Laba Bersih Usaha (Omzet Riil - Pengeluaran): ${sum.net >= 0 ? '+' : ''}${formatRupiah(sum.net)} (${margin}% Net Profit Margin)
+
+3. Sorotan Audit & Rekomendasi:
 ${topCat ? `- Pengeluaran terbesar tercatat pada kategori ${topCat.kategori} sebesar ${formatRupiah(topCat.nominal)} (${topCat.percentage}% dari total pengeluaran).` : '- Belum ada pengeluaran signifikan tercatat pada periode ini.'}
 - Pengambilan Prive Owner menyerap ${privePercent}% dari total pengeluaran periode ini.
-
-3. Rekomendasi Strategis:
-${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi modal operasional proyek dan pertahankan rasio prive di bawah 20% agar modal kerja tetap kuat.' : 'Arus kas defisit pada periode ini. Disarankan pengetatan pengeluaran non-operasional dan mempercepat pencairan termin dari klien.'}`;
+${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Riil terhadap total penerimaan agar tidak tergantung pada drop dana modal.' : 'Laba bersih P&L defisit pada periode ini. Percepat pelunasan invoice klien dan batasi pengeluaran non-operasional.'}`;
 
       setAiResult(cleanTextPunctuation(fallbackText));
       addToast('success', 'Ringkasan Analisis Keuangan berhasil dibuat!');
@@ -216,7 +234,7 @@ ${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi mo
       isConsolidated: true,
     });
 
-    addToast('success', 'Jurnal Akuntansi Excel Konsolidasi (74 Transaksi Lengkap) berhasil didownload!');
+    addToast('success', 'Jurnal Akuntansi Excel Konsolidasi berhasil didownload!');
   };
 
   if (globalLoading) return <LoadingSpinner size={32} />;
@@ -230,7 +248,7 @@ ${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi mo
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-gray-100 shadow-card">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Laporan Keuangan</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Analisis arus kas &amp; ekspor laporan resmi bertanda tangan</p>
+          <p className="text-xs text-gray-500 mt-0.5">Analisis omzet riil vs semu, arus kas &amp; ekspor laporan resmi</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" icon={<Download size={15} />} onClick={handleExportExcel}>
@@ -291,14 +309,36 @@ ${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi mo
         </Card>
       )}
 
-      {/* Summary Stat Cards */}
+      {/* Summary Stat Cards — Explicit Omzet Riil vs Semu */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan</p>
-            <p className="text-2xl font-extrabold text-emerald-600">{formatRupiah(summary.totalMasuk)}</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pemasukan Kas</p>
+            <p className="text-2xl font-extrabold text-slate-900">{formatRupiah(summary.totalMasuk)}</p>
             <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">
-              Drop Dana / Modal: <strong className="text-amber-700">{formatRupiah(summary.dropDanaOwner)}</strong> | Omzet Klien: <strong className="text-emerald-700">{formatRupiah(summary.omzetKlien)}</strong>
+              Riil: <strong className="text-emerald-700">{formatRupiah(summary.omzetKlien)}</strong> | Semu: <strong className="text-amber-700">{formatRupiah(summary.dropDanaOwner)}</strong>
+            </p>
+          </Card>
+
+          <Card className="!p-4 bg-emerald-50/60 border border-emerald-200/80 shadow-card">
+            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>💰 Omzet Riil (Klien)</span>
+              <span className="text-[10px] px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full font-bold">P&amp;L</span>
+            </p>
+            <p className="text-2xl font-extrabold text-emerald-700">{formatRupiah(summary.omzetKlien)}</p>
+            <p className="text-[11px] text-emerald-700 font-medium mt-1">
+              {summary.omzetRilCount} transaksi pembayaran klien
+            </p>
+          </Card>
+
+          <Card className="!p-4 bg-amber-50/60 border border-amber-200/80 shadow-card">
+            <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>📥 Omzet Semu (Drop/Mutasi)</span>
+              <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 rounded-full font-bold">Non-Omzet</span>
+            </p>
+            <p className="text-2xl font-extrabold text-amber-700">{formatRupiah(summary.dropDanaOwner)}</p>
+            <p className="text-[11px] text-amber-700 font-medium mt-1">
+              {summary.omzetSemuCount} transfer modal &amp; refund
             </p>
           </Card>
 
@@ -313,15 +353,123 @@ ${sum.net >= 0 ? 'Arus kas dalam kondisi Sehat & Positif. Pertahankan alokasi mo
             <p className={`text-2xl font-extrabold ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {summary.net >= 0 ? '+' : ''}{formatRupiah(summary.net)}
             </p>
-            <p className="text-[11px] text-gray-400 mt-1">Omzet Klien - Total Pengeluaran</p>
-          </Card>
-
-          <Card className="!p-4 bg-slate-900 text-white shadow-card">
-            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Jumlah Transaksi</p>
-            <p className="text-2xl font-extrabold">{summary.count} data</p>
-            <p className="text-[11px] text-slate-400 mt-1">Terverifikasi &amp; disetujui</p>
+            <p className="text-[11px] text-gray-400 mt-1">Omzet Riil Klien - Pengeluaran</p>
           </Card>
         </div>
+      )}
+
+      {/* 📊 AUDIT SECTION: ANALISIS PENETAPAN OMZET RIIL VS OMZET SEMU */}
+      {summary && (
+        <Card className="!p-5 border border-emerald-100 shadow-card bg-white space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+            <div>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <span>🔍</span> Audit &amp; Klasifikasi Omzet: Riil vs Semu
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Pemisahan tegas penerimaan riil klien (pendapatan P&amp;L) dengan uang masuk non-omzet (drop dana modal &amp; mutasi)
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+              <button
+                onClick={() => setOmzetTab('semua')}
+                className={`px-3 py-1 rounded-lg transition-all ${omzetTab === 'semua' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
+              >
+                Semua ({summary.omzetRilCount + summary.omzetSemuCount})
+              </button>
+              <button
+                onClick={() => setOmzetTab('riil')}
+                className={`px-3 py-1 rounded-lg transition-all ${omzetTab === 'riil' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-emerald-700'}`}
+              >
+                💰 Omzet Riil ({summary.omzetRilCount})
+              </button>
+              <button
+                onClick={() => setOmzetTab('semu')}
+                className={`px-3 py-1 rounded-lg transition-all ${omzetTab === 'semu' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:text-amber-700'}`}
+              >
+                📥 Omzet Semu ({summary.omzetSemuCount})
+              </button>
+            </div>
+          </div>
+
+          {/* Visual Percentage Progress Bar */}
+          <div className="space-y-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+            <div className="flex justify-between text-xs font-bold">
+              <span className="text-emerald-700 flex items-center gap-1">
+                💰 Omzet Riil Klien: {formatRupiah(summary.omzetKlien)} ({summary.totalMasuk > 0 ? Math.round((summary.omzetKlien / summary.totalMasuk) * 100) : 0}%)
+              </span>
+              <span className="text-amber-700 flex items-center gap-1">
+                📥 Omzet Semu / Drop Dana: {formatRupiah(summary.dropDanaOwner)} ({summary.totalMasuk > 0 ? Math.round((summary.dropDanaOwner / summary.totalMasuk) * 100) : 0}%)
+              </span>
+            </div>
+            <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden flex">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${summary.totalMasuk > 0 ? (summary.omzetKlien / summary.totalMasuk) * 100 : 0}%` }}
+              />
+              <div
+                className="h-full bg-amber-400 transition-all duration-500"
+                style={{ width: `${summary.totalMasuk > 0 ? (summary.dropDanaOwner / summary.totalMasuk) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Table of Classified Inflows */}
+          <div className="overflow-x-auto">
+            {(() => {
+              const displayList = omzetTab === 'riil'
+                ? omzetRilTx
+                : omzetTab === 'semu'
+                ? omzetSemuTx
+                : [...omzetRilTx, ...omzetSemuTx].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+
+              if (displayList.length === 0) {
+                return <p className="text-xs text-gray-400 text-center py-6">Tidak ada transaksi pemasukan pada kategori ini</p>;
+              }
+
+              return (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 text-gray-500 uppercase font-semibold border-b border-gray-100">
+                    <tr>
+                      <th className="px-3 py-2">Tanggal</th>
+                      <th className="px-3 py-2">Uraian / Deskripsi</th>
+                      <th className="px-3 py-2">Kategori</th>
+                      <th className="px-3 py-2">Klasifikasi Omzet</th>
+                      <th className="px-3 py-2 text-right">Nominal (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {displayList.map(t => {
+                      const isReal = isOmzetRil(t);
+                      return (
+                        <tr key={t.id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-3 py-2.5 whitespace-nowrap font-medium text-gray-600">{formatDate(t.tanggal)}</td>
+                          <td className="px-3 py-2.5 font-semibold text-gray-900 max-w-xs truncate">{t.deskripsi}</td>
+                          <td className="px-3 py-2.5 text-gray-500">{t.kategori}</td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {isReal ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                💰 Omzet Riil (Klien)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                📥 Omzet Semu (Drop/Mutasi)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-extrabold text-gray-900 tabular-nums">
+                            {formatRupiah(t.nominal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+        </Card>
       )}
 
       {/* Realisasi Pengeluaran Per Divisi (Admin, IT, Ahli) */}

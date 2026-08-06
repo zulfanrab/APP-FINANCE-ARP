@@ -17,6 +17,7 @@ import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
 import { uploadAttachmentFile, compressFileToAttachment } from '../../services/storageService';
 import { formatRupiah, formatDate, StatusBadge } from './index';
+import { isOmzetRil } from '../../services/analyticsService';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { parseRecipientString, extractHistoricalRecipients } from '../../utils/bankHelper';
@@ -394,6 +395,21 @@ export function TransactionDetailModal({
                 <span className="truncate">Tanggal: <strong className="text-white">{formatDate(displayTx.tanggal)}</strong></span>
                 <span className="truncate">Kategori: <strong className="text-emerald-300">{displayTx.kategori}</strong></span>
               </div>
+
+              {displayTx.jenis === 'masuk' && (
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 gap-2 flex-wrap">
+                  <span>Klasifikasi Omzet:</span>
+                  {isOmzetRil(displayTx) ? (
+                    <span className="text-[11px] px-2.5 py-0.5 bg-emerald-500/30 text-emerald-300 rounded-full font-bold border border-emerald-500/40">
+                      💰 Omzet Riil (Pendapatan Klien P&amp;L)
+                    </span>
+                  ) : (
+                    <span className="text-[11px] px-2.5 py-0.5 bg-amber-500/30 text-amber-300 rounded-full font-bold border border-amber-500/40">
+                      📥 Omzet Semu (Non-Omzet / Drop Dana / Transfer)
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Rejection Note from Management */}

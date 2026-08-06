@@ -9,7 +9,7 @@ import { type Transaction, type Project } from '../types';
 import { formatDate, formatRupiah } from '../components/ui';
 import { groupAndSortTransactions } from './transactionService';
 import { classifyTransaction } from './financialEngine';
-import { isMutasiInternal } from './analyticsService';
+import { isMutasiInternal, isOmzetRil, isOmzetSemu } from './analyticsService';
 
 interface ExportJournalOptions {
   title: string;
@@ -47,6 +47,8 @@ export function exportAccountingJournalExcel({
   let runningBalance = 0;
   let totalDebet = 0;
   let totalKredit = 0;
+  let totalOmzetRil = 0;
+  let totalOmzetSemu = 0;
 
   // Build Sheet 1: JURNAL UMUM (Accounting Journal Style)
   const journalRows: any[][] = [
@@ -61,6 +63,7 @@ export function exportAccountingJournalExcel({
       'NO. REFERENSI',
       'URAIAN / DESKRIPSI TRANSAKSI',
       'KATEGORI AKUN',
+      'KLASIFIKASI PENDAPATAN',
       'SUMBER KAS',
       'TAG PERUNTUKAN',
       'DEBET (PEMASUKAN - RP)',
@@ -91,6 +94,14 @@ export function exportAccountingJournalExcel({
       }
     }
 
+    if (t.jenis === 'masuk') {
+      if (isOmzetRil(t)) {
+        totalOmzetRil += debet;
+      } else {
+        totalOmzetSemu += debet;
+      }
+    }
+
     totalDebet += debet;
     totalKredit += kredit;
     runningBalance += debet - kredit;
@@ -99,12 +110,18 @@ export function exportAccountingJournalExcel({
       ? projects.find(p => p.id === t.proyekId)?.nama || 'Dana Proyek'
       : 'Kas Utama';
 
+    let klasifikasiOmzetStr = '-';
+    if (t.jenis === 'masuk') {
+      klasifikasiOmzetStr = isOmzetRil(t) ? '💰 Omzet Riil (Klien)' : '📥 Omzet Semu (Drop/Mutasi)';
+    }
+
     journalRows.push([
       idx + 1,
       formatDate(t.tanggal),
       t.id.slice(-8).toUpperCase(),
       t.deskripsi,
       t.kategori,
+      klasifikasiOmzetStr,
       projectName,
       t.tag === 'operasional' ? 'Operasional' : t.tag === 'pribadi' ? 'Non-Operasional / Prive' : '-',
       debet || '',
@@ -124,6 +141,7 @@ export function exportAccountingJournalExcel({
     '',
     '',
     '',
+    '',
     totalDebet,
     totalKredit,
     runningBalance,
@@ -137,6 +155,7 @@ export function exportAccountingJournalExcel({
     { wch: 14 }, // Ref
     { wch: 40 }, // Deskripsi
     { wch: 22 }, // Kategori
+    { wch: 26 }, // Klasifikasi Pendapatan
     { wch: 25 }, // Sumber Kas
     { wch: 16 }, // Tag
     { wch: 22 }, // Debet
@@ -154,14 +173,16 @@ export function exportAccountingJournalExcel({
     [],
     ['KOMPONEN KEUANGAN', 'NOMINAL (RP)', 'KETERANGAN'],
     ['Total Debet (Pemasukan Kas)', totalDebet, 'Semua arus dana masuk disetujui'],
+    ['💰 Omzet Riil Klien (P&L)', totalOmzetRil, 'Pendapatan murni dari klien / usaha'],
+    ['📥 Omzet Semu / Drop Dana', totalOmzetSemu, 'Drop dana modal, mutasi internal & refund'],
     ['Total Kredit (Pengeluaran Kas)', totalKredit, 'Semua arus dana keluar disetujui'],
-    ['Net Cashflow / Saldo Periode', totalDebet - totalKredit, totalDebet > 0 ? `${Math.round(((totalDebet - totalKredit) / totalDebet) * 100)}% Net Margin` : '-'],
+    ['Laba Bersih P&L (Omzet Riil - Pengeluaran)', totalOmzetRil - totalKredit, totalOmzetRil > 0 ? `${Math.round(((totalOmzetRil - totalKredit) / totalOmzetRil) * 100)}% Net Margin` : '-'],
     ['Saldo Kumulatif Akhir', runningBalance, 'Posisi Kas Terakhir'],
     ['Total Transaksi Terverifikasi', sorted.length, 'Baris data jurnal'],
   ];
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-  wsSummary['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 35 }];
+  wsSummary['!cols'] = [{ wch: 36 }, { wch: 22 }, { wch: 40 }];
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Ringkasan Eksekutif');
 
   // Generate File

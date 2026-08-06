@@ -46,55 +46,109 @@ export function isRefundToKasUtama(t: Transaction): boolean {
 }
 
 /**
- * Klasifikasi Pemasukan 1: Omzet Klien (Omzet Riil P&L)
- * HANYA transaksi Pemasukan ber-kategori:
- * - Pembayaran Klien / Proyek
- * - DP / Termijn Proyek
- * - Pelunasan Proyek
- * - PENDAPATAN / OMZET KLIEN (Laba-Rugi P&L)
- * - Atau keyword pembayaran, termijn, termin, pelunasan, klien, invoice, omzet, pendapatan
+ * Klasifikasi Pemasukan 1: Omzet Riil Klien (Omzet Murni P&L)
+ * HANYA penerimaan riil atas jasa/produk dari Klien yang menjadi pendapatan usaha asli.
  */
-export function isOmzetKlien(t: Transaction): boolean {
+export function isOmzetRil(t: Transaction): boolean {
   if (t.jenis !== 'masuk') return false;
   if (!isApproved(t)) return false;
 
   const classification = classifyTransaction(t);
-  if (classification.isMutasiInternal || classification.isExternalCapital || classification.isCapitalInjectionToProject || classification.isRefundToKasUtama || classification.isVendorRefund) {
+  if (
+    classification.isMutasiInternal ||
+    classification.isExternalCapital ||
+    classification.isCapitalInjectionToProject ||
+    classification.isRefundToKasUtama ||
+    classification.isVendorRefund
+  ) {
     return false;
   }
 
   const k = (t.kategori || '').toLowerCase().trim();
+  const d = (t.deskripsi || '').toLowerCase().trim();
 
-  if (
-    k.includes('drop dana') ||
-    k.includes('alokasi modal') ||
-    k.includes('suntikan modal') ||
-    k.includes('setoran modal') ||
-    k.includes('modal awal') ||
-    k.includes('saldo awal') ||
-    k.includes('refund') ||
-    k.includes('prive') ||
-    k.includes('modal & drop dana')
-  ) {
+  // Keyword eksplisit Omzet Semu / Non-Omzet (Drop Dana, Modal, Transfer, Refund, Talangan, Prive, Non-Klien)
+  const nonOmzetKeywords = [
+    'drop dana',
+    'alokasi modal',
+    'suntikan modal',
+    'setoran modal',
+    'modal awal',
+    'saldo awal',
+    'refund',
+    'prive',
+    'modal & drop dana',
+    'mutasi',
+    'transfer kas',
+    'talangan',
+    'titipan',
+    'pinjaman',
+    'deposit',
+    'pengembalian',
+    'cashback',
+    'bunga bank'
+  ];
+
+  if (nonOmzetKeywords.some(kw => k.includes(kw) || d.includes(kw))) {
     return false;
+  }
+
+  // Keyword eksplisit Omzet Klien / Pendapatan Usaha
+  const omzetKeywords = [
+    'pembayaran klien',
+    'dp / termijn',
+    'termijn',
+    'termin',
+    'pelunasan',
+    'klien',
+    'invoice',
+    'omzet',
+    'pendapatan',
+    'riksa uji',
+    'suket k3',
+    'kontrak',
+    'honorarium klien',
+    'penjualan',
+    'tagihan'
+  ];
+
+  if (omzetKeywords.some(kw => k.includes(kw) || d.includes(kw))) {
+    return true;
+  }
+
+  // Kategori standar omzet
+  if (
+    k === 'pembayaran klien / proyek' ||
+    k === 'dp / termijn proyek' ||
+    k === 'pelunasan proyek' ||
+    k === 'pendapatan / omzet klien (laba-rugi p&l)' ||
+    k === 'pendapatan' ||
+    k === 'omzet'
+  ) {
+    return true;
   }
 
   return true;
 }
 
+/** Legacy & Standard Alias for Omzet Klien */
+export function isOmzetKlien(t: Transaction): boolean {
+  return isOmzetRil(t);
+}
+
 /**
- * Klasifikasi Pemasukan 2: Drop Dana / Modal Injection
- * Transaksi Pemasukan ber-kategori:
- * - Drop Dana Kas Utama / Holding
- * - Alokasi Modal Operasional Proyek
- * - Setoran Modal Owner / Direksi
- * - MODAL & DROP DANA (Menambah Kas)
- * - Saldo Awal / Refund / Suntikan Modal
+ * Klasifikasi Pemasukan 2: Omzet Semu (Pemasukan Non-Omzet: Drop Dana / Transfer / Refund / Modal)
+ * Merupakan uang masuk kas yang BUKAN merupakan omzet riil dari Klien.
  */
-export function isDropDanaModal(t: Transaction): boolean {
+export function isOmzetSemu(t: Transaction): boolean {
   if (t.jenis !== 'masuk') return false;
   if (!isApproved(t)) return false;
-  return !isOmzetKlien(t);
+  return !isOmzetRil(t);
+}
+
+/** Alias untuk Drop Dana / Modal Non-Omzet */
+export function isDropDanaModal(t: Transaction): boolean {
+  return isOmzetSemu(t);
 }
 
 // ---- Dashboard Summary (COMBINED COMPANY CASH & REAL P&L) ----
