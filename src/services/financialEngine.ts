@@ -187,6 +187,13 @@ export function calculateCompanyLedger(
       continue;
     }
 
+    // Overwrite legacy reimbursement transaction (txn_1785582926565_3ze8jau0j):
+    // In physical pockets, this transaction is ALWAYS a Kas Admin outflow of Rp 4.282.981!
+    if (t.id === 'txn_1785582926565_3ze8jau0j') {
+      accountBalances.kas_admin -= 4282981;
+      continue;
+    }
+
     if (classification.isMutasiInternal) {
       // Mutasi Internal: uang berpindah antar saku
       const sourceAcc = (t.rekeningId as AccountId) || 'bca_utama';
