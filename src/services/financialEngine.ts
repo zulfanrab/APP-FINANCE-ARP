@@ -187,12 +187,6 @@ export function calculateCompanyLedger(
       continue;
     }
 
-    // Force legacy bugged reimbursement outflow (txn_1785582926565_3ze8jau0j) to deduct from kas_admin
-    if (t.id === 'txn_1785582926565_3ze8jau0j') {
-      accountBalances.kas_admin -= 4282981;
-      continue;
-    }
-
     if (classification.isMutasiInternal) {
       // Mutasi Internal: uang berpindah antar saku
       const sourceAcc = (t.rekeningId as AccountId) || 'bca_utama';
