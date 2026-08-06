@@ -146,12 +146,14 @@ export function ProjectDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editNama, setEditNama] = useState('');
   const [editKlien, setEditKlien] = useState('');
+  const [editAnggaran, setEditAnggaran] = useState('');
   const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (project) {
       setEditNama(project.nama);
       setEditKlien(project.klien);
+      setEditAnggaran(project.anggaran ? String(project.anggaran) : '');
       setEditPdfFile(null);
     }
   }, [project]);
@@ -174,6 +176,8 @@ export function ProjectDetail() {
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundNominal, setRefundNominal] = useState('');
+  const [refundDeskripsi, setRefundDeskripsi] = useState('');
   const [refundSaving, setRefundSaving] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
@@ -1030,6 +1034,27 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               onChange={e => setEditKlien(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {project?.tipe === 'operasional_kantor' ? 'Pagu Alokasi Modal Kantor (Rp)' : 'Target Invoice / Nilai Kontrak Pekerjaan (Rp)'}
+            </label>
+            <input
+              type="text"
+              value={editAnggaran ? new Intl.NumberFormat('id-ID').format(parseInt(editAnggaran.replace(/\D/g, '') || '0')) : ''}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, '');
+                setEditAnggaran(raw);
+              }}
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+              placeholder={project?.tipe === 'operasional_kantor' ? 'Contoh: 15.000.000' : 'Contoh: 35.000.000'}
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              {project?.tipe === 'operasional_kantor' 
+                ? 'Nominal pagu batas alokasi operasional kantor (acuan target).' 
+                : 'Nominal nilai pekerjaan/invoice terencana untuk menghitung proyeksi laba & persentase terpakai.'}
+            </p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">

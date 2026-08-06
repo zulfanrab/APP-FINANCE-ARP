@@ -65,8 +65,9 @@ export function Projects() {
     nama: '',
     klien: '',
     tipe: 'proyek_klien' as 'proyek_klien' | 'operasional_kantor',
+    anggaran: '',
     suratPengajuanPdfFile: null as File | null,
-    tanggalMulai: '',
+    tanggalMulai: new Date().toISOString().split('T')[0],
     deskripsi: '',
   });
   const [saving, setSaving] = useState(false);
@@ -77,6 +78,7 @@ export function Projects() {
       nama: '',
       klien: defaultTipe === 'operasional_kantor' ? 'Internal Kantor' : '',
       tipe: defaultTipe,
+      anggaran: '',
       suratPengajuanPdfFile: null,
       tanggalMulai: new Date().toISOString().split('T')[0],
       deskripsi: '',
@@ -91,6 +93,7 @@ export function Projects() {
       nama: p.nama,
       klien: p.klien,
       tipe: p.tipe ?? 'proyek_klien',
+      anggaran: p.anggaran ? String(p.anggaran) : '',
       suratPengajuanPdfFile: null,
       tanggalMulai: p.tanggalMulai,
       deskripsi: p.deskripsi ?? '',
@@ -103,6 +106,8 @@ export function Projects() {
     if (!form.nama.trim()) { addToast('error', 'Nama alokasi/proyek wajib diisi'); return; }
 
     const klienFinal = form.klien.trim() || (form.tipe === 'operasional_kantor' ? 'Internal Kantor' : 'Klien');
+    const parsedAnggaran = form.anggaran ? parseInt(form.anggaran.replace(/\D/g, ''), 10) || 0 : 0;
+
     setSaving(true);
     try {
       let pdfUrl = editingProject?.suratPengajuanPdf;
@@ -119,7 +124,7 @@ export function Projects() {
           nama: form.nama.trim(),
           klien: klienFinal,
           tipe: form.tipe,
-          anggaran: 0,
+          anggaran: parsedAnggaran,
           suratPengajuanPdf: pdfUrl,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
@@ -130,7 +135,7 @@ export function Projects() {
           nama: form.nama.trim(),
           klien: klienFinal,
           tipe: form.tipe,
-          anggaran: 0,
+          anggaran: parsedAnggaran,
           suratPengajuanPdf: pdfUrl,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
@@ -347,6 +352,27 @@ export function Projects() {
               placeholder={form.tipe === 'operasional_kantor' ? 'Contoh: Internal Kantor / Admin' : 'Contoh: PT Santika / Bapak Budi'}
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {form.tipe === 'operasional_kantor' ? 'Pagu Alokasi Modal Kantor (Rp, Opsional)' : 'Target Invoice / Nilai Kontrak Pekerjaan (Rp, Opsional)'}
+            </label>
+            <input
+              type="text"
+              value={form.anggaran ? new Intl.NumberFormat('id-ID').format(parseInt(form.anggaran.replace(/\D/g, '') || '0')) : ''}
+              onChange={e => {
+                const raw = e.target.value.replace(/\D/g, '');
+                setForm(f => ({ ...f, anggaran: raw }));
+              }}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+              placeholder={form.tipe === 'operasional_kantor' ? 'Contoh: 15.000.000 (Pagu Acuan Operasional)' : 'Contoh: 35.000.000 (Acuan Tagihan Invoice)'}
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              {form.tipe === 'operasional_kantor' 
+                ? 'Nominal pagu batas alokasi operasional kantor (hanya sebagai target acuan).' 
+                : 'Nominal nilai pekerjaan/invoice terencana untuk menghitung proyeksi laba & persentase.'}
+            </p>
           </div>
 
           <div>
