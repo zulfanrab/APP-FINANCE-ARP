@@ -277,7 +277,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       await updateProject(project.id, {
         nama: editNama.trim(),
         klien: editKlien.trim(),
-        anggaran: 0,
+        anggaran: editAnggaran ? parseInt(editAnggaran.replace(/\D/g, ''), 10) || 0 : 0,
         suratPengajuanPdf: pdfUrl,
       });
       addToast('success', 'Detail proyek berhasil diperbarui');
