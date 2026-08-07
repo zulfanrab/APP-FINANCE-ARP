@@ -12,7 +12,7 @@ import { Modal } from './Modal';
 import { type Transaction, type Project } from '../../types';
 import { formatDate, formatRupiah } from './index';
 import { groupAndSortTransactions } from '../../services/transactionService';
-import { isMutasiInternal } from '../../services/analyticsService';
+import { isMutasiInternal, isOmzetRil } from '../../services/analyticsService';
 import { classifyTransaction } from '../../services/financialEngine';
 
 interface PdfReportModalProps {
@@ -100,6 +100,8 @@ export function PdfReportModal({
   let modalAwal = 0;
   let totalDebet = 0;
   let totalKredit = 0;
+  let totalOmzetRil = 0;
+  let totalOmzetSemu = 0;
   let sisaDana = 0;
   let modalDisuntikkan = 0;
   let pemasukanKlien = 0;
@@ -162,8 +164,10 @@ export function PdfReportModal({
         totalDebet += t.nominal;
         if (isInjection || !isClientIncomeCategory(t.kategori)) {
           modalDisuntikkan += t.nominal;
+          totalOmzetSemu += t.nominal;
         } else {
           pemasukanKlien += t.nominal;
+          totalOmzetRil += t.nominal;
         }
       } else {
         currentBalance -= t.nominal;
@@ -226,6 +230,15 @@ export function PdfReportModal({
       currentBalance += debet - kredit;
       totalDebet += debet;
       totalKredit += kredit;
+
+      if (debet > 0) {
+        if (isOmzetRil(t)) {
+          totalOmzetRil += debet;
+        } else {
+          totalOmzetSemu += debet;
+        }
+      }
+
       if (!isMutasiInternal(t) && kredit > 0) {
         totalPengeluaranRiil += kredit;
       }
@@ -838,19 +851,23 @@ export function PdfReportModal({
                 </div>
               )
             ) : (
-              /* Kas Utama: 3 Cards */
-              <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Debet (Pemasukan)</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalDebet)}</p>
+              /* Kas Utama: 4 Cards (Omzet Riil, Omzet Semu, Total Pengeluaran, Saldo Akhir) */
+              <div className="summary-box flex flex-row justify-between items-stretch gap-2.5 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                <div className="summary-card card-green flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Omzet Riil Klien (P&L)</span>
+                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetRil)}</p>
                 </div>
-                <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
-                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
+                <div className="summary-card card-navy flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Omzet Semu / Drop</span>
+                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetSemu)}</p>
                 </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Akhir Periode</span>
-                  <p className="summary-val text-sm font-black tabular-nums">
+                <div className="summary-card card-red flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
+                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
+                </div>
+                <div className={`summary-card flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Akhir</span>
+                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">
                     {formatSaldoRupiah(sisaDana)}
                   </p>
                 </div>
