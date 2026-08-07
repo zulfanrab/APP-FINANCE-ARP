@@ -483,7 +483,7 @@ export function OwnerDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <SummaryCard label="Saldo BCA Utama" value={formatRupiah(summary.accountBalances?.bca_utama || 0)} icon={<Wallet size={20} className="text-white" />} color="bg-indigo-500" />
             <SummaryCard label="Saldo BRI Utama" value={formatRupiah(summary.accountBalances?.bri_utama || 0)} icon={<Wallet size={20} className="text-white" />} color="bg-blue-600" />
-            <SummaryCard label="Saldo Kas Admin" value={formatRupiah(summary.accountBalances?.kas_admin || 0)} icon={<Wallet size={20} className="text-white" />} color="bg-emerald-500" />
+            <SummaryCard label="Saldo Kas Admin" value={formatRupiah(summary.accountBalances?.kas_admin || 0)} icon={<Wallet size={20} className="text-white" />} color="bg-emerald-500" sub={`Dana Bebas: ${formatRupiah(Math.max(0, (summary.accountBalances?.kas_admin || 0) - (summary.totalKasProyek > 0 ? summary.totalKasProyek : 0)))} · Teralokasi: ${formatRupiah(summary.totalKasProyek > 0 ? summary.totalKasProyek : 0)}`} />
           </div>
         </div>
       )}
