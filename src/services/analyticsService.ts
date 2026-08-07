@@ -214,10 +214,24 @@ export function getDashboardSummary(
   // (Sangat Penting: DILARANG memasukkan totalDropDana ke dalam rumus Laba Bersih P&L!)
   const labaBersihBulanIni = totalOmzetBulanIni - pengeluaranOperasionalBulanIni;
 
+  // Calculate totalKasProyek (Dana Teralokasi Proyek) precisely from project summaries
+  let totalKasProyek = 0;
+  if (projects && projects.length > 0) {
+    for (const p of projects) {
+      const pTxns = transactions.filter(t => t.proyekId === p.id);
+      const summary = getProjectFinancialSummary(pTxns, p.anggaran || 0);
+      if (summary.sisaDanaProyek > 0) {
+        totalKasProyek += summary.sisaDanaProyek;
+      }
+    }
+  } else {
+    totalKasProyek = ledger.totalKasProyek;
+  }
+
   return {
     sisaKasTotal: ledger.sisaKasTotal,
     sisaKasUtama: ledger.sisaKasUtama,
-    totalKasProyek: ledger.totalKasProyek,
+    totalKasProyek,
     sisaKas: ledger.sisaKasTotal, // legacy compatibility
     totalPemasukanBulanIni,
     totalOmzetBulanIni,
