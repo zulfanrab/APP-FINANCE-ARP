@@ -451,10 +451,10 @@ export function OwnerDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <SummaryCard
               label="Total Kas Perusahaan"
-              value={formatRupiah(summary.sisaKasTotal)}
+              value={formatRupiah((summary.accountBalances?.bca_utama || 0) + (summary.accountBalances?.bri_utama || 0) + (summary.accountBalances?.kas_admin || 0))}
               icon={<Wallet size={22} className="text-white" />}
               color="gradient-primary"
-              sub={`Utama: ${formatRupiah(summary.sisaKasUtama)} · Proyek: ${formatRupiah(summary.totalKasProyek)}`}
+              sub={`BCA: ${formatRupiah(summary.accountBalances?.bca_utama || 0)} · BRI: ${formatRupiah(summary.accountBalances?.bri_utama || 0)} · Kas: ${formatRupiah(summary.accountBalances?.kas_admin || 0)}`}
             />
             <SummaryCard
               label="Pemasukan Bulan Ini"

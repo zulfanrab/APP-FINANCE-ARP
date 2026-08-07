@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, FolderOpen, Edit2, CheckCircle, Trash2,
+  Plus, FolderOpen, Edit2, CheckCircle, Trash2, RotateCcw,
   TrendingUp, TrendingDown, DollarSign, Calendar, Users, Wallet, ChevronRight
 } from 'lucide-react';
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
@@ -73,6 +73,7 @@ export function Projects() {
     suratPengajuanPdfFile: null as File | null,
     tanggalMulai: new Date().toISOString().split('T')[0],
     deskripsi: '',
+    status: 'aktif' as 'aktif' | 'selesai',
   });
   const [saving, setSaving] = useState(false);
 
@@ -86,6 +87,7 @@ export function Projects() {
       suratPengajuanPdfFile: null,
       tanggalMulai: new Date().toISOString().split('T')[0],
       deskripsi: '',
+      status: 'aktif',
     });
     setModalOpen(true);
   };
@@ -101,6 +103,7 @@ export function Projects() {
       suratPengajuanPdfFile: null,
       tanggalMulai: p.tanggalMulai,
       deskripsi: p.deskripsi ?? '',
+      status: p.status ?? 'aktif',
     });
     setModalOpen(true);
   };
@@ -132,6 +135,8 @@ export function Projects() {
           suratPengajuanPdf: pdfUrl,
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
+          status: form.status,
+          tanggalSelesai: form.status === 'selesai' ? (editingProject?.tanggalSelesai || new Date().toISOString().split('T')[0]) : undefined,
         });
         addToast('success', 'Proyek berhasil diperbarui!');
       } else {
@@ -159,6 +164,15 @@ export function Projects() {
     try {
       await completeProject(id);
       addToast('success', 'Proyek ditandai selesai');
+      triggerRefresh();
+    } catch {}
+  };
+
+  const handleReactivate = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await updateProject(id, { status: 'aktif', tanggalSelesai: undefined });
+      addToast('success', 'Proyek diaktifkan kembali!');
       triggerRefresh();
     } catch {}
   };
@@ -283,6 +297,7 @@ export function Projects() {
                 onSelect={() => navigate(`/proyek/${p.id}`)}
                 onEdit={(e) => openEdit(e, p)}
                 onComplete={(e) => handleComplete(e, p.id)}
+                onReactivate={(e) => handleReactivate(e, p.id)}
                 onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(p); }}
                 completed
               />
@@ -397,6 +412,37 @@ export function Projects() {
             )}
           </div>
 
+          {/* Status Selector when Editing */}
+          {editingProject && (
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-2">Status Alokasi / Proyek *</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, status: 'aktif' }))}
+                  className={`p-2.5 rounded-xl border text-center font-bold text-xs transition-all ${
+                    form.status === 'aktif'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-500/20'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  🟢 Aktif
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, status: 'selesai' }))}
+                  className={`p-2.5 rounded-xl border text-center font-bold text-xs transition-all ${
+                    form.status === 'selesai'
+                      ? 'border-purple-500 bg-purple-50 text-purple-900 ring-2 ring-purple-500/20'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  ✅ Selesai (Tutup Buku)
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai / Periode</label>
             <input
@@ -442,14 +488,25 @@ export function Projects() {
   );
 }
 
-function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, completed = false }: {
+interface ProjectCardProps {
   project: ProjectWithStats;
   onSelect: () => void;
   onEdit: (e: React.MouseEvent) => void;
   onComplete: (e: React.MouseEvent) => void;
+  onReactivate?: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
   completed?: boolean;
-}) {
+}
+
+function ProjectCard({
+  project,
+  onSelect,
+  onEdit,
+  onComplete,
+  onReactivate,
+  onDelete,
+  completed,
+}: ProjectCardProps) {
   const isKantor = project.tipe === 'operasional_kantor';
   const sisaModal = (project.sisaKas !== undefined) ? project.sisaKas : ((project.anggaran || 0) - project.totalPengeluaran);
 
@@ -466,15 +523,19 @@ function ProjectCard({ project, onSelect, onEdit, onComplete, onDelete, complete
           </Badge>
         </div>
         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-          <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+          <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Edit Proyek">
             <Edit2 size={14} />
           </button>
-          {!completed && (
+          {!completed ? (
             <button onClick={onComplete} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition-colors" title="Tandai Selesai">
               <CheckCircle size={14} />
             </button>
+          ) : (
+            <button onClick={onReactivate} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors" title="Aktifkan Kembali">
+              <RotateCcw size={14} />
+            </button>
           )}
-          <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors">
+          <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors" title="Hapus Proyek">
             <Trash2 size={14} />
           </button>
         </div>

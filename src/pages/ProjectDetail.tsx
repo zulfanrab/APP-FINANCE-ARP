@@ -398,6 +398,28 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     }
   };
 
+  const handleReactivateProject = async () => {
+    if (!project) return;
+    try {
+      await updateProject(project.id, { status: 'aktif', tanggalSelesai: undefined });
+      addToast('success', `Proyek "${project.nama}" diaktifkan kembali!`);
+      triggerRefresh();
+    } catch {
+      addToast('error', 'Gagal mengaktifkan proyek');
+    }
+  };
+
+  const handleCompleteProject = async () => {
+    if (!project) return;
+    try {
+      await updateProject(project.id, { status: 'selesai', tanggalSelesai: new Date().toISOString().split('T')[0] });
+      addToast('success', `Proyek "${project.nama}" ditandai selesai!`);
+      triggerRefresh();
+    } catch {
+      addToast('error', 'Gagal menyelesaikan proyek');
+    }
+  };
+
   const handleDeleteTx = async (txId: string) => {
     if (window.confirm('Yakin ingin menghapus transaksi ini?')) {
       try {
@@ -519,6 +541,15 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </Button>
           {role === 'admin' && (
             <>
+              {project.status === 'selesai' ? (
+                <Button variant="secondary" size="sm" icon={<RotateCcw size={15} className="text-emerald-600" />} onClick={handleReactivateProject}>
+                  Aktifkan Kembali
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" icon={<CheckCircle2 size={15} className="text-emerald-600" />} onClick={handleCompleteProject}>
+                  Tandai Selesai
+                </Button>
+              )}
               <Button variant="secondary" size="sm" icon={<Edit3 size={15} />} onClick={() => setEditModalOpen(true)}>
                 Edit
               </Button>
