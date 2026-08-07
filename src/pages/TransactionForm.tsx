@@ -46,6 +46,8 @@ export function TransactionForm() {
   const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
 
   // Category Manager Modal
   const [catModalOpen, setCatModalOpen] = useState(false);
@@ -194,6 +196,60 @@ export function TransactionForm() {
     setStagedFiles(prev => [...prev, ...newStaged]);
     addToast('success', `✅ ${newStaged.length} berkas ditambahkan.`);
     e.target.value = '';
+  };
+
+  // Drag-and-Drop Handlers (Desktop & Mobile Multi-File Support)
+  const processDroppedFiles = (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => 
+      f.type.startsWith('image/') || f.type === 'application/pdf' || 
+      /\.(jpg|jpeg|png|webp|heic|heif|pdf)$/i.test(f.name)
+    );
+    if (fileArray.length === 0) {
+      addToast('error', 'Format file tidak didukung. Gunakan foto (JPG/PNG/HEIC) atau PDF.');
+      return;
+    }
+    const newStaged: StagedFormAttachment[] = fileArray.map(file => ({
+      nama: file.name,
+      tipe: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      dataUrl: '',
+      previewUrl: URL.createObjectURL(file),
+      fileObj: file,
+    }));
+    setStagedFiles(prev => [...prev, ...newStaged]);
+    addToast('success', `✅ ${newStaged.length} berkas ditambahkan via drag & drop.`);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processDroppedFiles(e.dataTransfer.files);
+    }
   };
 
   const removeAttachment = (idx: number) => {
@@ -928,8 +984,27 @@ export function TransactionForm() {
             <input type="file" ref={ocrInputRef} accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" onChange={handleOcrFile} className="hidden" />
           </div>
 
-          {/* Staged File List */}
-          <div className="space-y-3">
+          {/* Staged File List — Drag & Drop Zone */}
+          <div
+            className={`space-y-3 relative rounded-2xl transition-all duration-200 ${
+              isDragging 
+                ? 'ring-2 ring-emerald-400 ring-offset-2 bg-emerald-50/60' 
+                : ''
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
+            {/* Drag Overlay */}
+            {isDragging && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-emerald-50/90 border-2 border-dashed border-emerald-500 rounded-2xl backdrop-blur-sm pointer-events-none">
+                <Upload size={36} className="text-emerald-500 mb-2 animate-bounce" />
+                <p className="text-sm font-bold text-emerald-700">Lepaskan file di sini!</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Foto (JPG/PNG/HEIC) & PDF didukung</p>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-gray-700">Lampiran Berkas ({stagedFiles.length})</label>
               <label
@@ -944,29 +1019,42 @@ export function TransactionForm() {
             {stagedFiles.length === 0 ? (
               <label
                 htmlFor="form-file-input"
-                className="block border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-2xl p-6 text-center text-gray-400 space-y-2 cursor-pointer transition-all active:scale-[0.99] select-none"
+                className="block border-2 border-dashed border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/40 rounded-2xl p-8 text-center text-gray-400 space-y-2.5 cursor-pointer transition-all active:scale-[0.99] select-none"
               >
-                <Upload size={28} className="mx-auto text-gray-400" />
-                <p className="text-xs font-semibold text-gray-600">Belum ada lampiran. Klik di sini untuk memilih foto resi / PDF.</p>
-                <p className="text-[10px] text-gray-400">Mendukung kamera HP, Galeri Foto &amp; Berkas PDF</p>
+                <Upload size={32} className="mx-auto text-gray-400" />
+                <p className="text-xs font-semibold text-gray-600">Klik untuk memilih atau seret & lepas file ke sini</p>
+                <p className="text-[10px] text-gray-400">Mendukung kamera HP, Galeri Foto, Berkas PDF • Multi-file drag & drop</p>
               </label>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {stagedFiles.map((staged, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText size={14} className="text-emerald-600 flex-shrink-0" />
-                      <span className="font-semibold text-gray-800 truncate">{staged.nama}</span>
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {stagedFiles.map((staged, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs group hover:border-emerald-300 transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {staged.previewUrl && staged.tipe.startsWith('image/') ? (
+                          <img src={staged.previewUrl} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-gray-200" />
+                        ) : (
+                          <FileText size={14} className="text-emerald-600 flex-shrink-0" />
+                        )}
+                        <span className="font-semibold text-gray-800 truncate">{staged.nama}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(idx)}
+                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg opacity-60 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(idx)}
-                      className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {/* Mini drop zone when files already exist */}
+                <label
+                  htmlFor="form-file-input"
+                  className="block border border-dashed border-gray-200 hover:border-emerald-400 rounded-xl p-3 text-center cursor-pointer transition-all hover:bg-emerald-50/30 select-none"
+                >
+                  <p className="text-[10px] font-medium text-gray-400">+ Klik atau seret file tambahan ke sini</p>
+                </label>
               </div>
             )}
           </div>
