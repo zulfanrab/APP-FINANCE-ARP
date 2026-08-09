@@ -424,9 +424,10 @@ export function getProjectFinancialSummary(
   }
 
   // Dynamic Capital Disuntikkan: 
-  // If there's an explicit initial funding, we don't add the implicit budget.
-  // Otherwise, we assume the implicit budget was given off-books, and any explicit tx is an EXTRA drop.
-  const implicitBudget = hasExplicitInitialFunding ? 0 : anggaranModal;
+  // If there are explicit capital injections from transactions (modalDisuntikkanFromTx > 0),
+  // we strictly use modalDisuntikkanFromTx. Otherwise, if no explicit drop transactions exist,
+  // we fallback to the implicit budget (anggaranModal).
+  const implicitBudget = (modalDisuntikkanFromTx > 0 || hasExplicitInitialFunding) ? 0 : anggaranModal;
   const modalDisuntikkan = implicitBudget + modalDisuntikkanFromTx;
   
   // Realisasi bersih adalah pengeluaran kotor dikurangi refund dari vendor

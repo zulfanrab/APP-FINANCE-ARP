@@ -970,13 +970,15 @@ export function PdfReportModal({
                             {budget > 0 ? formatRupiah(budget) : '-'}
                           </td>
                           <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
-                            {actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
+                            {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
                           </td>
-                          <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${selisih > 0 ? 'text-emerald-700' : selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
-                            {selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
+                          <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
+                            {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
                           </td>
                           <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
-                            {item.isPurchased ? (
+                            {item.isCancelled ? (
+                              <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
+                            ) : item.isPurchased ? (
                               <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
                             ) : (
                               <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>

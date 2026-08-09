@@ -10,7 +10,7 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp, FileUp, Ban
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
@@ -172,7 +172,18 @@ export function ProjectDetail() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
-  const [procurementExpanded, setProcurementExpanded] = useState(true);
+  const [procurementExpanded, setProcurementExpanded] = useState(() => {
+    const saved = localStorage.getItem(`procurement_expanded_${id}`);
+    return saved !== null ? saved === 'true' : false;
+  });
+
+  const toggleProcurementExpanded = () => {
+    setProcurementExpanded(prev => {
+      const next = !prev;
+      localStorage.setItem(`procurement_expanded_${id}`, String(next));
+      return next;
+    });
+  };
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
@@ -346,6 +357,20 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       triggerRefresh();
     } catch {
       addToast('error', 'Gagal menyimpan harga aktual');
+    }
+  };
+
+  const handleToggleCancelChecklist = async (itemId: string, currentCancelled?: boolean) => {
+    if (!project) return;
+    try {
+      const items = (project.procurementItems || []).map(item => 
+        item.id === itemId ? { ...item, isCancelled: !currentCancelled, isPurchased: false } : item
+      );
+      await updateProject(project.id, { procurementItems: items });
+      triggerRefresh();
+      addToast('info', !currentCancelled ? 'Item ditandai dibatalkan / tidak dipakai' : 'Item diaktifkan kembali');
+    } catch {
+      addToast('error', 'Gagal mengubah status pembatalan item');
     }
   };
 
@@ -588,22 +613,24 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               <p className="text-xs text-gray-500 mt-1">Checklist *cross-check* kesesuaian belanja dengan surat pengajuan.</p>
             </div>
             <div className="flex items-center gap-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<FileText size={15} className="text-purple-600" />}
-                onClick={() => setImportModalOpen(true)}
-              >
-                Import Teks Praktis
-              </Button>
-              <button
-                onClick={() => setProcurementExpanded(!procurementExpanded)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-colors border border-gray-200"
-                title={procurementExpanded ? 'Kecilkan / Sembunyikan' : 'Buka Checklist'}
-              >
-                <span>{procurementExpanded ? 'Tutup' : 'Buka List'}</span>
-                {procurementExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={procurementExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  onClick={toggleProcurementExpanded}
+                >
+                  {procurementExpanded ? 'Tutup Checklist' : 'Buka Checklist'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<FileUp size={15} className="text-emerald-600" />}
+                  onClick={() => setImportModalOpen(true)}
+                >
+                  Import Teks Praktis
+                </Button>
+              </div>
               {(() => {
                 const items = project.procurementItems || [];
                 const total = items.length;
@@ -726,25 +753,24 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
                         <div className="grid grid-cols-1 gap-2 pt-1">
                           {catItems.map(item => (
-                            <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                            <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${
+                              item.isCancelled ? 'bg-gray-100/70 border-gray-300 opacity-75' : item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'
+                            }`}>
                               <div 
                                 className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
-                                onClick={() => handleToggleChecklist(item.id, item.isPurchased)}
+                                onClick={() => !item.isCancelled && handleToggleChecklist(item.id, item.isPurchased)}
                               >
-                                {item.isPurchased ? (
+                                {item.isCancelled ? (
+                                  <Ban size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                ) : item.isPurchased ? (
                                   <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
                                 ) : (
                                   <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
                                 )}
                                 <div className="flex flex-col">
-                                  <span className={`text-sm font-medium ${item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                                    {item.kuantitas} {item.satuan ? item.satuan : 'x'} {item.nama}
+                                  <span className={`text-sm font-medium ${item.isCancelled ? 'text-gray-400 line-through' : item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                    {item.nama} {item.kuantitas > 1 && `(${item.kuantitas} ${item.satuan || 'pcs'})`}
                                   </span>
-                                  {item.hargaRencana !== undefined && (
-                                    <span className={`text-[10px] ${item.isPurchased ? 'text-gray-400' : 'text-gray-500'}`}>
-                                      Rencana: {formatRupiah(item.hargaRencana)}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
 

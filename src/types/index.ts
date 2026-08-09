@@ -52,6 +52,7 @@ export interface ProcurementItem {
   hargaAktual?: number;  // Total harga aktual pembelian
   kategori?: string;     // Operational Cost, Utilities, Overhead Cost, Biaya Lain-Lain
   isPurchased: boolean;
+  isCancelled?: boolean; // Item dibatalkan / tidak jadi beli
 }
 
 export interface Project {
