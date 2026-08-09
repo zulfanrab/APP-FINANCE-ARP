@@ -487,18 +487,18 @@ export function PdfReportModal({
             .kop-container {
               text-align: center;
               padding-bottom: 8px;
-              border-bottom: 2.5px solid #1A365D;
+              border-bottom: 2.5px solid #047857;
               margin-bottom: 2px;
             }
             .kop-line-secondary {
-              border-bottom: 1px solid #94A3B8;
+              border-bottom: 1px solid #A7F3D0;
               margin-bottom: 16px;
             }
             .company-title {
               font-family: 'Inter', sans-serif;
               font-size: 18px;
               font-weight: 900;
-              color: #1A365D;
+              color: #047857;
               letter-spacing: 0.5px;
               margin: 0;
               text-transform: uppercase;
@@ -516,7 +516,7 @@ export function PdfReportModal({
             .doc-title {
               font-size: 13.5px;
               font-weight: 800;
-              color: #1A365D;
+              color: #047857;
               text-transform: uppercase;
               letter-spacing: 0.5px;
               margin: 0;
@@ -604,14 +604,14 @@ export function PdfReportModal({
               break-inside: avoid !important;
             }
             table.journal-table th {
-              background-color: #1A365D !important;
+              background-color: #047857 !important;
               color: #FFFFFF !important;
               font-size: 9px;
               font-weight: 700;
               text-transform: uppercase;
               letter-spacing: 0.4px;
               padding: 9px 8px;
-              border: 1px solid #1A365D;
+              border: 1px solid #047857;
               line-height: 1.3;
               vertical-align: middle;
             }
@@ -654,12 +654,12 @@ export function PdfReportModal({
               height: 55px;
             }
             .signature-line {
-              border-top: 1px solid #1A365D;
+              border-top: 1.5px solid #047857;
               width: 170px;
               margin: 0 auto;
               padding-top: 4px;
               font-weight: 700;
-              color: #1A365D;
+              color: #047857;
             }
             .gallery-grid {
               display: flex;
@@ -772,8 +772,8 @@ export function PdfReportModal({
           <div ref={printRef} className="space-y-4 text-slate-900 font-sans">
             {/* EXACT OFFICIAL KOP HEADER FROM USER SCREENSHOT */}
             <div>
-              <div className="kop-container text-center pb-2 border-b-[2.5px] border-[#1A365D]">
-                <h1 className="company-title text-xl font-black text-[#1A365D] tracking-tight uppercase">
+              <div className="kop-container text-center pb-2 border-b-[2.5px] border-[#047857]">
+                <h1 className="company-title text-xl font-black text-[#047857] tracking-tight uppercase">
                   {companyName}
                 </h1>
                 <p className="company-info text-[10.5px] font-medium text-slate-700 mt-1 leading-relaxed">
@@ -781,12 +781,12 @@ export function PdfReportModal({
                   📞 {companyPhone} &nbsp;·&nbsp; ✉️ {companyEmail} &nbsp;·&nbsp; 🌐 {companyWebsite}
                 </p>
               </div>
-              <div className="kop-line-secondary border-b border-slate-300 mt-0.5 mb-4" />
+              <div className="kop-line-secondary border-b border-emerald-200 mt-0.5 mb-4" />
             </div>
 
             {/* DOCUMENT TITLE & METADATA */}
             <div className="doc-header text-center my-3">
-              <h2 className="doc-title text-base font-extrabold text-[#1A365D] uppercase tracking-wide">{displayTitle}</h2>
+              <h2 className="doc-title text-base font-extrabold text-[#047857] uppercase tracking-wide">{displayTitle}</h2>
               <p className="doc-subtitle text-xs text-slate-600 mt-1">
                 {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
               </p>
@@ -877,8 +877,8 @@ export function PdfReportModal({
             {/* SECTION 1: MATRIKS REALISASI ITEM PENGADAAN & VARIANS RAB (Rencana vs Realita) */}
             {project && project.procurementItems && project.procurementItems.length > 0 && (
               <div className="my-5 page-break-inside-avoid">
-                <div className="border-b border-[#1A365D] pb-1 mb-2 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-[#1A365D] uppercase tracking-wider m-0">
+                <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
                     📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
                   </h3>
                   <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
@@ -952,21 +952,21 @@ export function PdfReportModal({
 
             {/* SECTION 2: FORMAL ACCOUNTING JOURNAL TABLE */}
             <div className="overflow-x-auto my-4">
-              <div className="border-b border-[#1A365D] pb-1 mb-2">
-                <h3 className="text-xs font-bold text-[#1A365D] uppercase tracking-wider m-0">
+              <div className="border-b border-[#047857] pb-1 mb-2">
+                <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
                   📑 Jurnal Mutasi Realisasi Kas Lapangan (Rincian Transaksi Transparan)
                 </h3>
               </div>
               <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
                 <thead>
-                  <tr className="bg-[#1A365D] text-white text-[9.5px] uppercase tracking-wider font-bold">
-                    <th className="p-2.5 border border-[#1A365D] text-center w-10">No</th>
-                    <th className="p-2.5 border border-[#1A365D] text-center w-24">Tanggal</th>
-                    <th className="p-2.5 border border-[#1A365D] text-left">Uraian / Deskripsi Transaksi</th>
-                    <th className="p-2.5 border border-[#1A365D] text-left w-32">Kategori</th>
-                    <th className="p-2.5 border border-[#1A365D] text-right w-28">Debet (+)</th>
-                    <th className="p-2.5 border border-[#1A365D] text-right w-28">Kredit (-)</th>
-                    <th className="p-2.5 border border-[#1A365D] text-right w-32">Saldo Sisa (Rp)</th>
+                  <tr className="bg-[#047857] text-white text-[9.5px] uppercase tracking-wider font-bold">
+                    <th className="p-2.5 border border-[#047857] text-center w-10">No</th>
+                    <th className="p-2.5 border border-[#047857] text-center w-24">Tanggal</th>
+                    <th className="p-2.5 border border-[#047857] text-left">Uraian / Deskripsi Transaksi</th>
+                    <th className="p-2.5 border border-[#047857] text-left w-32">Kategori</th>
+                    <th className="p-2.5 border border-[#047857] text-right w-28">Debet (+)</th>
+                    <th className="p-2.5 border border-[#047857] text-right w-28">Kredit (-)</th>
+                    <th className="p-2.5 border border-[#047857] text-right w-32">Saldo Sisa (Rp)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1004,12 +1004,13 @@ export function PdfReportModal({
             </div>
 
             {/* FORMAL 3-COLUMN / 2-COLUMN SIGNATURE BOX AT BOTTOM */}
-            {project ? (
+            {project && !isInternal ? (
+              /* Proyek Klien dengan Tim Lapangan -> 3 Kolom */
               <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
                   <p className="text-xs text-slate-600 font-medium mb-1">Diajukan / Pelaksana:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#1A365D]">
+                  <div className="signature-line text-xs font-bold text-[#047857]">
                     Tim Pelaksana Lapangan
                   </div>
                   <p className="text-[9.5px] text-slate-400 mt-0.5">Penanggung Jawab Lapangan</p>
@@ -1018,7 +1019,7 @@ export function PdfReportModal({
                 <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
                   <p className="text-xs text-slate-600 font-medium mb-1">Diverifikasi &amp; Disiapkan:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#1A365D]">
+                  <div className="signature-line text-xs font-bold text-[#047857]">
                     Zulfan Rafly Baihaqi
                   </div>
                   <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Admin Keuangan (Finance)</p>
@@ -1027,18 +1028,19 @@ export function PdfReportModal({
                 <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
                   <p className="text-xs text-slate-600 font-medium mb-1">Mengetahui &amp; Disetujui:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#1A365D]">
+                  <div className="signature-line text-xs font-bold text-[#047857]">
                     Habsi Gufira Pradana
                   </div>
                   <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Direktur Utama</p>
                 </div>
               </div>
             ) : (
+              /* Pos Kantor / Transaksi Internal / Kas Utama -> 2 Kolom (Zulfan + Pak Habsi) */
               <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-around' }}>
                 <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Diverifikasi &amp; Disiapkan:</p>
+                  <p className="text-xs text-slate-600 font-medium mb-1">Diajukan &amp; Disiapkan:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#1A365D]">
+                  <div className="signature-line text-xs font-bold text-[#047857]">
                     Zulfan Rafly Baihaqi
                   </div>
                   <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Admin Keuangan (Finance)</p>
@@ -1047,7 +1049,7 @@ export function PdfReportModal({
                 <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
                   <p className="text-xs text-slate-600 font-medium mb-1">Mengetahui &amp; Disetujui:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#1A365D]">
+                  <div className="signature-line text-xs font-bold text-[#047857]">
                     Habsi Gufira Pradana
                   </div>
                   <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Direktur Utama</p>
