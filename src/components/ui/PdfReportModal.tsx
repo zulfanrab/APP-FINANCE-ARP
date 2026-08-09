@@ -50,6 +50,8 @@ export function PdfReportModal({
 }: PdfReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama'>('konsolidasi');
+  const [customPelaksanaName, setCustomPelaksanaName] = useState<string>('');
+  const [selectedPengajuanTxId, setSelectedPengajuanTxId] = useState<string>('semua');
 
   if (!isOpen) return null;
 
@@ -114,7 +116,18 @@ export function PdfReportModal({
     // ============================================================
     modalAwal = project.anggaran || 0;
 
-    const ptx = approvedTx.filter(t => t.proyekId === project.id);
+    let ptx = approvedTx.filter(t => t.proyekId === project.id);
+
+    // If a specific Surat Pengajuan is selected for LPJ filter
+    if (selectedPengajuanTxId !== 'semua') {
+      const targetInjectionTx = ptx.find(t => t.id === selectedPengajuanTxId);
+      if (targetInjectionTx) {
+        const injectionDate = new Date(targetInjectionTx.tanggal);
+        ptx = ptx.filter(t => t.id === selectedPengajuanTxId || new Date(t.tanggal) >= injectionDate);
+        displaySubtitle = `LPJ Khusus Pengajuan: ${targetInjectionTx.deskripsi} (${formatDate(targetInjectionTx.tanggal)})`;
+      }
+    }
+
     const sortedPtx = groupAndSortTransactions(ptx, 'asc');
 
     let currentBalance = 0;
@@ -452,12 +465,17 @@ export function PdfReportModal({
       }
     }
 
+    const sanitizeName = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dynamicDocTitle = project
+      ? `Laporan_Realisasi_${sanitizeName(project.nama)}_${new Date().toISOString().split('T')[0]}`
+      : `Laporan_Keuangan_${reportScope}_${new Date().toISOString().split('T')[0]}`;
+
     frameDoc.open();
     frameDoc.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${title} - ${companyName}</title>
+          <title>${dynamicDocTitle}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             @page {
@@ -736,35 +754,73 @@ export function PdfReportModal({
     <Modal isOpen={isOpen} onClose={onClose} title="Cetak Laporan PDF Resmi" size="xl">
       <div className="space-y-4">
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-slate-100 rounded-2xl border border-slate-200">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-            <FileText size={16} className="text-emerald-600 flex-shrink-0" />
-            <span>Format PDF KOP Resmi (Siap Cetak / Save PDF di HP &amp; PC)</span>
-          </div>
-          <div className="flex w-full sm:w-auto gap-2 flex-wrap items-center">
-            {!project && (
-              <select
-                value={reportScope}
-                onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
-                className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        <div className="flex flex-col gap-3 p-3.5 bg-slate-100 rounded-2xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <FileText size={16} className="text-emerald-600 flex-shrink-0" />
+              <span>Format PDF KOP Resmi (Siap Cetak / Save PDF di HP &amp; PC)</span>
+            </div>
+            <div className="flex w-full sm:w-auto gap-2 flex-wrap items-center">
+              {!project ? (
+                <select
+                  value={reportScope}
+                  onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
+                  className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
+                  <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
+                </select>
+              ) : (
+                (() => {
+                  const ptx = approvedTx.filter(t => t.proyekId === project.id);
+                  const injections = ptx.filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')));
+                  if (injections.length > 1) {
+                    return (
+                      <select
+                        value={selectedPengajuanTxId}
+                        onChange={e => setSelectedPengajuanTxId(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="semua">🌐 Akumulasi Total Proyek (Semua Pengajuan)</option>
+                        {injections.map((inj, idx) => (
+                          <option key={inj.id} value={inj.id}>
+                            📄 LPJ Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)} ({formatDate(inj.tanggal)})
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }
+                  return null;
+                })()
+              )}
+              <button
+                onClick={() => handlePrint(false)}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
               >
-                <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
-                <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
-              </select>
-            )}
-            <button
-              onClick={() => handlePrint(false)}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
-            >
-              <FileText size={16} /> Cetak Standar
-            </button>
-            <button
-              onClick={() => handlePrint(true)}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
-            >
-              <Printer size={16} /> Cetak + Lampiran
-            </button>
+                <FileText size={16} /> Cetak Standar
+              </button>
+              <button
+                onClick={() => handlePrint(true)}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95"
+              >
+                <Printer size={16} /> Cetak + Lampiran
+              </button>
+            </div>
           </div>
+
+          {/* Custom Pelaksana Name Input for Projects */}
+          {project && !isInternal && (
+            <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-2 text-xs">
+              <label className="font-bold text-slate-700 whitespace-nowrap">✍️ Nama Penanggung Jawab Lapangan (Untuk Tanda Tangan):</label>
+              <input
+                type="text"
+                value={customPelaksanaName}
+                onChange={e => setCustomPelaksanaName(e.target.value)}
+                placeholder="Contoh: Rio &amp; Ajay / Kates (Default: Tim Pelaksana Lapangan)"
+                className="flex-1 w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* Printable Document Preview Area */}
@@ -1011,7 +1067,7 @@ export function PdfReportModal({
                   <p className="text-xs text-slate-600 font-medium mb-1">Diajukan / Pelaksana:</p>
                   <div className="signature-space" style={{ height: '50px' }}></div>
                   <div className="signature-line text-xs font-bold text-[#047857]">
-                    Tim Pelaksana Lapangan
+                    {customPelaksanaName.trim() || 'Tim Pelaksana Lapangan'}
                   </div>
                   <p className="text-[9.5px] text-slate-400 mt-0.5">Penanggung Jawab Lapangan</p>
                 </div>
