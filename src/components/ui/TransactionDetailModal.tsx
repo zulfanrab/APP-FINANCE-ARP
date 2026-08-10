@@ -851,7 +851,9 @@ export function TransactionDetailModal({
               {(() => {
                 if (!editForm.proyekId) return null;
                 const projectTxns = cachedTransactions.filter(t => t.proyekId === editForm.proyekId);
-                const injections = projectTxns.filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+                const injections = projectTxns
+                  .filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+                  .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                 if (injections.length <= 1) return null;
 
                 return (

@@ -699,7 +699,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             <div className="space-y-4 pt-3 border-t border-gray-100">
                 {/* Batch Item Tagging Control Bar */}
                 {(() => {
-                  const injectionTxns = transactions.filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+                  const injectionTxns = transactions
+                    .filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+                    .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                   if (selectedItemIds.length === 0 || injectionTxns.length === 0) return null;
 
                   return (
@@ -1149,7 +1151,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             return <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />;
           }
 
-          const injectionTxns = transactions.filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+          const injectionTxns = transactions
+            .filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+            .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
           return (
             <div className="space-y-3">

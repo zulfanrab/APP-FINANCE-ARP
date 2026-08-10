@@ -802,7 +802,9 @@ export function PdfReportModal({
               ) : (
                 (() => {
                   const ptx = approvedTx.filter(t => t.proyekId === project.id);
-                  const injections = ptx.filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')));
+                  const injections = ptx
+                    .filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')))
+                    .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                   if (injections.length > 1) {
                     return (
                       <select
