@@ -13,7 +13,7 @@ import {
   Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp, FileUp, Ban
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
-import { getTransactionsByProject, addTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
+import { getTransactionsByProject, addTransaction, updateTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjectFinancialSummary, getProjectCategoryBreakdown, buildProjectAISummaryContext, cleanTextPunctuation } from '../services/analyticsService';
 import { exportProjectRealisasiExcel } from '../services/exportService';
 import { uploadAttachmentFile } from '../services/storageService';
@@ -191,6 +191,29 @@ export function ProjectDetail() {
   const [refundDeskripsi, setRefundDeskripsi] = useState('');
   const [refundSaving, setRefundSaving] = useState(false);
   const [pdfModalOpen, setPdfModalOpen] = useState(false);
+
+  // Batch Transaction Tagging State
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+  const [batchPengajuanId, setBatchPengajuanId] = useState<string>('');
+  const [batchSaving, setBatchSaving] = useState<boolean>(false);
+
+  const handleBatchTagTransactions = async () => {
+    if (!batchPengajuanId || selectedTxIds.length === 0) return;
+    setBatchSaving(true);
+    try {
+      await Promise.all(
+        selectedTxIds.map(txId => updateTransaction(txId, { suratPengajuanId: batchPengajuanId }))
+      );
+      addToast('success', `Berhasil menautkan ${selectedTxIds.length} transaksi ke Surat Pengajuan!`);
+      setSelectedTxIds([]);
+      setBatchPengajuanId('');
+      triggerRefresh();
+    } catch {
+      addToast('error', 'Gagal menautkan transaksi');
+    } finally {
+      setBatchSaving(false);
+    }
+  };
 
   // AI Project Analysis
   const [aiLoading, setAiLoading] = useState(false);
@@ -1027,36 +1050,104 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             return <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />;
           }
 
+          const injectionTxns = transactions.filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+
           return (
             <div className="space-y-3">
+              {/* Batch Action Floating Control Bar */}
+              {selectedTxIds.length > 0 && injectionTxns.length > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in mb-3 shadow-sm">
+                  <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+                    <CheckSquare size={16} className="text-blue-600" />
+                    <span>{selectedTxIds.length} Transaksi Terpilih</span>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <select
+                      value={batchPengajuanId}
+                      onChange={e => setBatchPengajuanId(e.target.value)}
+                      className="px-3 py-1.5 bg-white border border-blue-300 text-blue-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none"
+                    >
+                      <option value="">-- Pilih Surat Pengajuan Tujuan --</option>
+                      {injectionTxns.map((inj, idx) => (
+                        <option key={inj.id} value={inj.id}>
+                          📄 Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)} ({formatDate(inj.tanggal)})
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!batchPengajuanId || batchSaving}
+                      loading={batchSaving}
+                      onClick={handleBatchTagTransactions}
+                    >
+                      📌 Tautkan ({selectedTxIds.length})
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setSelectedTxIds([])}
+                    >
+                      Batal
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction Rows with Checkboxes */}
               {displaySortedTx.map(tx => (
               <div
                 key={tx.id}
                 onClick={() => setSelectedTx(tx)}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50/70 hover:bg-emerald-50/30 border border-gray-100 hover:border-emerald-300 rounded-2xl transition-all cursor-pointer active:scale-[0.99]"
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border rounded-2xl transition-all cursor-pointer active:scale-[0.99] ${
+                  selectedTxIds.includes(tx.id) ? 'bg-blue-50/80 border-blue-300 shadow-sm' : 'bg-gray-50/70 hover:bg-emerald-50/30 border-gray-100 hover:border-emerald-300'
+                }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      tx.jenis === 'masuk'
-                        ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                        : tx.kategori === 'Refund Dana Proyek ke Kas Utama'
-                        ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {tx.jenis === 'masuk' ? '📥 Refund / Dana Masuk' : tx.kategori === 'Refund Dana Proyek ke Kas Utama' ? '📤 Tarik ke Kas Utama' : '📤 Pengeluaran Proyek'}
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">{formatDate(tx.tanggal)}</span>
-                    <StatusBadge status={tx.status} />
-                  </div>
-                  <p className="font-bold text-gray-900 truncate text-sm">{tx.deskripsi}</p>
-                  {tx.lampiran && tx.lampiran.length > 0 && (
-                    <div className="pt-1.5 flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
-                      <Paperclip size={13} className="text-emerald-600" />
-                      <span>{tx.lampiran.length} Lampiran Struk</span>
-                      <span className="text-[10px] text-gray-400 font-normal">· Klik untuk lihat foto</span>
+                <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+                  {injectionTxns.length > 0 && (
+                    <div onClick={e => e.stopPropagation()} className="pt-0.5 sm:pt-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedTxIds.includes(tx.id)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedTxIds(prev => [...prev, tx.id]);
+                          } else {
+                            setSelectedTxIds(prev => prev.filter(i => i !== tx.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
+                      />
                     </div>
                   )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        tx.jenis === 'masuk'
+                          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                          : tx.kategori === 'Refund Dana Proyek ke Kas Utama'
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {tx.jenis === 'masuk' ? '📥 Refund / Dana Masuk' : tx.kategori === 'Refund Dana Proyek ke Kas Utama' ? '📤 Tarik ke Kas Utama' : '📤 Pengeluaran Proyek'}
+                      </span>
+                      {tx.suratPengajuanId && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                          📌 TertaUt Pengajuan
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500 font-medium">{formatDate(tx.tanggal)}</span>
+                      <StatusBadge status={tx.status} />
+                    </div>
+                    <p className="font-bold text-gray-900 truncate text-sm">{tx.deskripsi}</p>
+                    {tx.lampiran && tx.lampiran.length > 0 && (
+                      <div className="pt-1.5 flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
+                        <Paperclip size={13} className="text-emerald-600" />
+                        <span>{tx.lampiran.length} Lampiran Struk</span>
+                        <span className="text-[10px] text-gray-400 font-normal">· Klik untuk lihat foto</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
@@ -1066,7 +1157,10 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
                   {role === 'admin' && (
                     <button
-                      onClick={() => handleDeleteTx(tx.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTx(tx.id);
+                      }}
                       className="text-gray-400 hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50 transition-colors"
                       title="Hapus Transaksi"
                     >

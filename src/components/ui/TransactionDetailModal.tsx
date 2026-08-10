@@ -104,6 +104,7 @@ export function TransactionDetailModal({
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
     rekeningId: 'bca_utama' as AccountId,
     rekeningTujuanId: 'kas_admin' as AccountId,
+    suratPengajuanId: '',
   });
 
   const populateFormAndAttachments = (targetTx: Transaction) => {
@@ -121,6 +122,7 @@ export function TransactionDetailModal({
       divisi: targetTx.divisi || undefined,
       rekeningId: targetTx.rekeningId || 'bca_utama',
       rekeningTujuanId: targetTx.rekeningTujuanId || 'kas_admin',
+      suratPengajuanId: targetTx.suratPengajuanId || '',
     });
 
     const parsedLampiran = normalizeAttachments(targetTx.lampiran);
@@ -323,6 +325,7 @@ export function TransactionDetailModal({
         divisi: editForm.divisi || undefined,
         rekeningId: editForm.rekeningId,
         rekeningTujuanId: editForm.kategori === 'Mutasi Internal / Transfer Kas' ? editForm.rekeningTujuanId : undefined,
+        suratPengajuanId: editForm.suratPengajuanId || undefined,
       });
 
       // Update internal state so the view mode immediately reflects the saved data
@@ -843,6 +846,34 @@ export function TransactionDetailModal({
                   ))}
                 </select>
               </div>
+
+              {/* Surat Pengajuan Selector in Edit Modal */}
+              {(() => {
+                if (!editForm.proyekId) return null;
+                const projectTxns = cachedTransactions.filter(t => t.proyekId === editForm.proyekId);
+                const injections = projectTxns.filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+                if (injections.length <= 1) return null;
+
+                return (
+                  <div className="sm:col-span-2 pt-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      📌 Tautkan Khusus ke Surat Pengajuan (LPJ Segment)
+                    </label>
+                    <select
+                      value={editForm.suratPengajuanId || ''}
+                      onChange={e => setEditForm(f => ({ ...f, suratPengajuanId: e.target.value }))}
+                      className="w-full border border-blue-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50/50 font-semibold text-blue-900"
+                    >
+                      <option value="">-- Otomatis Berdasarkan Tanggal Dinas --</option>
+                      {injections.map((inj, idx) => (
+                        <option key={inj.id} value={inj.id}>
+                          📄 Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 35)} ({formatDate(inj.tanggal)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
 
               {/* Sub-Divisi Selector in Edit Mode */}
               <div className="sm:col-span-2 border-t border-gray-100 pt-2.5 mt-1">
