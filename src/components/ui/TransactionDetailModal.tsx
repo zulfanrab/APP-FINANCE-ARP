@@ -17,6 +17,7 @@ import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
 import { uploadAttachmentFile, compressFileToAttachment } from '../../services/storageService';
 import { formatRupiah, formatDate, StatusBadge } from './index';
+import { isCapitalInjectionTx } from './PdfReportModal';
 import { isOmzetRil } from '../../services/analyticsService';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -852,7 +853,7 @@ export function TransactionDetailModal({
                 if (!editForm.proyekId) return null;
                 const projectTxns = cachedTransactions.filter(t => t.proyekId === editForm.proyekId);
                 const injections = projectTxns
-                  .filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+                  .filter(t => isCapitalInjectionTx(t))
                   .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                 if (injections.length <= 1) return null;
 

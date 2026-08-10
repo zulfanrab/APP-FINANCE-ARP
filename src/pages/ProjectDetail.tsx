@@ -23,6 +23,7 @@ import {
   formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal, PdfReportModal
 } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
+import { isCapitalInjectionTx } from '../components/ui/PdfReportModal';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
@@ -700,7 +701,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                 {/* Batch Item Tagging Control Bar */}
                 {(() => {
                   const injectionTxns = transactions
-                    .filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+                    .filter(t => t.proyekId === project.id && isCapitalInjectionTx(t))
                     .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                   if (selectedItemIds.length === 0 || injectionTxns.length === 0) return null;
 
@@ -1152,7 +1153,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           }
 
           const injectionTxns = transactions
-            .filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+            .filter(t => t.proyekId === project.id && isCapitalInjectionTx(t))
             .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
           return (

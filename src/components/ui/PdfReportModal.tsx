@@ -34,9 +34,18 @@ export function formatSaldoRupiah(amount: number): string {
   return `Rp ${amount.toLocaleString('id-ID')}`;
 }
 
-/** Check if a transaction is a Capital Allocation / Injection (Alokasi Modal Operasional) */
+/** Check if a transaction is a Capital Allocation / Injection (Alokasi Modal Operasional / Drop Dana Surat Pengajuan) */
 export function isCapitalInjectionTx(t: Transaction): boolean {
-  return t.jenis === 'masuk' && isMutasiInternal(t);
+  if (t.jenis !== 'masuk') return false;
+  const k = (t.kategori || '').toLowerCase();
+  const d = (t.deskripsi || '').toLowerCase();
+
+  // STRICT RULE: Exclude any refund / sisa panjar / pengembalian dana from being treated as a Surat Pengajuan!
+  if (k.includes('refund') || k.includes('pengembalian') || d.includes('refund') || d.includes('sisa panjar') || d.includes('sisa dana')) {
+    return false;
+  }
+
+  return isMutasiInternal(t) || k.includes('mutasi') || d.includes('modal') || d.includes('pengajuan') || d.includes('drop dana') || d.includes('surat pengajuan') || d.includes('budget');
 }
 
 export function PdfReportModal({

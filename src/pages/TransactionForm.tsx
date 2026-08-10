@@ -20,6 +20,7 @@ import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
+import { isCapitalInjectionTx } from '../components/ui/PdfReportModal';
 import { parseRecipientString, extractHistoricalRecipients } from '../utils/bankHelper';
 
 function formatRupiahInput(value: string): string {
@@ -824,7 +825,7 @@ export function TransactionForm() {
               if (!targetProjId) return null;
               const projectTxns = cachedTransactions.filter(t => t.proyekId === targetProjId);
               const injections = projectTxns
-                .filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')))
+                .filter(t => isCapitalInjectionTx(t))
                 .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
               if (injections.length <= 1) return null;
 
