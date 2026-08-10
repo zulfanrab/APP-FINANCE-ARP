@@ -118,6 +118,17 @@ export function PdfReportModal({
 
     let ptx = approvedTx.filter(t => t.proyekId === project.id);
 
+    // Filter out internal capital refund/drain transactions so they don't corrupt the operational P&L report
+    ptx = ptx.filter(t => {
+      const k = (t.kategori || '').toLowerCase();
+      const d = (t.deskripsi || '').toLowerCase();
+      return !(t.jenis === 'keluar' && (
+        k.includes('refund dana proyek') ||
+        k.includes('refund sisa dana') ||
+        d.includes('penarikan sisa dana')
+      ));
+    });
+
     // If a specific Surat Pengajuan is selected for LPJ filter
     if (selectedPengajuanTxId !== 'semua') {
       const targetInjectionTx = ptx.find(t => t.id === selectedPengajuanTxId);
