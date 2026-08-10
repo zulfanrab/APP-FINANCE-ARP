@@ -27,6 +27,7 @@ export interface Transaction {
   kategori: string;
   tag?: TransactionTag; // hanya untuk jenis 'keluar'
   proyekId?: string;
+  suratPengajuanId?: string; // Tautan opsional ke ID transaksi Drop Dana / Surat Pengajuan tertentu
   lampiran: Attachment[];
   status: TransactionStatus;
   buktiTransfer?: string; // base64 image

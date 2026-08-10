@@ -74,6 +74,7 @@ export function TransactionForm() {
     divisi: undefined as 'admin' | 'ahli' | 'it' | 'umum' | undefined,
     rekeningId: 'kas_admin' as AccountId,
     rekeningTujuanId: 'kas_admin' as AccountId,
+    suratPengajuanId: '',
   });
 
   // Approval Flow Switch
@@ -330,6 +331,7 @@ export function TransactionForm() {
         divisi: form.divisi || undefined,
         rekeningId: form.rekeningId,
         rekeningTujuanId: form.kategori === 'Mutasi Internal / Transfer Kas' ? form.rekeningTujuanId : undefined,
+        suratPengajuanId: form.suratPengajuanId || undefined,
       });
 
       addToast('success', 'Transaksi & berkas berhasil disimpan!');
@@ -815,6 +817,38 @@ export function TransactionForm() {
                 </select>
               </div>
             ) : null}
+
+            {/* Surat Pengajuan Tag Selector */}
+            {(() => {
+              const targetProjId = form.proyekId || urlProyekId;
+              if (!targetProjId) return null;
+              const projectTxns = cachedTransactions.filter(t => t.proyekId === targetProjId);
+              const injections = projectTxns.filter(t => t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+              if (injections.length <= 1) return null;
+
+              return (
+                <div className="sm:col-span-2 pt-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    📌 Tautkan Khusus ke Surat Pengajuan (LPJ Segment)
+                  </label>
+                  <select
+                    value={form.suratPengajuanId || ''}
+                    onChange={e => setField('suratPengajuanId', e.target.value)}
+                    className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50/50 font-semibold text-blue-900"
+                  >
+                    <option value="">-- Otomatis Berdasarkan Tanggal Dinas --</option>
+                    {injections.map((inj, idx) => (
+                      <option key={inj.id} value={inj.id}>
+                        📄 Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 35)} ({inj.tanggal})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10.5px] text-slate-500 mt-1">
+                    Memastikan transaksi ini tepat masuk ke lembar LPJ pengajuan tertentu (misal: nota susulan untuk pengajuan awal).
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Saku / Rekening Conditional Selector */}
             {form.kategori === 'Mutasi Internal / Transfer Kas' ? (

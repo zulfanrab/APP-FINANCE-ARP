@@ -131,10 +131,28 @@ export function PdfReportModal({
 
     // If a specific Surat Pengajuan is selected for LPJ filter
     if (selectedPengajuanTxId !== 'semua') {
-      const targetInjectionTx = ptx.find(t => t.id === selectedPengajuanTxId);
+      const allInjections = ptx.filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')));
+      const targetInjectionTx = allInjections.find(t => t.id === selectedPengajuanTxId);
       if (targetInjectionTx) {
         const injectionDate = new Date(targetInjectionTx.tanggal);
-        ptx = ptx.filter(t => t.id === selectedPengajuanTxId || new Date(t.tanggal) >= injectionDate);
+        const nextInjection = allInjections
+          .filter(t => t.id !== selectedPengajuanTxId && new Date(t.tanggal) > injectionDate)
+          .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime())[0];
+        const nextInjectionDate = nextInjection ? new Date(nextInjection.tanggal) : null;
+
+        ptx = ptx.filter(t => {
+          if (t.id === selectedPengajuanTxId) return true;
+          // Explicit tag check
+          if (t.suratPengajuanId) {
+            return t.suratPengajuanId === selectedPengajuanTxId;
+          }
+          // Date bounds check: paid on/after injection date AND before next injection date
+          const txDate = new Date(t.tanggal);
+          if (txDate < injectionDate) return false;
+          if (nextInjectionDate && txDate >= nextInjectionDate) return false;
+          return true;
+        });
+
         displaySubtitle = `LPJ Khusus Pengajuan: ${targetInjectionTx.deskripsi} (${formatDate(targetInjectionTx.tanggal)})`;
       }
     }
