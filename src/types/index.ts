@@ -54,6 +54,7 @@ export interface ProcurementItem {
   kategori?: string;     // Operational Cost, Utilities, Overhead Cost, Biaya Lain-Lain
   isPurchased: boolean;
   isCancelled?: boolean; // Item dibatalkan / tidak jadi beli
+  suratPengajuanId?: string; // Tautan ke ID transaksi Drop Dana / Surat Pengajuan tertentu
 }
 
 export interface Project {

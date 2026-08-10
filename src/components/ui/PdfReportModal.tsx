@@ -960,82 +960,97 @@ export function PdfReportModal({
             )}
 
             {/* SECTION 1: MATRIKS REALISASI ITEM PENGADAAN & VARIANS RAB (Rencana vs Realita) */}
-            {project && project.procurementItems && project.procurementItems.length > 0 && (
-              <div className="my-5 page-break-inside-avoid">
-                <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
-                    📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
-                  </h3>
-                  <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
+            {(() => {
+              const displayProcurementItems = (project?.procurementItems || []).filter(item => {
+                if (selectedPengajuanTxId === 'semua') return true;
+                if (item.suratPengajuanId) {
+                  return item.suratPengajuanId === selectedPengajuanTxId;
+                }
+                const ptx = approvedTx.filter(t => t.proyekId === project?.id);
+                const allInjections = ptx.filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')));
+                const firstInj = allInjections[0];
+                return !firstInj || firstInj.id === selectedPengajuanTxId;
+              });
+
+              if (displayProcurementItems.length === 0) return null;
+
+              return (
+                <div className="my-5 page-break-inside-avoid">
+                  <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
+                      📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
+                    </h3>
+                    <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
+                  </div>
+                  <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
+                    <thead>
+                      <tr className="bg-slate-800 text-white text-[9px] uppercase tracking-wider font-bold">
+                        <th className="p-2 border border-slate-800 text-center w-8">No</th>
+                        <th className="p-2 border border-slate-800 text-left">Nama Item / Kebutuhan Pengadaan</th>
+                        <th className="p-2 border border-slate-800 text-center w-20">Volume / Satuan</th>
+                        <th className="p-2 border border-slate-800 text-right w-28">Harga Rencana (RAB)</th>
+                        <th className="p-2 border border-slate-800 text-right w-28">Harga Realisasi (Riil)</th>
+                        <th className="p-2 border border-slate-800 text-right w-32">Varians (Selisih)</th>
+                        <th className="p-2 border border-slate-800 text-center w-20">Status Belanja</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayProcurementItems.map((item, idx) => {
+                        const budget = item.hargaRencana || 0;
+                        const actual = item.hargaAktual || 0;
+                        const selisih = budget > 0 && actual > 0 ? budget - actual : 0;
+                        return (
+                          <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{idx + 1}</td>
+                            <td className="p-2 border border-slate-200 text-left font-bold text-slate-900">
+                              {item.nama}
+                              {item.kategori && <span className="text-[9px] text-slate-400 font-normal block">{item.kategori}</span>}
+                            </td>
+                            <td className="p-2 border border-slate-200 text-center text-slate-700 font-medium">
+                              {item.kuantitas} {item.satuan || ' unit'}
+                            </td>
+                            <td className="p-2 border border-slate-200 text-right font-semibold text-slate-700 tabular-nums">
+                              {budget > 0 ? formatRupiah(budget) : '-'}
+                            </td>
+                            <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
+                              {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
+                            </td>
+                            <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
+                              {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
+                            </td>
+                            <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
+                              {item.isCancelled ? (
+                                <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
+                              ) : item.isPurchased ? (
+                                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
+                              ) : (
+                                <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-800">
+                        <td colSpan={3} className="p-2 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
+                          TOTAL ESTIMASI RAB VS REALISASI ITEM
+                        </td>
+                        <td className="p-2 border border-slate-300 text-right text-slate-800 font-extrabold tabular-nums">
+                          {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0))}
+                        </td>
+                        <td className="p-2 border border-slate-300 text-right text-blue-900 font-black tabular-nums">
+                          {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
+                        </td>
+                        <td colSpan={2} className="p-2 border border-slate-300 text-center text-[10px] text-slate-600 font-semibold">
+                          Audit Verified by Finance
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-                <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
-                  <thead>
-                    <tr className="bg-slate-800 text-white text-[9px] uppercase tracking-wider font-bold">
-                      <th className="p-2 border border-slate-800 text-center w-8">No</th>
-                      <th className="p-2 border border-slate-800 text-left">Nama Item / Kebutuhan Pengadaan</th>
-                      <th className="p-2 border border-slate-800 text-center w-20">Volume / Satuan</th>
-                      <th className="p-2 border border-slate-800 text-right w-28">Harga Rencana (RAB)</th>
-                      <th className="p-2 border border-slate-800 text-right w-28">Harga Realisasi (Riil)</th>
-                      <th className="p-2 border border-slate-800 text-right w-32">Varians (Selisih)</th>
-                      <th className="p-2 border border-slate-800 text-center w-20">Status Belanja</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {project.procurementItems.map((item, idx) => {
-                      const budget = item.hargaRencana || 0;
-                      const actual = item.hargaAktual || 0;
-                      const selisih = budget > 0 && actual > 0 ? budget - actual : 0;
-                      return (
-                        <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{idx + 1}</td>
-                          <td className="p-2 border border-slate-200 text-left font-bold text-slate-900">
-                            {item.nama}
-                            {item.kategori && <span className="text-[9px] text-slate-400 font-normal block">{item.kategori}</span>}
-                          </td>
-                          <td className="p-2 border border-slate-200 text-center text-slate-700 font-medium">
-                            {item.kuantitas} {item.satuan || ' unit'}
-                          </td>
-                          <td className="p-2 border border-slate-200 text-right font-semibold text-slate-700 tabular-nums">
-                            {budget > 0 ? formatRupiah(budget) : '-'}
-                          </td>
-                          <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
-                            {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
-                          </td>
-                          <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
-                            {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
-                          </td>
-                          <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
-                            {item.isCancelled ? (
-                              <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
-                            ) : item.isPurchased ? (
-                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
-                            ) : (
-                              <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-slate-100 font-bold border-t-2 border-slate-800">
-                      <td colSpan={3} className="p-2 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
-                        TOTAL ESTIMASI RAB VS REALISASI ITEM
-                      </td>
-                      <td className="p-2 border border-slate-300 text-right text-slate-800 font-extrabold tabular-nums">
-                        {formatRupiah(project.procurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0))}
-                      </td>
-                      <td className="p-2 border border-slate-300 text-right text-blue-900 font-black tabular-nums">
-                        {formatRupiah(project.procurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
-                      </td>
-                      <td colSpan={2} className="p-2 border border-slate-300 text-center text-[10px] text-slate-600 font-semibold">
-                        Audit Verified by Finance
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
+              );
+            })()}
 
             {/* SECTION 2: FORMAL ACCOUNTING JOURNAL TABLE */}
             <div className="overflow-x-auto my-4">

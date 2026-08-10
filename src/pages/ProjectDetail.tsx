@@ -197,6 +197,11 @@ export function ProjectDetail() {
   const [batchPengajuanId, setBatchPengajuanId] = useState<string>('');
   const [batchSaving, setBatchSaving] = useState<boolean>(false);
 
+  // Batch Procurement Item Tagging State
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [batchItemPengajuanId, setBatchItemPengajuanId] = useState<string>('');
+  const [batchItemSaving, setBatchItemSaving] = useState<boolean>(false);
+
   const handleBatchTagTransactions = async () => {
     if (!batchPengajuanId || selectedTxIds.length === 0) return;
     setBatchSaving(true);
@@ -212,6 +217,25 @@ export function ProjectDetail() {
       addToast('error', 'Gagal menautkan transaksi');
     } finally {
       setBatchSaving(false);
+    }
+  };
+
+  const handleBatchTagProcurementItems = async () => {
+    if (!project || !batchItemPengajuanId || selectedItemIds.length === 0) return;
+    setBatchItemSaving(true);
+    try {
+      const items = (project.procurementItems || []).map(item =>
+        selectedItemIds.includes(item.id) ? { ...item, suratPengajuanId: batchItemPengajuanId } : item
+      );
+      await updateProject(project.id, { procurementItems: items });
+      addToast('success', `Berhasil menautkan ${selectedItemIds.length} item pengadaan ke Surat Pengajuan!`);
+      setSelectedItemIds([]);
+      setBatchItemPengajuanId('');
+      triggerRefresh();
+    } catch {
+      addToast('error', 'Gagal menautkan item pengadaan');
+    } finally {
+      setBatchItemSaving(false);
     }
   };
 
@@ -672,7 +696,53 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           </div>
   
           {procurementExpanded && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-4 pt-3 border-t border-gray-100">
+                {/* Batch Item Tagging Control Bar */}
+                {(() => {
+                  const injectionTxns = transactions.filter(t => t.proyekId === project.id && t.jenis === 'masuk' && ((t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('pengajuan') || (t.deskripsi || '').toLowerCase().includes('modal')));
+                  if (selectedItemIds.length === 0 || injectionTxns.length === 0) return null;
+
+                  return (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in my-2 shadow-sm">
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                        <CheckSquare size={16} className="text-emerald-600" />
+                        <span>{selectedItemIds.length} Item Pengadaan Terpilih</span>
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <select
+                          value={batchItemPengajuanId}
+                          onChange={e => setBatchItemPengajuanId(e.target.value)}
+                          className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none"
+                        >
+                          <option value="">-- Tautkan ke Surat Pengajuan --</option>
+                          {injectionTxns.map((inj, idx) => (
+                            <option key={inj.id} value={inj.id}>
+                              📄 Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)} ({formatDate(inj.tanggal)})
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={!batchItemPengajuanId || batchItemSaving}
+                          loading={batchItemSaving}
+                          onClick={handleBatchTagProcurementItems}
+                        >
+                          📌 Tautkan ({selectedItemIds.length})
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setSelectedItemIds([])}
+                        >
+                          Batal
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Form Quick Add */}
             <div className="flex flex-col lg:flex-row gap-2">
               <input
                 type="text"
@@ -777,23 +847,42 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                         <div className="grid grid-cols-1 gap-2 pt-1">
                           {catItems.map(item => (
                             <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all ${
-                              item.isCancelled ? 'bg-gray-100/70 border-gray-300 opacity-75' : item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'
+                              selectedItemIds.includes(item.id) ? 'bg-emerald-100/70 border-emerald-300 shadow-sm' : item.isCancelled ? 'bg-gray-100/70 border-gray-300 opacity-75' : item.isPurchased ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'
                             }`}>
-                              <div 
-                                className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
-                                onClick={() => !item.isCancelled && handleToggleChecklist(item.id, item.isPurchased)}
-                              >
-                                {item.isCancelled ? (
-                                  <Ban size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
-                                ) : item.isPurchased ? (
-                                  <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
-                                ) : (
-                                  <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
-                                )}
-                                <div className="flex flex-col">
-                                  <span className={`text-sm font-medium ${item.isCancelled ? 'text-gray-400 line-through' : item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                                    {item.nama} {item.kuantitas > 1 && `(${item.kuantitas} ${item.satuan || 'pcs'})`}
-                                  </span>
+                              <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedItemIds.includes(item.id)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSelectedItemIds(prev => [...prev, item.id]);
+                                    } else {
+                                      setSelectedItemIds(prev => prev.filter(i => i !== item.id));
+                                    }
+                                  }}
+                                  className="w-4 h-4 mt-0.5 sm:mt-0 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 cursor-pointer"
+                                />
+                                <div 
+                                  className="flex items-start sm:items-center gap-3 cursor-pointer flex-1 min-w-0"
+                                  onClick={() => !item.isCancelled && handleToggleChecklist(item.id, item.isPurchased)}
+                                >
+                                  {item.isCancelled ? (
+                                    <Ban size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                  ) : item.isPurchased ? (
+                                    <CheckSquare size={18} className="text-emerald-500 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                  ) : (
+                                    <Square size={18} className="text-gray-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+                                  )}
+                                  <div className="flex flex-col">
+                                    <span className={`text-sm font-medium ${item.isCancelled ? 'text-gray-400 line-through' : item.isPurchased ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                                      {item.nama} {item.kuantitas > 1 && `(${item.kuantitas} ${item.satuan || 'pcs'})`}
+                                    </span>
+                                    {item.suratPengajuanId && (
+                                      <span className="text-[9.5px] font-bold text-blue-700">
+                                        📌 TertaUt Pengajuan
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
