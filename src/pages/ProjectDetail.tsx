@@ -833,7 +833,17 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                                   )
                                 )}
                                 
-                                <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md transition-colors border border-transparent hover:bg-red-50">
+                                <button
+                                   type="button"
+                                   onClick={() => handleToggleCancelChecklist(item.id, item.isCancelled)}
+                                   className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border transition-all mr-1.5 ${
+                                     item.isCancelled ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200'
+                                   }`}
+                                   title={item.isCancelled ? 'Aktifkan Kembali Item Ini' : 'Tandai Item Tidak Jadi Beli / Dibatalkan'}
+                                 >
+                                   {item.isCancelled ? '🔄 Aktifkan' : '🚫 Batal Beli'}
+                                 </button>
+                                 <button onClick={() => handleDeleteChecklist(item.id)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md transition-colors border border-transparent hover:bg-red-50">
                                   <Trash2 size={15} />
                                 </button>
                               </div>
