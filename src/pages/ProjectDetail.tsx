@@ -33,90 +33,168 @@ function formatRupiahInput(value: string): string {
   return new Intl.NumberFormat('id-ID').format(Number(num));
 }
 
+function parsePriceValue(str: string | undefined): number | undefined {
+  if (!str) return undefined;
+  const s = str.trim().toLowerCase();
+
+  // Check for jt / juta, e.g. 1.5jt, 1,5 juta, 2jt
+  const jtMatch = s.match(/^(?:rp\.?|idr|\b)?\s*([\d\.\,]+)\s*(?:jt|juta)$/);
+  if (jtMatch) {
+    const val = parseFloat(jtMatch[1].replace(',', '.'));
+    return isNaN(val) ? undefined : Math.round(val * 1_000_000);
+  }
+
+  // Check for rb / k, e.g. 50rb, 50k, 150rb
+  const rbMatch = s.match(/^(?:rp\.?|idr|\b)?\s*([\d\.\,]+)\s*(?:rb|k)$/);
+  if (rbMatch) {
+    const val = parseFloat(rbMatch[1].replace(',', '.'));
+    return isNaN(val) ? undefined : Math.round(val * 1_000);
+  }
+
+  // Clean non-digits
+  const digits = s.replace(/\D/g, '');
+  if (!digits) return undefined;
+  const num = parseInt(digits, 10);
+  return isNaN(num) ? undefined : num;
+}
+
 function parseBulkImportText(text: string): ProcurementItem[] {
   if (!text || !text.trim()) return [];
   const lines = text.split('\n');
   const items: ProcurementItem[] = [];
   let currentCategory = 'Operational Cost';
 
+  const knownUnits = [
+    'sak', 'pcs', 'unit', 'roll', 'box', 'pack', 'm', 'm2', 'm3', 'kg', 'liter', 'l',
+    'trus', 'colt', 'bh', 'buah', 'orang', 'malam', 'pasang', 'set', 'ls', 'paket',
+    'lembar', 'btg', 'batang', 'rim', 'zak', 'drum', 'galon', 'meter', 'cm'
+  ];
+
   for (const rawLine of lines) {
     let line = rawLine.trim();
     if (!line) continue;
 
-    // Detect if this line is a Category Header (starts with #, [, --- or ends with : without commas/pipes)
+    // Detect if line is a Category Header
     const isHeaderLine =
       (line.startsWith('#') ||
         line.startsWith('[') ||
         line.startsWith('---') ||
-        (line.endsWith(':') && !line.includes(','))) &&
+        (line.endsWith(':') && !line.includes(',') && !line.includes('|') && !line.includes('\t') && !line.includes(';'))) &&
       !line.includes('|');
 
     if (isHeaderLine) {
       let cleanCategory = line.replace(/^[#\-\[\:\*]+|[#\-\]\:\*]+$/g, '').trim();
-      // Remove leading emojis if present (e.g. 🚗 Transportasi & Akomodasi -> Transportasi & Akomodasi)
       cleanCategory = cleanCategory.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
       if (cleanCategory) {
         currentCategory = cleanCategory;
       }
-      continue; // Skip adding header line as an item!
+      continue;
     }
 
-    // Remove leading bullet points or numbers like "1.", "1)", "-", "*"
-    line = line.replace(/^[\d+\.\-\*\)]+\s*/, '').trim();
+    // Clean leading list numbering: "1.", "1)", "1.-", "-", "*", "•", "[1]", "1.1", etc.
+    line = line.replace(/^([\d+\.\-\*\)\•\>]|\[\d+\])+\s*/, '').trim();
     if (!line) continue;
 
-    // Split by pipe '|', comma ',', or tab '\t'
+    // Multi-delimiter splitting (| \t ; , " - " " : ")
     let parts: string[] = [];
     if (line.includes('|')) {
       parts = line.split('|').map(p => p.trim());
-    } else if (line.includes(',')) {
-      parts = line.split(',').map(p => p.trim());
     } else if (line.includes('\t')) {
       parts = line.split('\t').map(p => p.trim());
+    } else if (line.includes(';')) {
+      parts = line.split(';').map(p => p.trim());
+    } else if (line.includes(',')) {
+      parts = line.split(',').map(p => p.trim());
+    } else if (line.includes(' - ')) {
+      parts = line.split(' - ').map(p => p.trim());
+    } else if (line.includes(' : ')) {
+      parts = line.split(' : ').map(p => p.trim());
     } else {
       parts = [line];
     }
 
-    const nama = parts[0] || 'Item Pengadaan';
+    let nama = 'Item Pengadaan';
     let kuantitas = 1;
     let satuan: string | undefined = undefined;
     let hargaRencana: number | undefined = undefined;
     let itemCategory = currentCategory;
 
     if (parts.length >= 2) {
+      nama = parts[0] || 'Item Pengadaan';
+
+      // Qty & Satuan from part 1
       const qtyMatch = parts[1].match(/^(\d+)\s*(.*)$/);
       if (qtyMatch) {
-        kuantitas = parseInt(qtyMatch[1]) || 1;
+        kuantitas = parseInt(qtyMatch[1], 10) || 1;
         if (qtyMatch[2] && qtyMatch[2].trim()) {
           satuan = qtyMatch[2].trim();
         }
+      } else {
+        const numPart = parts[1].replace(/\D/g, '');
+        if (numPart) kuantitas = parseInt(numPart, 10) || 1;
       }
-    }
 
-    if (parts.length >= 3) {
-      if (!satuan && parts[2] && !/^\d+$/.test(parts[2].replace(/\D/g, ''))) {
-        satuan = parts[2].trim();
-      } else if (!hargaRencana && parts[2]) {
-        const num = parts[2].replace(/\D/g, '');
-        if (num) hargaRencana = parseInt(num);
+      if (parts.length >= 3) {
+        const parsedVal = parsePriceValue(parts[2]);
+        if (!satuan && parts[2] && parsedVal === undefined) {
+          satuan = parts[2].trim();
+        } else if (parsedVal !== undefined) {
+          hargaRencana = parsedVal;
+        }
       }
+
+      if (parts.length >= 4 && hargaRencana === undefined) {
+        hargaRencana = parsePriceValue(parts[3]);
+      }
+
+      if (parts.length >= 5 && parts[4]) {
+        const catOverride = parts[4].replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+        if (catOverride) itemCategory = catOverride;
+      }
+    } else {
+      // Single un-delimited text string line
+      let rest = line;
+
+      // Extract category override if present at end in parentheses e.g. (Material)
+      const catMatch = rest.match(/\(([^)]+)\)$/);
+      if (catMatch) {
+        const potentialCat = catMatch[1].replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+        if (potentialCat) itemCategory = potentialCat;
+        rest = rest.replace(/\(([^)]+)\)$/, '').trim();
+      }
+
+      // Extract price at the end or after @ / Rp / IDR / Rp.
+      const priceRegex = /(?:@|rp\.?|idr|\b)?\s*([\d\.\,]+\s*(?:jt|juta|rb|k)?)\s*$/i;
+      const priceMatch = rest.match(priceRegex);
+      if (priceMatch) {
+        const candidatePriceStr = priceMatch[1];
+        const parsedP = parsePriceValue(candidatePriceStr);
+        if (parsedP !== undefined && parsedP > 0) {
+          hargaRencana = parsedP;
+          rest = rest.substring(0, rest.lastIndexOf(priceMatch[0])).trim();
+        }
+      }
+
+      // Extract Qty and Satuan from remaining text e.g. "Semen 10 sak"
+      const qtyUnitRegex = new RegExp(`(\\d+)\\s*(${knownUnits.join('|')})?`, 'i');
+      const qtyMatch = rest.match(qtyUnitRegex);
+      if (qtyMatch) {
+        kuantitas = parseInt(qtyMatch[1], 10) || 1;
+        if (qtyMatch[2]) satuan = qtyMatch[2];
+        rest = rest.replace(qtyMatch[0], '').trim();
+      }
+
+      nama = rest.replace(/^[,\-\s:|]+|[,\-\s:|]+$/g, '').trim() || line;
     }
 
-    if (parts.length >= 4 && hargaRencana === undefined) {
-      const num = parts[3].replace(/\D/g, '');
-      if (num) hargaRencana = parseInt(num);
-    }
-
-    if (parts.length >= 5 && parts[4]) {
-      const catOverride = parts[4].replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-      if (catOverride) itemCategory = catOverride;
-    }
+    nama = nama.replace(/^[,\-\s:|]+|[,\-\s:|]+$/g, '').trim();
+    if (!nama) continue;
 
     items.push({
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       nama,
-      kuantitas,
-      satuan,
+      kuantitas: kuantitas > 0 ? kuantitas : 1,
+      satuan: satuan || undefined,
       hargaRencana,
       kategori: itemCategory,
       isPurchased: false,
@@ -175,7 +253,7 @@ export function ProjectDetail() {
   const [importing, setImporting] = useState(false);
   const [procurementExpanded, setProcurementExpanded] = useState(() => {
     const saved = localStorage.getItem(`procurement_expanded_${id}`);
-    return saved !== null ? saved === 'true' : false;
+    return saved !== null ? saved === 'true' : true;
   });
 
   const toggleProcurementExpanded = () => {
@@ -348,7 +426,11 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   };
 
   const handleAddChecklist = async () => {
-    if (!newChecklistItem.trim() || !project) return;
+    if (!project) return;
+    if (!newChecklistItem.trim()) {
+      addToast('error', 'Silakan isi nama barang/kebutuhan terlebih dahulu');
+      return;
+    }
     try {
       const items = project.procurementItems || [];
       const newItem: ProcurementItem = {
@@ -367,8 +449,10 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       setNewChecklistKuantitas('1');
       setNewChecklistSatuan('');
       setNewChecklistHargaRencana('');
+      setProcurementExpanded(true);
+      localStorage.setItem(`procurement_expanded_${id}`, 'true');
       triggerRefresh();
-      addToast('success', 'Item berhasil ditambahkan');
+      addToast('success', 'Item pengadaan berhasil ditambahkan');
     } catch {
       addToast('error', 'Gagal menambahkan checklist');
     }
@@ -423,7 +507,11 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   };
 
   const handleImportBulkText = async () => {
-    if (!importText.trim() || !project) return;
+    if (!project) return;
+    if (!importText.trim()) {
+      addToast('error', 'Tempel teks daftar kebutuhan terlebih dahulu');
+      return;
+    }
     setImporting(true);
     try {
       const parsedItems = parseBulkImportText(importText);
@@ -438,6 +526,8 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       });
       setImportText('');
       setImportModalOpen(false);
+      setProcurementExpanded(true);
+      localStorage.setItem(`procurement_expanded_${id}`, 'true');
       triggerRefresh();
       addToast('success', `${parsedItems.length} item pengadaan berhasil di-import!`);
     } catch {
@@ -1398,15 +1488,16 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       >
         <div className="space-y-4">
           <p className="text-xs text-gray-600 leading-relaxed">
-            Tempel teks dari AI Assistant / catatan Anda (1 item per baris). Sistem akan otomatis memecah nama, kuantitas, satuan, dan harga rencana.
+            Tempel teks dari AI Assistant, WhatsApp, Excel, atau catatan Anda. Sistem otomatis memecah nama item, kuantitas, satuan, harga rencana (termasuk format 1.5jt, 50rb, Rp), serta kategori.
           </p>
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] font-mono text-slate-700 space-y-1">
-            <p className="font-bold text-slate-900 mb-1">Contoh Format Pemisah Header Kategori (#):</p>
+            <p className="font-bold text-slate-900 mb-1">💡 Contoh Format Bebas yang Didukung:</p>
             <p className="text-blue-600 font-bold"># Transportasi & Akomodasi</p>
-            <p>Sewa Mobil Inova, 2, Unit, 1.500.000</p>
-            <p>Penginapan Mess Lapangan, 3, Malam, 1.200.000</p>
+            <p>1. Sewa Mobil Inova, 2, Unit, 1.500.000</p>
+            <p>2. Penginapan Mess Lapangan - 3 Malam - 1.2jt</p>
             <p className="text-blue-600 font-bold pt-1"># Material & Perlengkapan Fisik</p>
-            <p>Crimping Ferrule & Rompi, 10, Box, 450.000</p>
+            <p>Semen Padang 10 sak Rp 75.000</p>
+            <p>Crimping Ferrule : 10 box : 450rb</p>
             <p className="text-blue-600 font-bold pt-1"># Upah & Tenaga Kerja</p>
             <p>Upah Harian Tenaga Lapangan, 5, Orang, 2.500.000</p>
           </div>
@@ -1416,7 +1507,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               rows={8}
               value={importText}
               onChange={e => setImportText(e.target.value)}
-              placeholder="Paste teks daftar kebutuhan di sini..."
+              placeholder="Paste teks daftar kebutuhan di sini (1 item per baris)..."
               className="w-full border border-gray-200 rounded-xl p-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
