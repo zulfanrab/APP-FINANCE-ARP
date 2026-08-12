@@ -240,9 +240,30 @@ export async function updateProject(
   id: string,
   updates: Partial<Omit<Project, 'id' | 'dibuatPada'>>
 ): Promise<Project> {
-  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
-  const idx = projects.findIndex(p => p.id === id);
-  if (idx === -1) throw new Error(`Project ${id} not found`);
+  let projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  let idx = projects.findIndex(p => p.id === id);
+
+  // Fallback 1: If not found in LocalStorage, reload from getProjects()
+  if (idx === -1) {
+    projects = await getProjects();
+    idx = projects.findIndex(p => p.id === id);
+  }
+
+  // Fallback 2: Direct query to Supabase by ID if still missing locally
+  if (idx === -1 && isSupabaseConfigured && supabase) {
+    try {
+      const { data } = await supabase.from('projects').select('*').eq('id', id).single();
+      if (data) {
+        const fetched = mapRowToProject(data);
+        projects.push(fetched);
+        idx = projects.length - 1;
+      }
+    } catch (err) {
+      console.warn('Supabase fallback query for project failed:', err);
+    }
+  }
+
+  if (idx === -1) throw new Error(`Project ${id} tidak ditemukan`);
 
   const updated: Project = {
     ...projects[idx],
@@ -261,10 +282,6 @@ export async function updateProject(
     }
   }
 
-  // if (updated.anggaran && updated.anggaran > 0) {
-  //   await syncProjectBudgetTransaction(updated);
-  // }
-
   return updated;
 }
 
@@ -276,7 +293,10 @@ export async function completeProject(id: string): Promise<Project> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  let projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  if (!projects.some(p => p.id === id)) {
+    projects = await getProjects();
+  }
   const filtered = projects.filter(p => p.id !== id);
   setItem(KEYS.PROJECTS, filtered);
 
