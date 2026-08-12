@@ -33,6 +33,37 @@ function formatRupiahInput(value: string): string {
   return new Intl.NumberFormat('id-ID').format(Number(num));
 }
 
+function splitIgnoreInParens(str: string, delimiter: string = ','): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+  let inQuotes = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (char === '"' || char === "'") {
+      inQuotes = !inQuotes;
+      current += char;
+    } else if (char === '(' || char === '[' || char === '{') {
+      parenDepth++;
+      current += char;
+    } else if (char === ')' || char === ']' || char === '}') {
+      if (parenDepth > 0) parenDepth--;
+      current += char;
+    } else if (str.substring(i, i + delimiter.length) === delimiter && parenDepth === 0 && !inQuotes) {
+      parts.push(current.trim());
+      current = '';
+      i += delimiter.length - 1;
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim() || parts.length > 0) {
+    parts.push(current.trim());
+  }
+  return parts;
+}
+
 function parsePriceValue(str: string | undefined): number | undefined {
   if (!str) return undefined;
   const s = str.trim().toLowerCase();
@@ -67,7 +98,7 @@ function parseBulkImportText(text: string): ProcurementItem[] {
   const knownUnits = [
     'sak', 'pcs', 'unit', 'roll', 'box', 'pack', 'm', 'm2', 'm3', 'kg', 'liter', 'l',
     'trus', 'colt', 'bh', 'buah', 'orang', 'malam', 'pasang', 'set', 'ls', 'paket',
-    'lembar', 'btg', 'batang', 'rim', 'zak', 'drum', 'galon', 'meter', 'cm'
+    'lembar', 'btg', 'batang', 'rim', 'zak', 'drum', 'galon', 'meter', 'cm', 'load', 'kamar', 'hari', 'isi'
   ];
 
   for (const rawLine of lines) {
@@ -95,20 +126,20 @@ function parseBulkImportText(text: string): ProcurementItem[] {
     line = line.replace(/^([\d+\.\-\*\)\•\>]|\[\d+\])+\s*/, '').trim();
     if (!line) continue;
 
-    // Multi-delimiter splitting (| \t ; , " - " " : ")
+    // Multi-delimiter splitting with paren-awareness (| \t ; , " - " " : ")
     let parts: string[] = [];
     if (line.includes('|')) {
-      parts = line.split('|').map(p => p.trim());
+      parts = splitIgnoreInParens(line, '|');
     } else if (line.includes('\t')) {
-      parts = line.split('\t').map(p => p.trim());
+      parts = splitIgnoreInParens(line, '\t');
     } else if (line.includes(';')) {
-      parts = line.split(';').map(p => p.trim());
+      parts = splitIgnoreInParens(line, ';');
     } else if (line.includes(',')) {
-      parts = line.split(',').map(p => p.trim());
+      parts = splitIgnoreInParens(line, ',');
     } else if (line.includes(' - ')) {
-      parts = line.split(' - ').map(p => p.trim());
+      parts = splitIgnoreInParens(line, ' - ');
     } else if (line.includes(' : ')) {
-      parts = line.split(' : ').map(p => p.trim());
+      parts = splitIgnoreInParens(line, ' : ');
     } else {
       parts = [line];
     }
@@ -149,7 +180,7 @@ function parseBulkImportText(text: string): ProcurementItem[] {
 
       if (parts.length >= 5 && parts[4]) {
         const catOverride = parts[4].replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-        if (catOverride) itemCategory = catOverride;
+        if (catOverride && isNaN(Number(catOverride))) itemCategory = catOverride;
       }
     } else {
       // Single un-delimited text string line
@@ -530,8 +561,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       localStorage.setItem(`procurement_expanded_${id}`, 'true');
       triggerRefresh();
       addToast('success', `${parsedItems.length} item pengadaan berhasil di-import!`);
-    } catch {
-      addToast('error', 'Gagal memproses import teks');
+    } catch (err: any) {
+      console.error('Failed to import bulk text:', err);
+      addToast('error', `Gagal memproses import teks: ${err?.message || 'Terjadi kesalahan'}`);
     } finally {
       setImporting(false);
     }
