@@ -15,6 +15,7 @@ import { type ToastMessage, type Transaction, type Project } from '../types';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
+import { getItem, KEYS } from '../services/storage';
 
 interface AppContextType {
   toasts: ToastMessage[];
@@ -42,12 +43,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const refreshData = useCallback(async () => {
+    // 1. INSTANT 0ms CACHE HYDRATION (Prevents perpetual skeleton loading UI)
+    const localTxs = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+    const localProjs = getItem<Project[]>(KEYS.PROJECTS, []);
+
+    if (localTxs.length > 0 || localProjs.length > 0) {
+      setTransactions(localTxs);
+      setProjects(localProjs);
+      setLoading(false); // Instantly unblocks screen in 0ms!
+    }
+
+    // 2. BACKGROUND REMOTE SYNC WITH SUPABASE
     try {
       const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
       setTransactions(txs);
       setProjects(projs);
     } catch (err) {
-      console.error('Failed to load global data:', err);
+      console.warn('Background sync with Supabase notice:', err);
     } finally {
       setLoading(false);
     }

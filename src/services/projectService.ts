@@ -155,15 +155,36 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
   }
 }
 
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then(res => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export async function getProjects(): Promise<Project[]> {
   const localData = getItem<Project[]>(KEYS.PROJECTS, []);
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('dibuat_pada', { ascending: false });
+      const { data, error } = await withTimeout(
+        supabase
+          .from('projects')
+          .select('*')
+          .order('dibuat_pada', { ascending: false }),
+        3000
+      );
 
       if (!error && data) {
         const remoteProjects = data.map(mapRowToProject);
@@ -187,7 +208,7 @@ export async function getProjects(): Promise<Project[]> {
         return merged;
       }
     } catch (err) {
-      console.warn('Supabase projects fetch error, falling back to local storage:', err);
+      console.warn('Supabase projects fetch error or timeout, falling back to local storage:', err);
     }
   }
 

@@ -151,15 +151,36 @@ function mapTransactionToRow(t: Transaction): any {
   return row;
 }
 
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then(res => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 export async function getTransactions(): Promise<Transaction[]> {
   const localData = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('tanggal', { ascending: false });
+      const { data, error } = await withTimeout(
+        supabase
+          .from('transactions')
+          .select('*')
+          .order('tanggal', { ascending: false }),
+        3000
+      );
 
       if (!error && data) {
         const localMap = new Map(localData.map(t => [t.id, t]));
