@@ -256,14 +256,22 @@ export function ProjectDetail() {
   // Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editNama, setEditNama] = useState('');
+  const [editNomorSurat, setEditNomorSurat] = useState('');
   const [editKlien, setEditKlien] = useState('');
+  const [editPemohonNama, setEditPemohonNama] = useState('');
+  const [editPemohonJabatan, setEditPemohonJabatan] = useState('');
+  const [editTeknisiPic, setEditTeknisiPic] = useState('');
   const [editAnggaran, setEditAnggaran] = useState('');
   const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (project) {
       setEditNama(project.nama);
+      setEditNomorSurat(project.nomorSurat ?? '');
       setEditKlien(project.klien);
+      setEditPemohonNama(project.pemohonNama ?? '');
+      setEditPemohonJabatan(project.pemohonJabatan ?? '');
+      setEditTeknisiPic(project.teknisiPic ?? '');
       setEditAnggaran(project.anggaran ? String(project.anggaran) : '');
       setEditPdfFile(null);
     }
@@ -445,7 +453,11 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       }
       await updateProject(project.id, {
         nama: editNama.trim(),
+        nomorSurat: editNomorSurat.trim() || undefined,
         klien: editKlien.trim(),
+        pemohonNama: editPemohonNama.trim() || undefined,
+        pemohonJabatan: editPemohonJabatan.trim() || undefined,
+        teknisiPic: editTeknisiPic.trim() || undefined,
         anggaran: editAnggaran ? parseInt(editAnggaran.replace(/\D/g, ''), 10) || 0 : 0,
         suratPengajuanPdf: pdfUrl,
       });
@@ -1117,22 +1129,61 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} title="Edit Detail & Anggaran Proyek">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Nama Proyek</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {project?.tipe === 'operasional_kantor' ? 'Nama Pos Operasional' : 'Nama Proyek'}
+            </label>
             <input
               type="text"
               value={editNama}
               onChange={e => setEditNama(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Nama Klien</label>
-            <input
-              type="text"
-              value={editKlien}
-              onChange={e => setEditKlien(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Klien Utama / Instansi Tujuan</label>
+              <input
+                type="text"
+                value={editKlien}
+                onChange={e => setEditKlien(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                placeholder="Contoh: DJKA Area Bogor dan Sukabumi"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">No. Surat Pengajuan (Opsional)</label>
+              <input
+                type="text"
+                value={editNomorSurat}
+                onChange={e => setEditNomorSurat(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono text-slate-800"
+                placeholder="Contoh: 050/ARP/VII/OP/2026"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Pemohon / Leader Teknik</label>
+              <input
+                type="text"
+                value={editPemohonNama}
+                onChange={e => setEditPemohonNama(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Contoh: Rama Regawa Sri Anggayana"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">PIC Lapangan / Teknisi</label>
+              <input
+                type="text"
+                value={editTeknisiPic}
+                onChange={e => setEditTeknisiPic(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Contoh: Fauzan"
+              />
+            </div>
           </div>
 
           <div>

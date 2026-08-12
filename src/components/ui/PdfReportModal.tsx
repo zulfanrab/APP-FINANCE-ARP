@@ -887,36 +887,55 @@ export function PdfReportModal({
                 {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
               </p>
               {project && (
-                <p className="text-xs font-bold text-blue-800 mt-0.5">
-                  {isInternal ? (
-                    <>POS OPERASIONAL: {project.nama.toUpperCase()} &nbsp;|&nbsp; DIVISI / PENGELOLA: ADMIN KEUANGAN</>
-                  ) : (
-                    <>NAMA PROYEK: {project.nama.toUpperCase()} &nbsp;|&nbsp; KLIEN: {project.klien.toUpperCase()}</>
-                  )}
-                </p>
+                <div className="mt-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-left space-y-1 font-sans">
+                  <div className="flex flex-col sm:flex-row justify-between gap-1 border-b border-slate-200 pb-1.5 font-bold text-slate-900">
+                    <span>🏢 Instansi / Klien Tujuan: <strong className="text-emerald-800">{project.klien}</strong></span>
+                    <span>📄 No. Surat Pengajuan: <strong className="text-blue-800">{project.nomorSurat || '050/ARP/VII/OP/2026'}</strong></span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row justify-between gap-1 pt-0.5 text-[11px] text-slate-600">
+                    <span>👤 Pemohon / Leader Teknik: <strong>{project.pemohonNama || 'Rama Regawa Sri Anggayana'}</strong> ({project.pemohonJabatan || 'Leader Teknik'})</span>
+                    <span>🔧 PIC Lapangan / Teknisi: <strong>{project.teknisiPic || 'Fauzan'}</strong></span>
+                  </div>
+                </div>
               )}
             </div>
 
             {/* EXECUTIVE FINANCIAL SUMMARY */}
             {project ? (
               isInternal ? (
-                /* Internal / Kas Operasional: 3 Cards Only */
-                <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                  <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi / Drop Dana Kas</span>
-                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
-                  </div>
-                  <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Pengeluaran Riil</span>
-                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
-                  </div>
-                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Sisa Kas</span>
-                    <p className="summary-val text-sm font-black tabular-nums">
-                      {formatSaldoRupiah(sisaDana)}
-                    </p>
-                  </div>
-                </div>
+                /* Internal / Kas Operasional: 3 Cards with Real Time Item Settlement Math */
+                (() => {
+                  const displayProcurementItems = (project.procurementItems || []);
+                  const hasPurchasedItems = displayProcurementItems.some(i => i.isPurchased && (i.hargaAktual || 0) > 0);
+                  const totalAktualItem = displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0);
+                  
+                  const totalBelanjaRiil = hasPurchasedItems ? totalAktualItem : (totalPengeluaranRiil - totalRefundMasuk);
+                  const dropDana = modalDisuntikkan > 0 ? modalDisuntikkan : displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0);
+                  const sisaDanaRiil = dropDana - totalBelanjaRiil;
+
+                  return (
+                    <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                      <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi / Drop Dana Kas</span>
+                        <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(dropDana)}</p>
+                      </div>
+                      <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Belanja Riil Item</span>
+                        <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalBelanjaRiil)}</p>
+                      </div>
+                      <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDanaRiil >= 0 ? 'card-green' : 'card-red'}`}>
+                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          {sisaDanaRiil > 0 ? 'Saldo Sisa (Wajib Refund)' : sisaDanaRiil < 0 ? 'Defisit (Reimbursement)' : 'Saldo Sisa Kas'}
+                        </span>
+                        <p className="summary-val text-sm font-black tabular-nums">
+                          {formatSaldoRupiah(sisaDanaRiil)}
+                        </p>
+                        {sisaDanaRiil > 0 && <span className="text-[9px] font-bold text-emerald-700 block mt-0.5">(Hemat +{formatRupiah(sisaDanaRiil)})</span>}
+                        {sisaDanaRiil < 0 && <span className="text-[9px] font-bold text-rose-700 block mt-0.5">(Over -{formatRupiah(Math.abs(sisaDanaRiil))})</span>}
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 /* External Project (e.g. Proyek Angkur): 5 Cards */
                 <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">

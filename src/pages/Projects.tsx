@@ -67,7 +67,11 @@ export function Projects() {
   // Form
   const [form, setForm] = useState({
     nama: '',
+    nomorSurat: '',
     klien: '',
+    pemohonNama: '',
+    pemohonJabatan: '',
+    teknisiPic: '',
     tipe: 'proyek_klien' as 'proyek_klien' | 'operasional_kantor',
     anggaran: '',
     suratPengajuanPdfFile: null as File | null,
@@ -81,7 +85,11 @@ export function Projects() {
     setEditingProject(null);
     setForm({
       nama: '',
-      klien: defaultTipe === 'operasional_kantor' ? 'Internal Kantor' : '',
+      nomorSurat: '',
+      klien: defaultTipe === 'operasional_kantor' ? 'DJKA Area Bogor dan Sukabumi' : '',
+      pemohonNama: 'Rama Regawa Sri Anggayana',
+      pemohonJabatan: 'Leader Teknik',
+      teknisiPic: 'Fauzan',
       tipe: defaultTipe,
       anggaran: '',
       suratPengajuanPdfFile: null,
@@ -97,7 +105,11 @@ export function Projects() {
     setEditingProject(p);
     setForm({
       nama: p.nama,
+      nomorSurat: p.nomorSurat ?? '',
       klien: p.klien,
+      pemohonNama: p.pemohonNama ?? '',
+      pemohonJabatan: p.pemohonJabatan ?? '',
+      teknisiPic: p.teknisiPic ?? '',
       tipe: p.tipe ?? 'proyek_klien',
       anggaran: p.anggaran ? String(p.anggaran) : '',
       suratPengajuanPdfFile: null,
@@ -129,7 +141,11 @@ export function Projects() {
       if (editingProject) {
         await updateProject(editingProject.id, {
           nama: form.nama.trim(),
+          nomorSurat: form.nomorSurat.trim() || undefined,
           klien: klienFinal,
+          pemohonNama: form.pemohonNama.trim() || undefined,
+          pemohonJabatan: form.pemohonJabatan.trim() || undefined,
+          teknisiPic: form.teknisiPic.trim() || undefined,
           tipe: form.tipe,
           anggaran: parsedAnggaran,
           suratPengajuanPdf: pdfUrl,
@@ -142,7 +158,11 @@ export function Projects() {
       } else {
         await addProject({
           nama: form.nama.trim(),
+          nomorSurat: form.nomorSurat.trim() || undefined,
           klien: klienFinal,
+          pemohonNama: form.pemohonNama.trim() || undefined,
+          pemohonJabatan: form.pemohonJabatan.trim() || undefined,
+          teknisiPic: form.teknisiPic.trim() || undefined,
           tipe: form.tipe,
           anggaran: parsedAnggaran,
           suratPengajuanPdf: pdfUrl,
@@ -353,24 +373,58 @@ export function Projects() {
               type="text"
               value={form.nama}
               onChange={e => setForm(f => ({ ...f, nama: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={form.tipe === 'operasional_kantor' ? 'Contoh: Operasional Kantor Juli 2026' : 'Contoh: Pekerjaan Angkur PT Santika'}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-semibold"
+              placeholder={form.tipe === 'operasional_kantor' ? 'Contoh: Permohonan Budget Operational Riksa Uji' : 'Contoh: Pekerjaan Angkur PT Santika'}
               required autoFocus
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {form.tipe === 'operasional_kantor' ? 'Unit / Penanggung Jawab *' : 'Nama Klien *'}
-            </label>
-            <input
-              type="text"
-              value={form.klien}
-              onChange={e => setForm(f => ({ ...f, klien: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={form.tipe === 'operasional_kantor' ? 'Contoh: Internal Kantor / Admin' : 'Contoh: PT Santika / Bapak Budi'}
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Klien Utama / Instansi Tujuan *</label>
+              <input
+                type="text"
+                value={form.klien}
+                onChange={e => setForm(f => ({ ...f, klien: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-medium"
+                placeholder="Contoh: DJKA Area Bogor dan Sukabumi"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">No. Surat Pengajuan (Opsional)</label>
+              <input
+                type="text"
+                value={form.nomorSurat}
+                onChange={e => setForm(f => ({ ...f, nomorSurat: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary font-mono text-slate-800"
+                placeholder="Contoh: 050/ARP/VII/OP/2026"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Pemohon / Leader Teknik</label>
+              <input
+                type="text"
+                value={form.pemohonNama}
+                onChange={e => setForm(f => ({ ...f, pemohonNama: e.target.value }))}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Contoh: Rama Regawa Sri Anggayana"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">PIC Lapangan / Teknisi</label>
+              <input
+                type="text"
+                value={form.teknisiPic}
+                onChange={e => setForm(f => ({ ...f, teknisiPic: e.target.value }))}
+                className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Contoh: Fauzan"
+              />
+            </div>
           </div>
 
           <div>

@@ -60,7 +60,11 @@ export interface ProcurementItem {
 export interface Project {
   id: string;
   nama: string;
-  klien: string;
+  klien: string; // Klien Utama / Instansi Tujuan (cth: "DJKA Area Bogor dan Sukabumi")
+  nomorSurat?: string; // Nomor Surat Pengajuan (cth: "050/ARP/VII/OP/2026")
+  pemohonNama?: string; // Pemohon / Leader Teknik (cth: "Rama Regawa Sri Anggayana")
+  pemohonJabatan?: string; // Jabatan Pemohon (cth: "Leader Teknik")
+  teknisiPic?: string; // PIC Lapangan / Teknisi (cth: "Fauzan")
   tipe?: 'proyek_klien' | 'operasional_kantor'; // 'proyek_klien' (default) vs 'operasional_kantor'
   anggaran?: number; // Modal/Anggaran Operasional (Legacy/Depreceated)
   suratPengajuanPdf?: string; // URL to the uploaded PDF
