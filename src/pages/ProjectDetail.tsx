@@ -1328,7 +1328,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         isOpen={pdfModalOpen}
         onClose={() => setPdfModalOpen(false)}
         title={`Laporan Realisasi & Pertanggungjawaban Dana Proyek`}
-        subtitle={`Klien: ${project.klien}`}
+        subtitle={project.tipe === 'operasional_kantor' ? 'Dokumen Pertanggungjawaban Kas Operasional Internal' : 'Dokumen Realisasi Proyek Klien'}
         periodText={`Per ${formatDate(new Date().toISOString())}`}
         transactions={transactions}
         project={project}

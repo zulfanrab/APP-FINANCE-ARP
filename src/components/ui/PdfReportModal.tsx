@@ -62,6 +62,44 @@ export function PdfReportModal({
   const [customPelaksanaName, setCustomPelaksanaName] = useState<string>('');
   const [selectedPengajuanTxId, setSelectedPengajuanTxId] = useState<string>('semua');
 
+  // Digital Signature Images State (Base64 dataURL) with LocalStorage persistence
+  const [sigPemohon, setSigPemohon] = useState<string>(() => localStorage.getItem('signature_pemohon') || '');
+  const [sigFinance, setSigFinance] = useState<string>(() => localStorage.getItem('signature_finance') || '');
+  const [sigDirektur, setSigDirektur] = useState<string>(() => localStorage.getItem('signature_direktur') || '');
+
+  const handleSignatureUpload = (roleKey: 'pemohon' | 'finance' | 'direktur', file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        if (roleKey === 'pemohon') {
+          setSigPemohon(dataUrl);
+          localStorage.setItem('signature_pemohon', dataUrl);
+        } else if (roleKey === 'finance') {
+          setSigFinance(dataUrl);
+          localStorage.setItem('signature_finance', dataUrl);
+        } else if (roleKey === 'direktur') {
+          setSigDirektur(dataUrl);
+          localStorage.setItem('signature_direktur', dataUrl);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSignatureClear = (roleKey: 'pemohon' | 'finance' | 'direktur') => {
+    if (roleKey === 'pemohon') {
+      setSigPemohon('');
+      localStorage.removeItem('signature_pemohon');
+    } else if (roleKey === 'finance') {
+      setSigFinance('');
+      localStorage.removeItem('signature_finance');
+    } else if (roleKey === 'direktur') {
+      setSigDirektur('');
+      localStorage.removeItem('signature_direktur');
+    }
+  };
+
   if (!isOpen) return null;
 
   const companyName = 'PT. AKSARA RIKSA PERDANA';
@@ -847,20 +885,76 @@ export function PdfReportModal({
               </button>
             </div>
           </div>
-
-          {/* Custom Pelaksana Name Input for Projects */}
-          {project && !isInternal && (
-            <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-center gap-2 text-xs">
-              <label className="font-bold text-slate-700 whitespace-nowrap">✍️ Nama Penanggung Jawab Lapangan (Untuk Tanda Tangan):</label>
-              <input
-                type="text"
-                value={customPelaksanaName}
-                onChange={e => setCustomPelaksanaName(e.target.value)}
-                placeholder="Contoh: Rio &amp; Ajay / Kates (Default: Tim Pelaksana Lapangan)"
-                className="flex-1 w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+          {/* Digital Signatures Upload Bar (PDF Editor Style) */}
+          <div className="p-3 bg-slate-900 text-white rounded-2xl space-y-2 border border-slate-800 shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                ✍️ Upload Gambar Tanda Tangan Digital (Siap Tempel Otomatis di PDF)
+              </span>
+              <span className="text-[10px] text-slate-400">Tersimpan di peramban</span>
             </div>
-          )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              {/* Pemohon */}
+              <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10.5px] font-bold text-slate-200">1. TTD Pemohon / Leader</span>
+                  {sigPemohon && (
+                    <button onClick={() => handleSignatureClear('pemohon')} className="text-[10px] text-rose-400 hover:underline">Hapus</button>
+                  )}
+                </div>
+                {sigPemohon ? (
+                  <div className="h-10 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                    <img src={sigPemohon} alt="TTD Pemohon" className="max-h-full max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <label className="h-10 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[10px] text-slate-300 cursor-pointer transition-colors">
+                    + Drop / Upload File TTD
+                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload('pemohon', e.target.files[0])} />
+                  </label>
+                )}
+              </div>
+
+              {/* Finance */}
+              <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10.5px] font-bold text-slate-200">2. TTD Keuangan (Finance)</span>
+                  {sigFinance && (
+                    <button onClick={() => handleSignatureClear('finance')} className="text-[10px] text-rose-400 hover:underline">Hapus</button>
+                  )}
+                </div>
+                {sigFinance ? (
+                  <div className="h-10 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                    <img src={sigFinance} alt="TTD Finance" className="max-h-full max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <label className="h-10 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[10px] text-slate-300 cursor-pointer transition-colors">
+                    + Drop / Upload File TTD
+                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload('finance', e.target.files[0])} />
+                  </label>
+                )}
+              </div>
+
+              {/* Direktur */}
+              <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10.5px] font-bold text-slate-200">3. TTD Direktur Utama</span>
+                  {sigDirektur && (
+                    <button onClick={() => handleSignatureClear('direktur')} className="text-[10px] text-rose-400 hover:underline">Hapus</button>
+                  )}
+                </div>
+                {sigDirektur ? (
+                  <div className="h-10 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                    <img src={sigDirektur} alt="TTD Direktur" className="max-h-full max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <label className="h-10 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[10px] text-slate-300 cursor-pointer transition-colors">
+                    + Drop / Upload File TTD
+                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload('direktur', e.target.files[0])} />
+                  </label>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Printable Document Preview Area */}
@@ -886,17 +980,40 @@ export function PdfReportModal({
               <p className="doc-subtitle text-xs text-slate-600 mt-1">
                 {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
               </p>
+              
               {project && (
-                <div className="mt-2 text-xs text-slate-700 bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-left space-y-1 font-sans">
-                  <div className="flex flex-col sm:flex-row justify-between gap-1 border-b border-slate-200 pb-1.5 font-bold text-slate-900">
-                    <span>🏢 Instansi / Klien Tujuan: <strong className="text-emerald-800">{project.klien}</strong></span>
-                    <span>📄 No. Surat Pengajuan: <strong className="text-blue-800">{project.nomorSurat || '050/ARP/VII/OP/2026'}</strong></span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between gap-1 pt-0.5 text-[11px] text-slate-600">
-                    <span>👤 Pemohon / Leader Teknik: <strong>{project.pemohonNama || 'Rama Regawa Sri Anggayana'}</strong> ({project.pemohonJabatan || 'Leader Teknik'})</span>
-                    <span>🔧 PIC Lapangan / Teknisi: <strong>{project.teknisiPic || 'Fauzan'}</strong></span>
-                  </div>
-                </div>
+                <table className="metadata-table my-3 text-left w-full border-collapse font-sans text-xs bg-slate-50 border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                  <tbody>
+                    <tr className="border-b border-slate-200">
+                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider w-1/4">
+                        INSTANSI / KLIEN TUJUAN
+                      </td>
+                      <td className="p-2 px-3 font-extrabold text-slate-900 w-1/4">
+                        : {project.klien}
+                      </td>
+                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider w-1/4">
+                        NO. SURAT PENGAJUAN
+                      </td>
+                      <td className="p-2 px-3 font-extrabold text-blue-900 font-mono w-1/4">
+                        : {project.nomorSurat || '050/ARP/VII/OP/2026'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider">
+                        PEMOHON / LEADER TEKNIK
+                      </td>
+                      <td className="p-2 px-3 font-extrabold text-slate-900">
+                        : {project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}
+                      </td>
+                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider">
+                        PIC LAPANGAN / TEKNISI
+                      </td>
+                      <td className="p-2 px-3 font-extrabold text-slate-900">
+                        : {project.teknisiPic || 'Fauzan'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               )}
             </div>
 
@@ -930,8 +1047,6 @@ export function PdfReportModal({
                         <p className="summary-val text-sm font-black tabular-nums">
                           {formatSaldoRupiah(sisaDanaRiil)}
                         </p>
-                        {sisaDanaRiil > 0 && <span className="text-[9px] font-bold text-emerald-700 block mt-0.5">(Hemat +{formatRupiah(sisaDanaRiil)})</span>}
-                        {sisaDanaRiil < 0 && <span className="text-[9px] font-bold text-rose-700 block mt-0.5">(Over -{formatRupiah(Math.abs(sisaDanaRiil))})</span>}
                       </div>
                     </div>
                   );
@@ -1033,8 +1148,8 @@ export function PdfReportModal({
                           <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{idx + 1}</td>
                             <td className="p-2 border border-slate-200 text-left font-bold text-slate-900">
-                              {item.nama}
-                              {item.kategori && <span className="text-[9px] text-slate-400 font-normal block">{item.kategori}</span>}
+                              <div>{item.nama}</div>
+                              {item.kategori && <div className="text-[9px] text-slate-400 font-normal mt-0.5">{item.kategori}</div>}
                             </td>
                             <td className="p-2 border border-slate-200 text-center text-slate-700 font-medium">
                               {item.kuantitas} {item.satuan || ' unit'}
@@ -1135,59 +1250,47 @@ export function PdfReportModal({
               </table>
             </div>
 
-            {/* FORMAL 3-COLUMN / 2-COLUMN SIGNATURE BOX AT BOTTOM */}
-            {project && !isInternal ? (
-              /* Proyek Klien dengan Tim Lapangan -> 3 Kolom */
-              <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Diajukan / Pelaksana:</p>
-                  <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    {customPelaksanaName.trim() || 'Tim Pelaksana Lapangan'}
-                  </div>
-                  <p className="text-[9.5px] text-slate-400 mt-0.5">Penanggung Jawab Lapangan</p>
+            {/* FORMAL 3-COLUMN SIGNATURE BOX WITH DIGITAL SIGNATURE IMAGE EMBEDDING */}
+            <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 8px' }}>
+                <p className="text-xs text-slate-600 font-medium mb-1">Diajukan &amp; Pemohon:</p>
+                <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {sigPemohon ? (
+                    <img src={sigPemohon} alt="Tanda Tangan Pemohon" style={{ maxHeight: '52px', maxWidth: '140px', objectFit: 'contain', margin: '0 auto' }} />
+                  ) : null}
                 </div>
-
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Diverifikasi &amp; Disiapkan:</p>
-                  <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    Zulfan Rafly Baihaqi
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Admin Keuangan (Finance)</p>
+                <div className="signature-line text-xs font-bold text-[#047857]">
+                  {project?.pemohonNama || customPelaksanaName.trim() || 'Rama Regawa Sri Anggayana'}
                 </div>
-
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Mengetahui &amp; Disetujui:</p>
-                  <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    Habsi Gufira Pradana
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Direktur Utama</p>
-                </div>
+                <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{project?.pemohonJabatan || 'Leader Teknik'}</p>
               </div>
-            ) : (
-              /* Pos Kantor / Transaksi Internal / Kas Utama -> 2 Kolom (Zulfan + Pak Habsi) */
-              <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-around' }}>
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Diajukan &amp; Disiapkan:</p>
-                  <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    Zulfan Rafly Baihaqi
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Admin Keuangan (Finance)</p>
-                </div>
 
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">Mengetahui &amp; Disetujui:</p>
-                  <div className="signature-space" style={{ height: '50px' }}></div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    Habsi Gufira Pradana
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Direktur Utama</p>
+              <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 8px' }}>
+                <p className="text-xs text-slate-600 font-medium mb-1">Diverifikasi &amp; Disiapkan:</p>
+                <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {sigFinance ? (
+                    <img src={sigFinance} alt="Tanda Tangan Finance" style={{ maxHeight: '52px', maxWidth: '140px', objectFit: 'contain', margin: '0 auto' }} />
+                  ) : null}
                 </div>
+                <div className="signature-line text-xs font-bold text-[#047857]">
+                  Zulfan Rafly Baihaqi
+                </div>
+                <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Admin Keuangan (Finance)</p>
               </div>
-            )}
+
+              <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 8px' }}>
+                <p className="text-xs text-slate-600 font-medium mb-1">Mengetahui &amp; Disetujui:</p>
+                <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {sigDirektur ? (
+                    <img src={sigDirektur} alt="Tanda Tangan Direktur" style={{ maxHeight: '52px', maxWidth: '140px', objectFit: 'contain', margin: '0 auto' }} />
+                  ) : null}
+                </div>
+                <div className="signature-line text-xs font-bold text-[#047857]">
+                  Habsi Gufira Pradana
+                </div>
+                <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">Direktur Utama</p>
+              </div>
+            </div>
 
           </div>
         </div>
