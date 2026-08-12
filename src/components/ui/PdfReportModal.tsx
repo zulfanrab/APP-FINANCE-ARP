@@ -982,38 +982,32 @@ export function PdfReportModal({
               </p>
               
               {project && (
-                <table className="metadata-table my-3 text-left w-full border-collapse font-sans text-xs bg-slate-50 border border-slate-300 rounded-xl overflow-hidden shadow-xs">
-                  <tbody>
-                    <tr className="border-b border-slate-200">
-                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider w-1/4">
-                        INSTANSI / KLIEN TUJUAN
-                      </td>
-                      <td className="p-2 px-3 font-extrabold text-slate-900 w-1/4">
-                        : {project.klien}
-                      </td>
-                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider w-1/4">
-                        NO. SURAT PENGAJUAN
-                      </td>
-                      <td className="p-2 px-3 font-extrabold text-blue-900 font-mono w-1/4">
-                        : {project.nomorSurat || '050/ARP/VII/OP/2026'}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider">
-                        PEMOHON / LEADER TEKNIK
-                      </td>
-                      <td className="p-2 px-3 font-extrabold text-slate-900">
-                        : {project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}
-                      </td>
-                      <td className="p-2 px-3 font-bold text-slate-600 bg-slate-100 text-[9.5px] uppercase tracking-wider">
-                        PIC LAPANGAN / TEKNISI
-                      </td>
-                      <td className="p-2 px-3 font-extrabold text-slate-900">
-                        : {project.teknisiPic || 'Fauzan'}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="my-3 border.border-slate-300 rounded-xl overflow-hidden bg-slate-50/70 p-3 text-left font-sans text-xs border border-slate-300">
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      <tr>
+                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider w-44">No. Surat Pengajuan</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-800 w-3">:</td>
+                        <td className="py-1.5 font-extrabold text-blue-900 font-mono text-xs">{project.nomorSurat || '050/ARP/VII/OP/2026'}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Instansi / Klien Tujuan</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                        <td className="py-1.5 font-extrabold text-slate-900">{project.klien}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Pemohon / Leader Teknik</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                        <td className="py-1.5 font-extrabold text-slate-900">{project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}</td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">PIC Lapangan / Teknisi</td>
+                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                        <td className="py-1.5 font-extrabold text-slate-900">{project.teknisiPic || 'Fauzan'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
