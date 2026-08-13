@@ -27,6 +27,7 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
   'Operasional Kantor',
   'Alokasi Modal Operasional Proyek',
   'Mutasi Internal / Transfer Kas',
+  'Refund Sisa Dana Proyek ke Kas Utama',
   'Penarikan Prive / Non-Operasional',
   'Pengeluaran Lainnya',
 ];
