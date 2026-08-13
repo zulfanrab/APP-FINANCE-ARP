@@ -100,6 +100,7 @@ function mapRowToTransaction(row: any): Transaction {
     kategori: row.kategori,
     tag: row.tag ?? undefined,
     proyekId: row.proyek_id ?? undefined,
+    suratPengajuanId: row.surat_pengajuan_id || row.suratPengajuanId || undefined,
     lampiran: parseLampiranField(row.lampiran),
     status: row.status,
     buktiTransfer: row.bukti_transfer ?? undefined,
@@ -127,6 +128,7 @@ function mapTransactionToRow(t: Transaction): any {
     kategori: t.kategori,
     tag: t.tag ?? null,
     proyek_id: t.proyekId ?? null,
+    surat_pengajuan_id: t.suratPengajuanId ?? null,
     lampiran: t.lampiran ?? [],
     status: t.status,
     bukti_transfer: t.buktiTransfer ?? null,
@@ -197,6 +199,9 @@ export async function getTransactions(): Promise<Transaction[]> {
             }
             if (!tx.buktiTransfer && local.buktiTransfer) {
               tx.buktiTransfer = local.buktiTransfer;
+            }
+            if (!tx.suratPengajuanId && local.suratPengajuanId) {
+              tx.suratPengajuanId = local.suratPengajuanId;
             }
           }
           return tx;
