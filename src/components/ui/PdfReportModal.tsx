@@ -386,6 +386,8 @@ export function PdfReportModal({
         tanggal: string;
         deskripsi: string;
         nominal: number;
+        jenis?: string;
+        kategori?: string;
         qrDataUrl?: string;
       }> = [];
 
@@ -472,70 +474,98 @@ export function PdfReportModal({
             tanggal: t.tanggal,
             deskripsi: t.deskripsi,
             nominal: t.nominal,
+            jenis: t.jenis,
+            kategori: t.kategori,
             qrDataUrl,
           });
         }
       }
 
       if (itemsToPrint.length > 0) {
+        const financeItems = itemsToPrint.filter(i => i.jenis === 'masuk' || (i.kategori || '').toLowerCase().includes('mutasi'));
+        const fieldItems = itemsToPrint.filter(i => i.jenis === 'keluar' && !(i.kategori || '').toLowerCase().includes('mutasi'));
+
         attachmentsHtml += `
-          <div style="page-break-before: always; padding-top: 20px;">
-            <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #1A365D; margin-bottom: 2px;">
-              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 900; color: #1A365D; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI & STRUK</h1>
+          <div style="page-break-before: always; padding-top: 10px;">
+            <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #047857; margin-bottom: 2px;">
+              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 900; color: #047857; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI &amp; STRUK BUKTI AUDIT</h1>
               <p class="company-info" style="font-size: 9.5px; color: #334155; margin-top: 4px; line-height: 1.5;">
                 ${displayTitle} &middot; Periode: ${periodText}
               </p>
             </div>
-            
-            <div class="gallery-grid">
         `;
 
-        itemsToPrint.forEach(item => {
-          if (item.type === 'image') {
-            const driveId = getDriveId(item.url);
-            const fallbackSrc = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w800` : item.url;
-            attachmentsHtml += `
-              <div class="gallery-item">
-                <div class="img-wrapper">
-                  <img src="${item.url}" alt="${item.nama}" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
-                </div>
-                <div class="caption">
-                  <div class="caption-date">[${formatDate(item.tanggal)}]</div>
-                  <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
-                  <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
-                </div>
+        const renderItemGrid = (items: typeof itemsToPrint, sectionTitle: string) => {
+          if (items.length === 0) return '';
+          let gridHtml = `
+            <div style="margin-top: 16px; page-break-inside: avoid;">
+              <div style="background: #F1F5F9; border-left: 4px solid #047857; padding: 6px 10px; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 11px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.3px;">${sectionTitle}</h3>
               </div>
-            `;
-          } else {
-            // PDF Document QR Code Fallback Card
-            attachmentsHtml += `
-              <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px;">
-                <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 200px;">
-                  ${
-                    item.qrDataUrl
-                      ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 110px; height: 110px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
-                      : `<div style="font-size: 32px; margin-bottom: 4px;">📄</div>`
-                  }
-                  <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
-                    📄 ${item.nama}
+              <div class="gallery-grid">
+          `;
+
+          items.forEach(item => {
+            if (item.type === 'image') {
+              const driveId = getDriveId(item.url);
+              const fallbackSrc = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w800` : item.url;
+              gridHtml += `
+                <div class="gallery-item">
+                  <div class="img-wrapper">
+                    <img src="${item.url}" alt="${item.nama}" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                   </div>
-                  <div style="font-size: 8.5px; font-weight: 700; color: #4F46E5; margin-top: 2px;">DOKUMEN PDF CLOUD ARCHIVE</div>
-                  <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
-                    📱 Scan QR Code untuk melihat dokumen PDF asli di Google Drive / Cloud Archive
+                  <div class="caption">
+                    <div class="caption-date">[${formatDate(item.tanggal)}]</div>
+                    <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
+                    <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
                   </div>
                 </div>
-                <div class="caption" style="margin-top: 6px;">
-                  <div class="caption-date">[${formatDate(item.tanggal)}]</div>
-                  <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
-                  <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
+              `;
+            } else {
+              gridHtml += `
+                <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px;">
+                  <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 180px;">
+                    ${
+                      item.qrDataUrl
+                        ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 100px; height: 100px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
+                        : `<div style="font-size: 32px; margin-bottom: 4px;">📄</div>`
+                    }
+                    <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
+                      📄 ${item.nama}
+                    </div>
+                    <div style="font-size: 8.5px; font-weight: 700; color: #4F46E5; margin-top: 2px;">DOKUMEN PDF CLOUD ARCHIVE</div>
+                    <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
+                      📱 Scan QR Code untuk melihat dokumen PDF asli
+                    </div>
+                  </div>
+                  <div class="caption" style="margin-top: 6px;">
+                    <div class="caption-date">[${formatDate(item.tanggal)}]</div>
+                    <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
+                    <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
+                  </div>
                 </div>
+              `;
+            }
+          });
+
+          gridHtml += `
               </div>
-            `;
-          }
-        });
+            </div>
+          `;
+          return gridHtml;
+        };
+
+        if (financeItems.length > 0) {
+          attachmentsHtml += renderItemGrid(financeItems, '📌 BAGIAN A: OTORISASI & MUTASI DANA FINANCE (Pencairan Drop Dana & Transfer Panjar)');
+        }
+        if (fieldItems.length > 0) {
+          attachmentsHtml += renderItemGrid(fieldItems, '📌 BAGIAN B: STRUK & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana)');
+        }
+        if (financeItems.length === 0 && fieldItems.length === 0) {
+          attachmentsHtml += renderItemGrid(itemsToPrint, '📌 LAMPIRAN BUKTI TRANSAKSI & STRUK');
+        }
 
         attachmentsHtml += `
-            </div>
           </div>
         `;
       }
