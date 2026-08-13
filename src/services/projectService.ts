@@ -195,7 +195,23 @@ export async function getProjects(): Promise<Project[]> {
       );
 
       if (!error && data) {
-        const remoteProjects = data.map(mapRowToProject);
+        const localMap = new Map(localData.map(p => [p.id, p]));
+        const remoteProjects = data.map(row => {
+          const proj = mapRowToProject(row);
+          const local = localMap.get(proj.id);
+          if (local) {
+            if (!proj.nomorSurat && local.nomorSurat) proj.nomorSurat = local.nomorSurat;
+            if (!proj.pemohonNama && local.pemohonNama) proj.pemohonNama = local.pemohonNama;
+            if (!proj.pemohonJabatan && local.pemohonJabatan) proj.pemohonJabatan = local.pemohonJabatan;
+            if (!proj.teknisiPic && local.teknisiPic) proj.teknisiPic = local.teknisiPic;
+            if ((!proj.procurementItems || proj.procurementItems.length === 0) && local.procurementItems && local.procurementItems.length > 0) {
+              proj.procurementItems = local.procurementItems;
+            }
+            if (!proj.suratPengajuanPdf && local.suratPengajuanPdf) proj.suratPengajuanPdf = local.suratPengajuanPdf;
+          }
+          return proj;
+        });
+
         const remoteIds = new Set(remoteProjects.map(p => p.id));
         const unsyncedLocal = localData.filter(p => !remoteIds.has(p.id));
 
