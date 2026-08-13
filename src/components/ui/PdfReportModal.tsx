@@ -1316,29 +1316,6 @@ export function PdfReportModal({
                           </tr>
                         );
                       })}
-
-                      {/* AUTOMATIC ZERO-GAP RECONCILIATION FOR BANK ADMIN FEES & INCIDENTAL CASH OUTFLOWS */}
-                      {(() => {
-                        const itemsTotalActual = displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0);
-                        const selisihReconcile = totalPengeluaranRiil > itemsTotalActual ? totalPengeluaranRiil - itemsTotalActual : 0;
-                        if (selisihReconcile <= 0) return null;
-                        return (
-                          <tr className="bg-emerald-50/40 italic">
-                            <td className="p-2 border border-slate-200 text-center text-slate-400 font-bold tabular-nums">+</td>
-                            <td className="p-2 border border-slate-200 text-left font-bold text-slate-800">
-                              <div>Biaya Admin Bank Transfer &amp; Insidentil Kas</div>
-                              <div className="text-[9px] text-emerald-600 font-normal mt-0.5">Rekonsiliasi Otomatis Jurnal Kas</div>
-                            </td>
-                            <td className="p-2 border border-slate-200 text-center text-slate-600 font-medium">1 Paket</td>
-                            <td className="p-2 border border-slate-200 text-right font-semibold text-slate-400 tabular-nums">-</td>
-                            <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">{formatRupiah(selisihReconcile)}</td>
-                            <td className="p-2 border border-slate-200 text-right font-semibold text-slate-400 tabular-nums">-</td>
-                            <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
-                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Reconciled</span>
-                            </td>
-                          </tr>
-                        );
-                      })()}
                     </tbody>
                     <tfoot>
                       <tr className="bg-slate-100 font-bold border-t-2 border-slate-800">
@@ -1349,7 +1326,7 @@ export function PdfReportModal({
                           {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0))}
                         </td>
                         <td className="p-2 border border-slate-300 text-right text-blue-900 font-black tabular-nums">
-                          {formatRupiah(totalPengeluaranRiil > 0 ? totalPengeluaranRiil : displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
+                          {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
                         </td>
                         <td colSpan={2} className="p-2 border border-slate-300 text-center text-[10px] text-slate-600 font-semibold">
                           Audit Verified by Finance
