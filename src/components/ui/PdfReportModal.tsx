@@ -1247,15 +1247,15 @@ export function PdfReportModal({
 
             {/* SECTION 1: MATRIKS REALISASI ITEM PENGADAAN & VARIANS RAB (Rencana vs Realita) */}
             {(() => {
-              const displayProcurementItems = (project?.procurementItems || []).filter(item => {
+              const allItems = project?.procurementItems || [];
+              const hasItemsExplicitlyForSelectedSurat = allItems.some(i => i.suratPengajuanId === selectedPengajuanTxId);
+
+              const displayProcurementItems = allItems.filter(item => {
                 if (selectedPengajuanTxId === 'semua') return true;
-                if (item.suratPengajuanId) {
+                if (hasItemsExplicitlyForSelectedSurat) {
                   return item.suratPengajuanId === selectedPengajuanTxId;
                 }
-                const ptx = approvedTx.filter(t => t.proyekId === project?.id);
-                const allInjections = ptx.filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')));
-                const firstInj = allInjections[0];
-                return !firstInj || firstInj.id === selectedPengajuanTxId;
+                return true;
               });
 
               if (displayProcurementItems.length === 0) return null;
