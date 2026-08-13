@@ -915,9 +915,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                 onClick={() => setRefundModalOpen(true)}
                 className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md"
               >
-                <ArrowUpRight size={15} /> Tarik Sisa Dana {formatRupiah(financials.sisaDanaProyek)} ke Kas Utama
+                <ArrowUpRight size={15} /> Tarik Sisa Dana {formatRupiah(financials.sisaDanaProyek)} ke Kas Admin
               </button>
-              <p className="text-[10px] text-gray-400 mt-1.5">Dana akan dipindahkan dari pool proyek kembali ke kas utama perusahaan</p>
+              <p className="text-[10px] text-gray-400 mt-1.5">Dana sisa operasional akan dipindahkan kembali ke Kas Admin Keuangan (Holding)</p>
             </div>
           )}
         </div>

@@ -383,19 +383,30 @@ export function getProjectFinancialSummary(
     if (!isApproved(t)) continue;
 
     const k = (t.kategori || '').toLowerCase();
+    const d = (t.deskripsi || '').toLowerCase();
 
     // 1. Uang dikembalikan dari Proyek ke Kas Utama (Keluar dari Proyek)
-    if (k.includes('refund dana proyek') || k.includes('refund sisa dana')) {
+    if (k.includes('refund dana proyek') || k.includes('refund sisa dana') || d.includes('sisa dana ke kas utama')) {
       if (t.jenis === 'keluar') {
         mutasiKeluarLainnya += t.nominal;
       }
       continue;
     }
 
-    // 2. Uang dikembalikan dari Vendor ke Proyek (Masuk ke Proyek)
-    if (k.includes('refund') || k.includes('pengembalian dana')) {
+    // 2. Explicit Refund (Pengembalian sisa panjar / vendor ke proyek)
+    const isExplicitRefund = 
+      k.includes('pengembalian dana') || 
+      k.includes('sisa panjar') || 
+      d.includes('refund budget') || 
+      d.includes('sisa panjar') || 
+      d.includes('sisa dana') ||
+      (k.includes('refund') && (d.includes('refund') || d.includes('sisa') || d.includes('pengembalian')));
+
+    if (isExplicitRefund) {
       if (t.jenis === 'masuk') {
         totalRefundMasuk += t.nominal;
+      } else if (t.jenis === 'keluar') {
+        mutasiKeluarLainnya += t.nominal;
       }
       continue;
     }
@@ -406,7 +417,7 @@ export function getProjectFinancialSummary(
         modalDisuntikkanFromTx += t.nominal;
         
         // Detect if this is the initial funding
-        if (t.nominal === anggaranModal || (t.deskripsi || '').toLowerCase().includes('alokasi modal proyek')) {
+        if (t.nominal === anggaranModal || d.includes('alokasi modal proyek')) {
           hasExplicitInitialFunding = true;
         }
       } else {
