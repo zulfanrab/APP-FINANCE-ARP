@@ -655,22 +655,24 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       await addTransaction({
         tanggal: new Date().toISOString().split('T')[0],
         jenis: 'keluar',
-        deskripsi: `Penarikan Sisa Dana Proyek: ${project.nama} → Kas Utama`,
+        deskripsi: `Penarikan Sisa Dana Proyek: ${project.nama} → Kas Admin Keuangan`,
         nominal: sisaDana,
-        kategori: 'Refund Dana Proyek ke Kas Utama',
+        kategori: 'Refund Sisa Dana Proyek ke Kas Utama',
+        rekeningId: 'kas_admin',
         tag: 'operasional',
         proyekId: project.id,
         lampiran: [],
         status: 'selesai',
       });
 
-      // 2. Record masuk to kas utama (money flows back to main cash)
+      // 2. Record masuk to kas admin keuangan (money flows back to admin cash)
       await addTransaction({
         tanggal: new Date().toISOString().split('T')[0],
         jenis: 'masuk',
         deskripsi: `Refund Sisa Dana Proyek: ${project.nama} (${formatRupiah(sisaDana)})`,
         nominal: sisaDana,
-        kategori: 'Refund Dana Proyek ke Kas Utama',
+        kategori: 'Refund Sisa Dana Proyek ke Kas Utama',
+        rekeningId: 'kas_admin',
         lampiran: [],
         status: 'selesai',
       });
