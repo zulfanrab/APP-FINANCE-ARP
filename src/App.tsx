@@ -22,6 +22,7 @@ const TransactionsList = lazy(() => import('./pages/TransactionsList').then(m =>
 const Projects = lazy(() => import('./pages/Projects').then(m => ({ default: m.Projects })));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail').then(m => ({ default: m.ProjectDetail })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const TrashPage = lazy(() => import('./pages/TrashPage').then(m => ({ default: m.TrashPage })));
 
 // ---- Protected Route ----
 function ProtectedRoute({
@@ -151,6 +152,16 @@ function AppInner() {
             <ProtectedRoute>
               <Layout>
                 <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trash"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TrashPage />
               </Layout>
             </ProtectedRoute>
           }

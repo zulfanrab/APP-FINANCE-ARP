@@ -71,6 +71,8 @@ function mapRowToProject(row: any): Project {
     deskripsi: row.deskripsi ?? undefined,
     suratPengajuanPdf: row.surat_pengajuan_pdf ?? undefined,
     procurementItems: row.procurement_items ? (typeof row.procurement_items === 'string' ? JSON.parse(row.procurement_items) : row.procurement_items) : [],
+    isDeleted: Boolean(row.is_deleted),
+    deletedAt: row.deleted_at ?? undefined,
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -92,6 +94,8 @@ function mapProjectToRow(p: Project): any {
     deskripsi: p.deskripsi ?? null,
     surat_pengajuan_pdf: p.suratPengajuanPdf ?? null,
     procurement_items: p.procurementItems ? JSON.stringify(p.procurementItems) : null,
+    is_deleted: p.isDeleted ?? false,
+    deleted_at: p.deletedAt ?? null,
     dibuat_pada: p.dibuatPada,
     diupdate_pada: p.diupdatePada,
   };
@@ -181,8 +185,10 @@ function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Prom
   });
 }
 
-export async function getProjects(): Promise<Project[]> {
+export async function getProjects(includeDeleted: boolean = false): Promise<Project[]> {
   const localData = getItem<Project[]>(KEYS.PROJECTS, []);
+  // Use longer timeout if local cache is empty (fresh PWA install / re-add to homescreen on mobile)
+  const timeoutMs = localData.length === 0 ? 10000 : 4000;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -191,7 +197,7 @@ export async function getProjects(): Promise<Project[]> {
           .from('projects')
           .select('*')
           .order('dibuat_pada', { ascending: false }),
-        3000
+        timeoutMs
       );
 
       if (!error && data) {
@@ -208,12 +214,14 @@ export async function getProjects(): Promise<Project[]> {
               proj.procurementItems = local.procurementItems;
             }
             if (!proj.suratPengajuanPdf && local.suratPengajuanPdf) proj.suratPengajuanPdf = local.suratPengajuanPdf;
+            if (local.isDeleted) proj.isDeleted = true;
           }
           return proj;
         });
 
         const remoteIds = new Set(remoteProjects.map(p => p.id));
-        const unsyncedLocal = localData.filter(p => !remoteIds.has(p.id));
+        // Only keep local projects that were NOT deleted locally and not on remote
+        const unsyncedLocal = localData.filter(p => !remoteIds.has(p.id) && !p.isDeleted);
 
         if (unsyncedLocal.length > 0) {
           console.info(`Found ${unsyncedLocal.length} unsynced local projects. Resyncing to Supabase...`);
@@ -229,16 +237,17 @@ export async function getProjects(): Promise<Project[]> {
         );
 
         setItem(KEYS.PROJECTS, merged);
-        return merged;
+        return includeDeleted ? merged : merged.filter(p => !p.isDeleted);
       }
     } catch (err) {
       console.warn('Supabase projects fetch error or timeout, falling back to local storage:', err);
     }
   }
 
-  return [...localData].sort(
+  const sorted = [...localData].sort(
     (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
   );
+  return includeDeleted ? sorted : sorted.filter(p => !p.isDeleted);
 }
 
 export async function getProjectById(id: string): Promise<Project | null> {
@@ -338,15 +347,19 @@ export async function completeProject(id: string): Promise<Project> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  let projects = getItem<Project[]>(KEYS.PROJECTS, []);
-  if (!projects.some(p => p.id === id)) {
-    projects = await getProjects();
-  }
-  const filtered = projects.filter(p => p.id !== id);
-  setItem(KEYS.PROJECTS, filtered);
+  const projects = getItem<Project[]>(KEYS.PROJECTS, []);
+  const timestamp = now();
+  const updated = projects.map(p => {
+    if (p.id === id) {
+      return { ...p, isDeleted: true, deletedAt: timestamp, diupdatePada: timestamp };
+    }
+    return p;
+  });
+  setItem(KEYS.PROJECTS, updated);
 
   if (isSupabaseConfigured && supabase) {
     try {
+      await safeSupabaseUpdate('projects', { is_deleted: true, deleted_at: timestamp }, id);
       await supabase.from('projects').delete().eq('id', id);
     } catch (err) {
       console.warn('Supabase delete project error:', err);

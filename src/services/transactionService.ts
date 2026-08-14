@@ -113,6 +113,8 @@ function mapRowToTransaction(row: any): Transaction {
     parentTransactionId: row.parent_transaction_id ?? undefined,
     divisi: row.divisi ?? undefined,
     urutan: row.urutan ? Number(row.urutan) : undefined,
+    isDeleted: Boolean(row.is_deleted),
+    deletedAt: row.deleted_at ?? undefined,
     dibuatPada: row.dibuat_pada,
     diupdatePada: row.diupdate_pada,
   };
@@ -139,6 +141,8 @@ function mapTransactionToRow(t: Transaction): any {
     rekening_tujuan_id: t.rekeningTujuanId ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
     urutan: t.urutan ?? null,
+    is_deleted: t.isDeleted ?? false,
+    deleted_at: t.deletedAt ?? null,
     dibuat_pada: t.dibuatPada,
     diupdate_pada: t.diupdatePada,
   };
@@ -171,8 +175,9 @@ function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Prom
   });
 }
 
-export async function getTransactions(): Promise<Transaction[]> {
+export async function getTransactions(includeDeleted: boolean = false): Promise<Transaction[]> {
   const localData = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const timeoutMs = localData.length === 0 ? 10000 : 4000;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -181,7 +186,7 @@ export async function getTransactions(): Promise<Transaction[]> {
           .from('transactions')
           .select('*')
           .order('tanggal', { ascending: false }),
-        3000
+        timeoutMs
       );
 
       if (!error && data) {
@@ -229,7 +234,7 @@ export async function getTransactions(): Promise<Transaction[]> {
         );
 
         setItem(KEYS.TRANSACTIONS, merged);
-        return merged;
+        return includeDeleted ? merged : merged.filter(t => !t.isDeleted);
       } else if (error) {
         console.warn('Supabase select transactions error:', error);
       }
@@ -238,9 +243,10 @@ export async function getTransactions(): Promise<Transaction[]> {
     }
   }
 
-  return [...localData].sort(
+  const sorted = [...localData].sort(
     (a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()
   );
+  return includeDeleted ? sorted : sorted.filter(t => !t.isDeleted);
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {
@@ -269,12 +275,16 @@ export async function ensurePosOperasionalForDivisi(
 
   const targetNama = labelMap[divisi] || 'Operasional Kantor';
 
-  const projects = await getProjects();
-  const existing = projects.find(
+  const allProjects = await getProjects(true); // include deleted projects
+  const existing = allProjects.find(
     p => p.tipe === 'operasional_kantor' && (p.nama === targetNama || p.nama.toLowerCase().includes(divisi.toLowerCase()))
   );
 
   if (existing) {
+    if (existing.isDeleted) {
+      // User explicitly deleted this division project! Do NOT resurrect or auto-create it.
+      return '';
+    }
     return existing.id;
   }
 
@@ -599,7 +609,52 @@ export async function uploadBuktiTransfer(
   return updateTransaction(id, { buktiTransfer, status: 'selesai' });
 }
 
+export async function getDeletedTransactions(): Promise<Transaction[]> {
+  const all = await getTransactions(true);
+  return all.filter(t => t.isDeleted === true);
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const now = new Date().toISOString();
+  const updated = transactions.map(t => {
+    if (t.id === id || t.parentTransactionId === id) {
+      return { ...t, isDeleted: true, deletedAt: now, diupdatePada: now };
+    }
+    return t;
+  });
+  setItem(KEYS.TRANSACTIONS, updated);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('transactions').update({ is_deleted: true, deleted_at: now }).eq('id', id);
+    } catch (err: any) {
+      console.warn('Supabase soft delete transaction warning:', err);
+    }
+  }
+}
+
+export async function restoreTransaction(id: string): Promise<void> {
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const now = new Date().toISOString();
+  const updated = transactions.map(t => {
+    if (t.id === id || t.parentTransactionId === id) {
+      return { ...t, isDeleted: false, deletedAt: undefined, diupdatePada: now };
+    }
+    return t;
+  });
+  setItem(KEYS.TRANSACTIONS, updated);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase.from('transactions').update({ is_deleted: false, deleted_at: null }).eq('id', id);
+    } catch (err: any) {
+      console.warn('Supabase restore transaction warning:', err);
+    }
+  }
+}
+
+export async function permanentDeleteTransaction(id: string): Promise<void> {
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
   const filtered = transactions.filter(t => t.id !== id && t.parentTransactionId !== id);
   setItem(KEYS.TRANSACTIONS, filtered);
@@ -607,10 +662,24 @@ export async function deleteTransaction(id: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     try {
       const { error } = await supabase.from('transactions').delete().eq('id', id);
-      if (error) throw new Error(`Supabase delete error: ${error.message}`);
+      if (error) console.warn('Supabase permanent delete error:', error);
     } catch (err: any) {
-      console.error('Supabase delete transaction error:', err);
-      throw err;
+      console.warn('Supabase permanent delete transaction error:', err);
+    }
+  }
+}
+
+export async function emptyTrashBin(): Promise<void> {
+  const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const deletedIds = transactions.filter(t => t.isDeleted).map(t => t.id);
+  const remaining = transactions.filter(t => !t.isDeleted);
+  setItem(KEYS.TRANSACTIONS, remaining);
+
+  if (isSupabaseConfigured && supabase && deletedIds.length > 0) {
+    try {
+      await supabase.from('transactions').delete().in('id', deletedIds);
+    } catch (err: any) {
+      console.warn('Supabase empty trash error:', err);
     }
   }
 }

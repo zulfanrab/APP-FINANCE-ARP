@@ -250,6 +250,12 @@ export function ProjectDetail() {
     return allTransactions.filter(t => t.proyekId === id);
   }, [allTransactions, id]);
 
+  const injectionTxns = React.useMemo(() => {
+    return transactions
+      .filter(t => isCapitalInjectionTx(t))
+      .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+  }, [transactions]);
+
   const [filterType, setFilterType] = useState<'semua' | 'masuk' | 'keluar'>('semua');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
@@ -306,6 +312,7 @@ export function ProjectDetail() {
 
   // Refund & PDF Modal
   const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [refundTargetPengajuanId, setRefundTargetPengajuanId] = useState<string>('semua');
   const [refundNominal, setRefundNominal] = useState('');
   const [refundDeskripsi, setRefundDeskripsi] = useState('');
   const [refundSaving, setRefundSaving] = useState(false);
@@ -642,15 +649,21 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
   // REFUND: Tarik sisa dana proyek ke kas utama
   const handleRefundToKasUtama = async () => {
-    if (financials.sisaDanaProyek <= 0) {
-      addToast('error', 'Tidak ada sisa dana proyek untuk ditarik');
+    // Calculate targeted Sisa Dana
+    let targetTxns = transactions;
+    if (refundTargetPengajuanId !== 'semua') {
+      targetTxns = transactions.filter(t => t.suratPengajuanId === refundTargetPengajuanId || t.id === refundTargetPengajuanId);
+    }
+    const targetFinancials = getProjectFinancialSummary(targetTxns, refundTargetPengajuanId === 'semua' ? (project.anggaran || 0) : 0);
+    const sisaDana = targetFinancials.sisaDanaProyek;
+
+    if (sisaDana <= 0) {
+      addToast('error', 'Tidak ada sisa dana proyek untuk ditarik pada pilihan ini');
       return;
     }
 
     setRefundSaving(true);
     try {
-      const sisaDana = financials.sisaDanaProyek;
-
       // 1. Record keluar from project pool (drain remaining funds)
       await addTransaction({
         tanggal: new Date().toISOString().split('T')[0],
@@ -661,6 +674,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         rekeningId: 'kas_admin',
         tag: 'operasional',
         proyekId: project.id,
+        suratPengajuanId: refundTargetPengajuanId !== 'semua' ? refundTargetPengajuanId : undefined,
         lampiran: [],
         status: 'selesai',
       });
@@ -1000,10 +1014,6 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             return <EmptyState icon={<Layers size={28} />} title="Belum Ada Transaksi Proyek" description="Semua transaksi pengeluaran/refund proyek akan tampil di sini" />;
           }
 
-          const injectionTxns = transactions
-            .filter(t => t.proyekId === project.id && isCapitalInjectionTx(t))
-            .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
-
           return (
             <div className="space-y-3">
               {/* Batch Action Floating Control Bar */}
@@ -1236,18 +1246,40 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       {/* Refund Confirmation Modal */}
       <Modal isOpen={refundModalOpen} onClose={() => setRefundModalOpen(false)} title="Tarik Sisa Dana Proyek ke Kas Utama">
         <div className="space-y-4">
-          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2">
-            <p className="text-xs text-slate-400">Sisa dana proyek yang akan ditarik:</p>
-            <p className="text-3xl font-extrabold text-emerald-400">{formatRupiah(financials.sisaDanaProyek)}</p>
-            <p className="text-xs text-slate-400">Proyek: <strong className="text-white">{project.nama}</strong></p>
+          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-4">
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-2">Pilih Sumber Penarikan</label>
+              <select
+                value={refundTargetPengajuanId}
+                onChange={e => setRefundTargetPengajuanId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:border-emerald-500"
+              >
+                <option value="semua">Semua Transaksi Proyek (Total Sisa)</option>
+                {injectionTxns.map((inj, idx) => (
+                  <option key={inj.id} value={inj.id}>
+                    Surat Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="pt-2 border-t border-slate-700/50">
+              <p className="text-xs text-slate-400 mb-1">Total sisa dana yang akan ditarik:</p>
+              <p className="text-3xl font-extrabold text-emerald-400">
+                {formatRupiah(getProjectFinancialSummary(
+                  refundTargetPengajuanId === 'semua' ? transactions : transactions.filter(t => t.suratPengajuanId === refundTargetPengajuanId || t.id === refundTargetPengajuanId),
+                  refundTargetPengajuanId === 'semua' ? (project.anggaran || 0) : 0
+                ).sisaDanaProyek)}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Proyek: <strong className="text-white">{project.nama}</strong></p>
+            </div>
           </div>
 
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 font-medium space-y-1">
             <p className="font-bold">⚠️ Perhatian:</p>
             <ul className="list-disc list-inside space-y-0.5 text-amber-700">
-              <li>Sisa dana proyek akan dipindahkan <strong>kembali ke Kas Utama</strong> perusahaan</li>
-              <li>Saldo dana proyek akan menjadi <strong>Rp 0</strong></li>
-              <li>Aksi ini akan tercatat di laporan kedua sisi (proyek & kas utama)</li>
+              <li>Sisa dana operasional dari sumber terpilih akan dipindahkan <strong>kembali ke Kas Utama</strong></li>
+              <li>Aksi ini otomatis membuat 2 riwayat transaksi (di dalam proyek dan di Kas Utama) untuk mencegah selisih</li>
             </ul>
           </div>
 

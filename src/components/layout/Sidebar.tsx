@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
     label: 'Proyek',
   },
   { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
+  { to: '/trash', icon: <Trash2 size={20} />, label: 'Kotak Sampah' },
 ];
 
 export function Sidebar() {

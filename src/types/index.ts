@@ -40,6 +40,8 @@ export interface Transaction {
   parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
   divisi?: 'admin' | 'ahli' | 'it' | 'umum'; // Sub-Divisi pengaju (Divisi Admin, Divisi Ahli, Divisi IT, Umum)
   urutan?: number; // Custom drag-and-drop order index
+  isDeleted?: boolean; // Soft delete flag
+  deletedAt?: string; // ISO datetime when deleted
   dibuatPada: string; // ISO datetime
   diupdatePada: string; // ISO datetime
 }
@@ -73,6 +75,8 @@ export interface Project {
   tanggalSelesai?: string;
   status: 'aktif' | 'selesai';
   deskripsi?: string;
+  isDeleted?: boolean; // Soft delete flag to prevent zombie projects
+  deletedAt?: string; // ISO datetime when deleted
   dibuatPada: string;
   diupdatePada: string;
 }

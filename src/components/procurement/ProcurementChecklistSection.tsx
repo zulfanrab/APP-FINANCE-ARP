@@ -29,16 +29,24 @@ function parseRupiahNumber(value: string): number | undefined {
 
 interface QuickAddFormProps {
   onAdd: (item: Omit<ProcurementItem, 'id' | 'isPurchased'>) => Promise<void>;
+  injectionTxns: Transaction[];
 }
 
 // 1. ISOLATED QUICK ADD FORM (Prevents page re-renders on keystroke)
-const QuickAddForm = React.memo(({ onAdd }: QuickAddFormProps) => {
+const QuickAddForm = React.memo(({ onAdd, injectionTxns }: QuickAddFormProps) => {
   const [nama, setNama] = useState('');
   const [kuantitas, setKuantitas] = useState('1');
   const [satuan, setSatuan] = useState('');
   const [hargaRencana, setHargaRencana] = useState('');
   const [kategori, setKategori] = useState('Operational Cost');
+  const [suratPengajuanId, setSuratPengajuanId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (injectionTxns.length > 0 && !suratPengajuanId) {
+      setSuratPengajuanId(injectionTxns[0].id);
+    }
+  }, [injectionTxns]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -52,6 +60,7 @@ const QuickAddForm = React.memo(({ onAdd }: QuickAddFormProps) => {
         satuan: satuan.trim() || undefined,
         hargaRencana: parseRupiahNumber(hargaRencana),
         kategori: kategori || 'Operational Cost',
+        suratPengajuanId: suratPengajuanId || undefined,
       });
       setNama('');
       setKuantitas('1');
@@ -102,6 +111,23 @@ const QuickAddForm = React.memo(({ onAdd }: QuickAddFormProps) => {
           <option value="Overhead Cost">🏢 Overhead Cost</option>
           <option value="Biaya Lain-Lain">📑 Biaya Lain-Lain</option>
         </select>
+
+        {injectionTxns.length > 0 && (
+          <select
+            value={suratPengajuanId}
+            onChange={e => setSuratPengajuanId(e.target.value)}
+            className="border border-blue-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50/70 text-blue-900 font-bold shadow-sm"
+            title="Tautkan item ini ke Surat Pengajuan tertentu"
+          >
+            <option value="">-- Tanpa Surat --</option>
+            {injectionTxns.map((inj, idx) => (
+              <option key={inj.id} value={inj.id}>
+                📄 Surat #{idx + 1}: {inj.deskripsi.slice(0, 18)}
+              </option>
+            ))}
+          </select>
+        )}
+
         <input
           type="text"
           value={hargaRencana}
@@ -165,6 +191,7 @@ export function ProcurementChecklistSection({
   const [editSatuan, setEditSatuan] = useState('');
   const [editHargaRencana, setEditHargaRencana] = useState('');
   const [editKategori, setEditKategori] = useState('Operational Cost');
+  const [editSuratPengajuanId, setEditSuratPengajuanId] = useState<string>('');
   const [editSaving, setEditSaving] = useState(false);
 
   // Realization Modal State
@@ -196,6 +223,7 @@ export function ProcurementChecklistSection({
     setEditSatuan(item.satuan || '');
     setEditHargaRencana(item.hargaRencana ? new Intl.NumberFormat('id-ID').format(item.hargaRencana) : '');
     setEditKategori(item.kategori || 'Operational Cost');
+    setEditSuratPengajuanId(item.suratPengajuanId || '');
   };
 
   const handleSaveEditItem = async () => {
@@ -211,6 +239,7 @@ export function ProcurementChecklistSection({
             satuan: editSatuan.trim() || undefined,
             hargaRencana: parseRupiahNumber(editHargaRencana),
             kategori: editKategori,
+            suratPengajuanId: editSuratPengajuanId || undefined,
           };
         }
         return item;
@@ -312,7 +341,19 @@ export function ProcurementChecklistSection({
     }
   };
 
-  // 6. BATCH TAGGING TO SURAT PENGAJUAN
+  // 6. BATCH & SINGLE TAGGING TO SURAT PENGAJUAN
+  const handleSingleTagItem = async (itemId: string, targetSuratId: string) => {
+    try {
+      const items = (project.procurementItems || []).map(item =>
+        item.id === itemId ? { ...item, suratPengajuanId: targetSuratId || undefined } : item
+      );
+      await onUpdateProcurementItems(items);
+      addToast('success', 'Tautan Surat Pengajuan berhasil diperbarui');
+    } catch {
+      addToast('error', 'Gagal memperbarui tautan Surat Pengajuan');
+    }
+  };
+
   const handleBatchTagItems = async () => {
     if (!batchItemPengajuanId || selectedItemIds.length === 0) return;
     setBatchItemSaving(true);
@@ -442,7 +483,7 @@ export function ProcurementChecklistSection({
           )}
 
           {/* Isolated Quick Add Form */}
-          <QuickAddForm onAdd={handleAddItem} />
+          <QuickAddForm onAdd={handleAddItem} injectionTxns={injectionTxns} />
 
           {/* Item List by Category */}
           {procurementItems.length === 0 ? (
@@ -550,10 +591,26 @@ export function ProcurementChecklistSection({
                                     </span>
                                   )}
                                 </div>
-                                {item.suratPengajuanId && (
-                                  <span className="text-[9.5px] font-bold text-blue-700 mt-0.5">
-                                    📌 Taut Surat Pengajuan
-                                  </span>
+                                {injectionTxns.length > 0 && (
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    <select
+                                      value={item.suratPengajuanId || ''}
+                                      onChange={e => handleSingleTagItem(item.id, e.target.value)}
+                                      onClick={e => e.stopPropagation()}
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                                        item.suratPengajuanId
+                                          ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
+                                          : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                                      }`}
+                                    >
+                                      <option value="">⚠️ Belum Ditautkan ke Surat</option>
+                                      {injectionTxns.map((inj, idx) => (
+                                        <option key={inj.id} value={inj.id}>
+                                          📌 Taut ke Surat #{idx + 1}: {inj.deskripsi.slice(0, 25)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -698,6 +755,24 @@ export function ProcurementChecklistSection({
               placeholder="0"
             />
           </div>
+
+          {injectionTxns.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Surat Pengajuan Tujuan:</label>
+              <select
+                value={editSuratPengajuanId}
+                onChange={e => setEditSuratPengajuanId(e.target.value)}
+                className="w-full border border-blue-200 rounded-xl px-3.5 py-2 text-xs font-bold text-blue-900 bg-blue-50/70 focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">-- Tanpa Surat Pengajuan (Umum) --</option>
+                {injectionTxns.map((inj, idx) => (
+                  <option key={inj.id} value={inj.id}>
+                    📌 Surat Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 35)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
             <Button variant="secondary" size="sm" onClick={() => setEditingItem(null)}>

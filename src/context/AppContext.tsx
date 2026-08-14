@@ -123,6 +123,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [triggerRefresh]);
 
+  // 2. AUTO-SYNC ON MOBILE APP RESUME / WINDOW FOCUS / BACK ONLINE
+  useEffect(() => {
+    const handleResumeOrOnline = () => {
+      console.info('📱 App resumed or came online. Triggering automatic background sync...');
+      triggerRefresh();
+    };
+
+    window.addEventListener('focus', handleResumeOrOnline);
+    window.addEventListener('online', handleResumeOrOnline);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleResumeOrOnline();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleResumeOrOnline);
+      window.removeEventListener('online', handleResumeOrOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [triggerRefresh]);
+
 
 
   return (
