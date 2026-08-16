@@ -8,6 +8,8 @@ const KEYS = {
   CATEGORIES: 'arka_categories',
   PIN_HASH: 'arka_pin_hash',
   SESSION: 'arka_session',
+  TRASH_TRANSACTIONS: 'arka_trash_transactions',
+  TRASH_PROJECTS: 'arka_trash_projects',
 } as const;
 
 export function getItem<T>(key: string, defaultValue: T): T {
