@@ -72,7 +72,7 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
       const img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
-        const MAX_DIM = 1000;
+        const MAX_DIM = 900;
         let w = img.width;
         let h = img.height;
         if (w > MAX_DIM || h > MAX_DIM) {
@@ -92,7 +92,7 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.60);
           resolve({
             nama: file.name,
             tipe: 'image/jpeg',
@@ -107,7 +107,7 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
         readAsDataUrlFallback(file, mimeType, resolve);
       };
       img.src = objectUrl;
-    }, 10);
+    }, 5);
   });
 }
 
@@ -146,7 +146,7 @@ export async function uploadAttachmentFile(
     try {
       const drivePromise = uploadToGoogleDrive(file, context);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Drive upload timeout')), 12000)
+        setTimeout(() => reject(new Error('Drive upload timeout')), 6000)
       );
       const driveResult = await Promise.race([drivePromise, timeoutPromise]);
       if (driveResult && driveResult.dataUrl) {

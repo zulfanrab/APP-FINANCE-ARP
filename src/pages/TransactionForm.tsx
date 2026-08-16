@@ -276,43 +276,40 @@ export function TransactionForm() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
-      const uploadedAttachments: Attachment[] = [];
       const currentProject = projects.find(p => p.id === (form.proyekId || urlProyekId));
 
-      for (const staged of stagedFiles) {
-        if (staged.fileObj) {
-          try {
-            const uploaded = await uploadAttachmentFile(staged.fileObj, {
-              tanggal: form.tanggal,
-              tag: form.tag,
-              proyekNama: currentProject?.nama,
-            });
-            if (uploaded && uploaded.dataUrl) {
-              uploadedAttachments.push(uploaded);
-            } else {
-              const fallbackAtt = await compressFileToAttachment(staged.fileObj);
-              uploadedAttachments.push(fallbackAtt);
-            }
-          } catch {
+      const uploadedAttachments: Attachment[] = await Promise.all(
+        stagedFiles.map(async (staged) => {
+          if (staged.fileObj) {
             try {
-              const fallbackAtt = await compressFileToAttachment(staged.fileObj);
-              uploadedAttachments.push(fallbackAtt);
-            } catch {
-              uploadedAttachments.push({
-                nama: staged.nama,
-                tipe: staged.tipe,
-                dataUrl: staged.dataUrl || '',
+              const uploaded = await uploadAttachmentFile(staged.fileObj, {
+                tanggal: form.tanggal,
+                tag: form.tag,
+                proyekNama: currentProject?.nama,
               });
+              if (uploaded && uploaded.dataUrl) {
+                return uploaded;
+              }
+              return await compressFileToAttachment(staged.fileObj);
+            } catch {
+              try {
+                return await compressFileToAttachment(staged.fileObj);
+              } catch {
+                return {
+                  nama: staged.nama,
+                  tipe: staged.tipe,
+                  dataUrl: staged.dataUrl || '',
+                };
+              }
             }
           }
-        } else {
-          uploadedAttachments.push({
+          return {
             nama: staged.nama,
             tipe: staged.tipe,
             dataUrl: staged.dataUrl,
-          });
-        }
-      }
+          };
+        })
+      );
 
       const adminNominalCustom = parseRupiahInput(form.adminNominalCustomStr || '0');
 

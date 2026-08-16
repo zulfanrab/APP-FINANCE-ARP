@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Modal } from './Modal';
 import { AttachmentViewer } from './AttachmentViewer';
-import { type Transaction, type Project, type JalurTransfer, type AccountId } from '../../types';
+import { type Transaction, type Project, type JalurTransfer, type AccountId, type Attachment } from '../../types';
 import { updateTransaction, deleteTransaction, getTransactions } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
@@ -271,43 +271,40 @@ export function TransactionDetailModal({
     setSaving(true);
     await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
-      const finalAttachments = [];
       const currentProject = cachedProjects.find(p => p.id === editForm.proyekId);
 
-      for (const att of stagedAttachments) {
-        if (att.fileObj) {
-          try {
-            const uploaded = await uploadAttachmentFile(att.fileObj, {
-              tanggal: editForm.tanggal,
-              tag: editForm.tag,
-              proyekNama: currentProject?.nama,
-            });
-            if (uploaded && uploaded.dataUrl) {
-              finalAttachments.push(uploaded);
-            } else {
-              const fallbackAtt = await compressFileToAttachment(att.fileObj);
-              finalAttachments.push(fallbackAtt);
-            }
-          } catch {
+      const finalAttachments: Attachment[] = await Promise.all(
+        stagedAttachments.map(async (att) => {
+          if (att.fileObj) {
             try {
-              const fallbackAtt = await compressFileToAttachment(att.fileObj);
-              finalAttachments.push(fallbackAtt);
-            } catch {
-              finalAttachments.push({
-                nama: att.nama,
-                tipe: att.tipe,
-                dataUrl: att.dataUrl || '',
+              const uploaded = await uploadAttachmentFile(att.fileObj, {
+                tanggal: editForm.tanggal,
+                tag: editForm.tag,
+                proyekNama: currentProject?.nama,
               });
+              if (uploaded && uploaded.dataUrl) {
+                return uploaded;
+              }
+              return await compressFileToAttachment(att.fileObj);
+            } catch {
+              try {
+                return await compressFileToAttachment(att.fileObj);
+              } catch {
+                return {
+                  nama: att.nama,
+                  tipe: att.tipe,
+                  dataUrl: att.dataUrl || '',
+                };
+              }
             }
           }
-        } else {
-          finalAttachments.push({
+          return {
             nama: att.nama,
             tipe: att.tipe,
             dataUrl: att.dataUrl,
-          });
-        }
-      }
+          };
+        })
+      );
 
       const adminNominalCustom = parseRupiahInput(editForm.adminNominalCustomStr || '0');
 

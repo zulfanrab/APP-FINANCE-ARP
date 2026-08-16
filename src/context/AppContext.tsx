@@ -29,6 +29,7 @@ interface AppContextType {
   projects: Project[];
   loading: boolean;
   refreshData: () => Promise<void>;
+  forceSyncCloud: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -73,6 +74,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
   }, []);
+
+  const forceSyncCloud = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      addToast('error', '⚠️ Mode Lokal: Kunci Supabase (.env) belum terpasang di browser perangkat ini.');
+      return;
+    }
+
+    addToast('info', '🔄 Menghubungi Supabase Cloud...');
+    try {
+      const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
+      setTransactions(txs);
+      setProjects(projs);
+      addToast('success', `✅ Sinkronisasi Berhasil! (${txs.length} transaksi & ${projs.length} proyek dimuat)`);
+    } catch (err: any) {
+      console.error('Manual force sync failed:', err);
+      addToast('error', `❌ Gagal menarik data: ${err?.message || 'Koneksi terputus'}`);
+    }
+  }, [addToast]);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -160,6 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         projects,
         loading,
         refreshData,
+        forceSyncCloud,
       }}
     >
       {children}

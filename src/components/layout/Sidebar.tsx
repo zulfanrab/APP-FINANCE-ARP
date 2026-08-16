@@ -15,9 +15,11 @@ import {
   ChevronRight,
   BookOpen,
   Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
+import { useApp } from '../../context/AppContext';
 import { UserGuideModal } from '../ui/UserGuideModal';
 import { isSupabaseConfigured } from '../../services/supabase';
 
@@ -48,6 +50,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const { role, logout } = useAuth();
+  const { forceSyncCloud } = useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
 
@@ -111,14 +114,22 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Cloud Sync Status Indicator */}
+      {/* Cloud Sync Status Indicator & Force Pull Action */}
       {!collapsed && (
-        <div className="px-3 py-1.5 mx-3 mb-2 bg-white/5 rounded-xl border border-white/10 flex items-center gap-2 text-[11px]">
-          <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-          <span className="text-white/80 font-medium">
-            {isSupabaseConfigured ? 'Cloud Sync Active' : 'Mode Lokal'}
-          </span>
-        </div>
+        <button
+          type="button"
+          onClick={forceSyncCloud}
+          className="mx-3 mb-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex items-center justify-between gap-2 text-[11px] transition-all active:scale-95 group text-left cursor-pointer"
+          title="Klik untuk Tarik & Sinkronkan Data dari Cloud Database"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-white/90 font-semibold truncate">
+              {isSupabaseConfigured ? 'Cloud Sync Active' : 'Mode Lokal'}
+            </span>
+          </div>
+          <RefreshCw size={12} className="text-emerald-400 group-hover:rotate-180 transition-transform flex-shrink-0" />
+        </button>
       )}
 
       {/* Bottom: guide + collapse toggle + logout */}
