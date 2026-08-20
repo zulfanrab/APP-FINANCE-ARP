@@ -7,7 +7,7 @@
 import React, { useState, useRef } from 'react';
 import {
   FileText, Image as ImageIcon, ExternalLink, X,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, RefreshCw, Eye
+  ZoomIn, ZoomOut, RotateCw, RefreshCw, Download, AlertCircle, Eye, Maximize2
 } from 'lucide-react';
 import { type Attachment } from '../../types';
 
@@ -67,6 +67,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
     blobUrl?: string;
     driveId?: string | null;
     isGoogleDrive: boolean;
+    isEmptyData: boolean;
   } | null>(null);
 
   // Touch gesture & animation frame references for smooth 60FPS performance
@@ -91,20 +92,25 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
   };
 
   const handleOpenPdf = (att: Attachment) => {
-    const isGoogleDrive = att.dataUrl && att.dataUrl.includes('drive.google.com');
-    const driveId = isGoogleDrive ? getDriveFileId(att.dataUrl) : null;
-    const isBase64 = att.dataUrl && att.dataUrl.startsWith('data:');
+    const rawData = att.dataUrl || '';
+    const isGoogleDrive = Boolean(rawData && rawData.includes('drive.google.com'));
+    const driveId = isGoogleDrive ? getDriveFileId(rawData) : null;
+    const isBase64 = rawData.startsWith('data:');
+    const isEmptyData = !rawData || rawData.trim() === '';
 
     let blobUrl = '';
     if (isBase64) {
-      blobUrl = convertBase64ToBlobUrl(att.dataUrl);
+      blobUrl = convertBase64ToBlobUrl(rawData);
+    } else if (rawData && !isGoogleDrive) {
+      blobUrl = rawData;
     }
 
     setActivePdfModal({
       att,
       blobUrl,
       driveId,
-      isGoogleDrive: Boolean(isGoogleDrive),
+      isGoogleDrive,
+      isEmptyData,
     });
   };
 
@@ -322,7 +328,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
             onClick={e => e.stopPropagation()}
           >
             {/* PDF Header */}
-            <div className="px-4 sm:px-6 py-3 bg-slate-900 border-b border-white/10 flex items-center justify-between gap-2">
+            <div className="px-4 sm:px-6 py-3 bg-slate-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center flex-shrink-0">
                   <FileText size={18} />
@@ -337,7 +343,7 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {activePdfModal.isGoogleDrive && activePdfModal.driveId && (
                   <a
                     href={`https://drive.google.com/file/d/${activePdfModal.driveId}/view?usp=sharing`}
@@ -348,22 +354,33 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                     <ExternalLink size={13} /> Buka di Drive
                   </a>
                 )}
-                {activePdfModal.blobUrl && (
-                  <a
-                    href={activePdfModal.blobUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
-                  >
-                    <ExternalLink size={13} /> Buka Tab Baru
-                  </a>
+                {(activePdfModal.blobUrl || activePdfModal.att.dataUrl) && !activePdfModal.isEmptyData && (
+                  <>
+                    <a
+                      href={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                    >
+                      <ExternalLink size={13} /> Tab Baru
+                    </a>
+                    <a
+                      href={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                      download={activePdfModal.att.nama || 'dokumen.pdf'}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
+                    >
+                      <Download size={13} /> Unduh
+                    </a>
+                  </>
                 )}
                 <button
                   onClick={() => {
-                    if (activePdfModal.blobUrl) URL.revokeObjectURL(activePdfModal.blobUrl);
+                    if (activePdfModal.blobUrl && activePdfModal.blobUrl.startsWith('blob:')) {
+                      try { URL.revokeObjectURL(activePdfModal.blobUrl); } catch { /* ignore */ }
+                    }
                     setActivePdfModal(null);
                   }}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors"
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors ml-1"
                 >
                   <X size={18} />
                 </button>
@@ -372,18 +389,69 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
 
             {/* PDF Viewport */}
             <div className="relative flex-1 bg-slate-950 p-2 overflow-hidden flex flex-col">
-              {activePdfModal.isGoogleDrive && activePdfModal.driveId ? (
+              {activePdfModal.isEmptyData ? (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center text-slate-300">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3">
+                    <AlertCircle size={32} />
+                  </div>
+                  <h4 className="text-base font-bold text-white mb-1">
+                    {activePdfModal.att.nama || 'File PDF'}
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-md mb-4 leading-relaxed">
+                    Data berkas PDF ini kosong atau belum tersimpan secara penuh di server / penyimpanan lokal. Silakan buka menu <strong>Edit Transaksi</strong> untuk mengunggah ulang file PDF Anda.
+                  </p>
+                  <button
+                    onClick={() => setActivePdfModal(null)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold"
+                  >
+                    Tutup Pratinjau
+                  </button>
+                </div>
+              ) : activePdfModal.isGoogleDrive && activePdfModal.driveId ? (
                 <iframe
                   src={`https://drive.google.com/file/d/${activePdfModal.driveId}/preview`}
                   title={activePdfModal.att.nama}
                   className="w-full h-full rounded-2xl border-0 bg-white"
                 />
               ) : (
-                <iframe
-                  src={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
-                  title={activePdfModal.att.nama}
+                <object
+                  data={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                  type="application/pdf"
                   className="w-full h-full rounded-2xl border-0 bg-white"
-                />
+                >
+                  <iframe
+                    src={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                    title={activePdfModal.att.nama}
+                    className="w-full h-full rounded-2xl border-0 bg-white"
+                  >
+                    <div className="flex flex-col items-center justify-center h-full p-6 text-center text-slate-300 bg-slate-900 rounded-2xl">
+                      <FileText size={44} className="text-emerald-400 mb-2" />
+                      <h4 className="text-sm font-bold text-white mb-1">
+                        Pratinjau PDF: {activePdfModal.att.nama}
+                      </h4>
+                      <p className="text-xs text-slate-400 mb-4 max-w-sm">
+                        Browser Anda tidak mendukung render PDF di dalam aplikasi. Silakan buka dokumen di tab baru atau unduh langsung.
+                      </p>
+                      <div className="flex gap-2">
+                        <a
+                          href={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <ExternalLink size={14} /> Buka di Tab Baru
+                        </a>
+                        <a
+                          href={activePdfModal.blobUrl || activePdfModal.att.dataUrl}
+                          download={activePdfModal.att.nama || 'dokumen.pdf'}
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+                        >
+                          <Download size={14} /> Unduh PDF
+                        </a>
+                      </div>
+                    </div>
+                  </iframe>
+                </object>
               )}
             </div>
           </div>

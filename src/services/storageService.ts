@@ -34,8 +34,8 @@ export function buildFolderPath(fileName: string, context: UploadContext): strin
 
 /**
  * Processes and compresses file (Image or PDF) into a clean Attachment object.
- * Images are scaled to max 1400px and compressed via Canvas to ~150-250KB JPEG base64.
- * PDFs are converted to base64 Data URLs.
+ * Images are scaled to max 900px and compressed via Canvas to ~100-200KB JPEG base64.
+ * PDFs are converted to base64 Data URLs with strict timeout safeguards.
  */
 export async function compressFileToAttachment(file: File): Promise<Attachment> {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -43,14 +43,14 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
     ? 'application/pdf'
     : (file.type || (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'));
 
-  if (isPdf) {
-    return new Promise((resolve) => {
+  const processingPromise = new Promise<Attachment>((resolve) => {
+    if (isPdf) {
       const reader = new FileReader();
       reader.onload = () => {
         resolve({
           nama: file.name,
           tipe: 'application/pdf',
-          dataUrl: reader.result as string,
+          dataUrl: (reader.result as string) || '',
         });
       };
       reader.onerror = () => {
@@ -61,20 +61,28 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
         });
       };
       reader.readAsDataURL(file);
-    });
-  }
+      return;
+    }
 
-  // Handle Images (compress via canvas)
-  return new Promise((resolve) => {
-    // Yield to main thread first so UI button animation renders smoothly
+    // Handle Images (compress via canvas)
     setTimeout(() => {
-      const objectUrl = URL.createObjectURL(file);
+      let objectUrl = '';
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch {
+        readAsDataUrlFallback(file, mimeType, resolve);
+        return;
+      }
+
       const img = new Image();
       img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch { /* ignore */ }
+
         const MAX_DIM = 900;
-        let w = img.width;
-        let h = img.height;
+        let w = img.width || 800;
+        let h = img.height || 600;
         if (w > MAX_DIM || h > MAX_DIM) {
           if (w > h) {
             h = Math.round((h * MAX_DIM) / w);
@@ -84,50 +92,77 @@ export async function compressFileToAttachment(file: File): Promise<Attachment> 
             h = MAX_DIM;
           }
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.60);
-          resolve({
-            nama: file.name,
-            tipe: 'image/jpeg',
-            dataUrl: compressedDataUrl,
-          });
-        } else {
-          readAsDataUrlFallback(file, mimeType, resolve);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.60);
+            resolve({
+              nama: file.name,
+              tipe: 'image/jpeg',
+              dataUrl: compressedDataUrl,
+            });
+            return;
+          }
+        } catch {
+          // Canvas failure fallback
         }
+        readAsDataUrlFallback(file, mimeType, resolve);
       };
       img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch { /* ignore */ }
         readAsDataUrlFallback(file, mimeType, resolve);
       };
       img.src = objectUrl;
     }, 5);
   });
+
+  // Safety Timeout: Never let compression freeze or hang the UI (max 4.5s)
+  const timeoutFallback = new Promise<Attachment>((resolve) => {
+    setTimeout(() => {
+      resolve({
+        nama: file.name,
+        tipe: mimeType,
+        dataUrl: '',
+      });
+    }, 4500);
+  });
+
+  return Promise.race([processingPromise, timeoutFallback]);
 }
 
 function readAsDataUrlFallback(file: File, mimeType: string, resolve: (att: Attachment) => void) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    resolve({
-      nama: file.name,
-      tipe: mimeType,
-      dataUrl: reader.result as string,
-    });
-  };
-  reader.onerror = () => {
+  try {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        nama: file.name,
+        tipe: mimeType,
+        dataUrl: (reader.result as string) || '',
+      });
+    };
+    reader.onerror = () => {
+      resolve({
+        nama: file.name,
+        tipe: mimeType,
+        dataUrl: '',
+      });
+    };
+    reader.readAsDataURL(file);
+  } catch {
     resolve({
       nama: file.name,
       tipe: mimeType,
       dataUrl: '',
     });
-  };
-  reader.readAsDataURL(file);
+  }
 }
 
 /**
@@ -146,7 +181,7 @@ export async function uploadAttachmentFile(
     try {
       const drivePromise = uploadToGoogleDrive(file, context);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Drive upload timeout')), 6000)
+        setTimeout(() => reject(new Error('Drive upload timeout')), 3500)
       );
       const driveResult = await Promise.race([drivePromise, timeoutPromise]);
       if (driveResult && driveResult.dataUrl) {

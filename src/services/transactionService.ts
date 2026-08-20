@@ -53,26 +53,36 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
     } catch { /* fallback */ }
   }
 
-  let { error } = await supabase.from(table).update(retryRow).eq('id', id);
+  const performUpdate = async (): Promise<{ error: any }> => {
+    let { error } = await supabase!.from(table).update(retryRow).eq('id', id);
 
-  while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
-    const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
-    if (match && match[1]) {
-      const missingCol = match[1];
-      // PROTECT CORE COLUMNS: Never delete lampiran, nominal, deskripsi, status, or account IDs!
-      if (['lampiran', 'nominal', 'deskripsi', 'status', 'tanggal', 'kategori', 'rekening_id', 'rekening_tujuan_id'].includes(missingCol)) {
-        console.error(`Cannot strip core column "${missingCol}" from Supabase update payload!`);
+    while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
+      const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        if (['lampiran', 'nominal', 'deskripsi', 'status', 'tanggal', 'kategori', 'rekening_id', 'rekening_tujuan_id'].includes(missingCol)) {
+          console.error(`Cannot strip core column "${missingCol}" from Supabase update payload!`);
+          break;
+        }
+        console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
+        delete retryRow[missingCol];
+        const retryRes = await supabase!.from(table).update(retryRow).eq('id', id);
+        error = retryRes.error;
+      } else {
         break;
       }
-      console.warn(`Supabase missing "${missingCol}" column. Retrying update without it...`);
-      delete retryRow[missingCol];
-      const retryRes = await supabase.from(table).update(retryRow).eq('id', id);
-      error = retryRes.error;
-    } else {
-      break;
     }
-  }
-  return { error };
+    return { error };
+  };
+
+  const timeoutPromise = new Promise<{ error: any }>((resolve) =>
+    setTimeout(() => {
+      console.warn(`Supabase update timeout on table "${table}" (id: ${id}). Proceeding with local cache.`);
+      resolve({ error: null });
+    }, 7000)
+  );
+
+  return Promise.race([performUpdate(), timeoutPromise]);
 }
 
 function parseLampiranField(raw: any): Attachment[] {

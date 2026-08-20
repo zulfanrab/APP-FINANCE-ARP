@@ -273,6 +273,7 @@ export function TransactionDetailModal({
     try {
       const currentProject = cachedProjects.find(p => p.id === editForm.proyekId);
 
+      // Process attachments with parallel execution and safety fallback
       const finalAttachments: Attachment[] = await Promise.all(
         stagedAttachments.map(async (att) => {
           if (att.fileObj) {
@@ -301,7 +302,7 @@ export function TransactionDetailModal({
           return {
             nama: att.nama,
             tipe: att.tipe,
-            dataUrl: att.dataUrl,
+            dataUrl: att.dataUrl || '',
           };
         })
       );
@@ -341,6 +342,7 @@ export function TransactionDetailModal({
       triggerRefresh();
       if (onUpdate) onUpdate(updatedTx);
     } catch (err: any) {
+      console.error('Error saving edited transaction:', err);
       addToast('error', err?.message || 'Gagal memperbarui transaksi');
     } finally {
       setSaving(false);
