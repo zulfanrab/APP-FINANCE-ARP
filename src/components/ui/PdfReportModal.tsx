@@ -48,88 +48,95 @@ export function isCapitalInjectionTx(t: Transaction): boolean {
   return isMutasiInternal(t) || k.includes('mutasi') || d.includes('modal') || d.includes('pengajuan') || d.includes('drop dana') || d.includes('surat pengajuan') || d.includes('budget');
 }
 
-export interface AccountingDisplayRow {
-  no: number | string;
-  tanggal: string;
-  deskripsi: string;
-  kategori: string;
-  debet: number;
-  kredit: number;
-  saldo: number;
-  isPindahan?: boolean;
-  isDipindahkan?: boolean;
+export interface AccountingPageChunk {
+  pageNumber: number;
+  isFirstPage: boolean;
+  isLastPage: boolean;
+  rows: {
+    no: number | string;
+    tanggal: string;
+    deskripsi: string;
+    kategori: string;
+    debet: number;
+    kredit: number;
+    saldo: number;
+  }[];
+  pindahanDebet?: number;
+  pindahanKredit?: number;
+  pindahanSaldo?: number;
+  dipindahkanDebet?: number;
+  dipindahkanKredit?: number;
+  dipindahkanSaldo?: number;
 }
 
 /**
- * Standard Indonesian Accounting Pagination
- * Splits transactions across pages and injects:
- * - "JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA" at bottom of split pages
- * - "PINDAHAN DARI HALAMAN SEBELUMNYA" at top of subsequent pages
+ * Standard Indonesian Accounting Page Chunker
+ * Splits transactions across physical paper pages and computes:
+ * - "JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA" at bottom of split page
+ * - "PINDAHAN DARI HALAMAN SEBELUMNYA" at top of subsequent page
  */
-export function paginateTableRowsForAccounting(
+export function splitTransactionsIntoAccountingPages(
   rows: { no: number | string; tanggal: string; deskripsi: string; kategori: string; debet: number; kredit: number; saldo: number }[],
-  hasHeaderKopAndSummary: boolean = true
-): AccountingDisplayRow[] {
-  if (rows.length <= 16) {
-    return rows;
+  isF4: boolean = true,
+  hasProcurementItems: boolean = false,
+  hasKopAndSummary: boolean = true
+): AccountingPageChunk[] {
+  const singlePageLimit = hasProcurementItems ? (isF4 ? 16 : 14) : (isF4 ? 22 : 18);
+  if (rows.length <= singlePageLimit) {
+    return [{
+      pageNumber: 1,
+      isFirstPage: true,
+      isLastPage: true,
+      rows: rows,
+    }];
   }
 
-  const ROWS_FIRST_PAGE = hasHeaderKopAndSummary ? 15 : 22;
-  const ROWS_SUBSEQUENT_PAGE = 24;
+  const firstPageLimit = hasProcurementItems ? (isF4 ? 14 : 12) : (isF4 ? 19 : 15);
+  const subsequentPageLimit = isF4 ? 24 : 20;
 
-  const result: AccountingDisplayRow[] = [];
+  const chunks: AccountingPageChunk[] = [];
   let currentIndex = 0;
   let runningDebet = 0;
   let runningKredit = 0;
-  let pageIdx = 1;
+  let pageNumber = 1;
 
   while (currentIndex < rows.length) {
-    const limit = pageIdx === 1 ? ROWS_FIRST_PAGE : ROWS_SUBSEQUENT_PAGE;
-    const chunk = rows.slice(currentIndex, currentIndex + limit);
+    const limit = pageNumber === 1 ? firstPageLimit : subsequentPageLimit;
+    const chunkRows = rows.slice(currentIndex, currentIndex + limit);
     const isLastPage = currentIndex + limit >= rows.length;
+    const isFirstPage = pageNumber === 1;
 
-    // If page 2+, inject "PINDAHAN DARI HALAMAN SEBELUMNYA"
-    if (pageIdx > 1) {
-      result.push({
-        no: '-',
-        tanggal: '-',
-        deskripsi: 'PINDAHAN DARI HALAMAN SEBELUMNYA',
-        kategori: 'Saldo Pindahan',
-        debet: runningDebet,
-        kredit: runningKredit,
-        saldo: runningDebet - runningKredit,
-        isPindahan: true,
-      });
-    }
+    const prevDebet = runningDebet;
+    const prevKredit = runningKredit;
+    const prevSaldo = runningDebet - runningKredit;
 
-    for (const r of chunk) {
+    chunkRows.forEach(r => {
       runningDebet += r.debet;
       runningKredit += r.kredit;
-      result.push({
-        ...r,
-        saldo: runningDebet - runningKredit,
-      });
-    }
+    });
 
-    // If NOT last page, inject "JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA"
-    if (!isLastPage) {
-      result.push({
-        no: '-',
-        tanggal: '-',
-        deskripsi: 'JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA',
-        kategori: 'Saldo Dipindahkan',
-        debet: runningDebet,
-        kredit: runningKredit,
-        saldo: runningDebet - runningKredit,
-        isDipindahkan: true,
-      });
-    }
+    const currentDebet = runningDebet;
+    const currentKredit = runningKredit;
+    const currentSaldo = runningDebet - runningKredit;
+
+    chunks.push({
+      pageNumber,
+      isFirstPage,
+      isLastPage,
+      rows: chunkRows,
+      pindahanDebet: isFirstPage ? undefined : prevDebet,
+      pindahanKredit: isFirstPage ? undefined : prevKredit,
+      pindahanSaldo: isFirstPage ? undefined : prevSaldo,
+      dipindahkanDebet: isLastPage ? undefined : currentDebet,
+      dipindahkanKredit: isLastPage ? undefined : currentKredit,
+      dipindahkanSaldo: isLastPage ? undefined : currentSaldo,
+    });
 
     currentIndex += limit;
-    pageIdx++;
+    pageNumber++;
   }
 
-  return result;
+  return chunks;
 }
 
 export function PdfReportModal({
@@ -143,6 +150,7 @@ export function PdfReportModal({
 }: PdfReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama'>('konsolidasi');
+  const [paperSize, setPaperSize] = useState<'f4' | 'a4'>('f4');
   const [customPelaksanaName, setCustomPelaksanaName] = useState<string>('');
   const [selectedPengajuanTxId, setSelectedPengajuanTxId] = useState<string>('semua');
 
@@ -687,8 +695,19 @@ export function PdfReportModal({
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             @page {
-              size: A4 portrait;
+              size: ${paperSize === 'f4' ? '215mm 330mm' : 'A4 portrait'};
               margin: 12mm 10mm 12mm 10mm;
+            }
+            .page-break-divider {
+              page-break-after: always !important;
+              break-after: page !important;
+              height: 0px !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              display: block !important;
+            }
+            .accounting-page-container {
+              page-break-inside: auto;
             }
             * {
               box-sizing: border-box;
@@ -1006,6 +1025,15 @@ export function PdfReportModal({
                   return null;
                 })()
               )}
+              <select
+                value={paperSize}
+                onChange={e => setPaperSize(e.target.value as 'f4' | 'a4')}
+                className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                title="Pilih Ukuran Kertas"
+              >
+                <option value="f4">📄 Ukuran F4 / Folio (215 × 330 mm)</option>
+                <option value="a4">📄 Ukuran A4 (210 × 297 mm)</option>
+              </select>
               <button
                 onClick={() => handlePrint(false)}
                 className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
@@ -1189,371 +1217,424 @@ export function PdfReportModal({
                 </div>
               </div>
             </div>
-          </div>
 
         {/* Printable Document Preview Area */}
         <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-inner scrollbar-thin font-sans">
           <div ref={printRef} className="space-y-4 text-slate-900 font-sans">
-            {/* EXACT OFFICIAL KOP HEADER FROM USER SCREENSHOT */}
-            <div>
-              <div className="kop-container text-center pb-2 border-b-[2.5px] border-[#047857]">
-                <h1 className="company-title text-xl font-black text-[#047857] tracking-tight uppercase">
-                  {companyName}
-                </h1>
-                <p className="company-info text-[10.5px] font-medium text-slate-700 mt-1 leading-relaxed">
-                  {companyAddress}<br />
-                  📞 {companyPhone} &nbsp;·&nbsp; ✉️ {companyEmail} &nbsp;·&nbsp; 🌐 {companyWebsite}
-                </p>
-              </div>
-              <div className="kop-line-secondary border-b border-emerald-200 mt-0.5 mb-4" />
-            </div>
-
-            {/* DOCUMENT TITLE & METADATA */}
-            <div className="doc-header text-center my-3">
-              <h2 className="doc-title text-base font-extrabold text-[#047857] uppercase tracking-wide">{displayTitle}</h2>
-              <p className="doc-subtitle text-xs text-slate-600 mt-1">
-                {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
-              </p>
-              
-              {project && (
-                <div className="my-3 border.border-slate-300 rounded-xl overflow-hidden bg-slate-50/70 p-3 text-left font-sans text-xs border border-slate-300">
-                  <table className="w-full border-collapse">
-                    <tbody>
-                      <tr>
-                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider w-44">No. Surat Pengajuan</td>
-                        <td className="py-1.5 px-1 font-bold text-slate-800 w-3">:</td>
-                        <td className="py-1.5 font-extrabold text-blue-900 font-mono text-xs">{project.nomorSurat || '050/ARP/VII/OP/2026'}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Instansi / Klien Tujuan</td>
-                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                        <td className="py-1.5 font-extrabold text-slate-900">{project.klien}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Pemohon / Leader Teknik</td>
-                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                        <td className="py-1.5 font-extrabold text-slate-900">{project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">PIC Lapangan / Teknisi</td>
-                        <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                        <td className="py-1.5 font-extrabold text-slate-900">{project.teknisiPic || 'Fauzan'}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* EXECUTIVE FINANCIAL SUMMARY */}
-            {project ? (
-              isInternal ? (
-                /* Internal / Kas Operasional: 3 Cards with Real Time Item Settlement Math */
-                (() => {
-                  const displayProcurementItems = (project.procurementItems || []);
-                  const hasPurchasedItems = displayProcurementItems.some(i => i.isPurchased && (i.hargaAktual || 0) > 0);
-                  const totalAktualItem = displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0);
-                  
-                  const totalBelanjaRiil = hasPurchasedItems ? totalAktualItem : (totalPengeluaranRiil - totalRefundMasuk);
-                  const dropDana = modalDisuntikkan > 0 ? modalDisuntikkan : displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0);
-                  const sisaDanaRiil = dropDana - totalBelanjaRiil;
-
-                  return (
-                    <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                      <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi / Drop Dana Kas</span>
-                        <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(dropDana)}</p>
-                      </div>
-                      <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Belanja Riil Item</span>
-                        <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalBelanjaRiil)}</p>
-                      </div>
-                      <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDanaRiil >= 0 ? 'card-green' : 'card-red'}`}>
-                        <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          {sisaDanaRiil > 0 ? 'Saldo Sisa (Wajib Refund)' : sisaDanaRiil < 0 ? 'Defisit (Reimbursement)' : 'Saldo Sisa Kas'}
-                        </span>
-                        <p className="summary-val text-sm font-black tabular-nums">
-                          {formatSaldoRupiah(sisaDanaRiil)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                /* External Project (e.g. Proyek Angkur): 5 Cards */
-                <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                  <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
-                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
-                  </div>
-                  <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
-                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(pemasukanKlien)}</p>
-                  </div>
-                  <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
-                    <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
-                  </div>
-                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
-                    <p className="summary-val text-sm font-black tabular-nums">
-                      {formatSaldoRupiah(pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk))}
-                    </p>
-                  </div>
-                  <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                    <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Proyek</span>
-                    <p className="summary-val text-sm font-black tabular-nums">
-                      {formatSaldoRupiah(sisaDana)}
-                    </p>
-                  </div>
-                </div>
-              )
-            ) : (
-              /* Kas Utama: 4 Cards (Omzet Riil, Omzet Semu, Total Pengeluaran, Saldo Akhir) */
-              <div className="summary-box flex flex-row justify-between items-stretch gap-2.5 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
-                <div className="summary-card card-green flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Omzet Riil Klien (P&L)</span>
-                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetRil)}</p>
-                </div>
-                <div className="summary-card card-navy flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Omzet Semu / Drop</span>
-                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetSemu)}</p>
-                </div>
-                <div className="summary-card card-red flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
-                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
-                </div>
-                <div className={`summary-card flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                  <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Akhir</span>
-                  <p className="summary-val text-xs sm:text-sm font-black tabular-nums">
-                    {formatSaldoRupiah(sisaDana)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* SECTION 1: MATRIKS REALISASI ITEM PENGADAAN & VARIANS RAB (Rencana vs Realita) */}
             {(() => {
-              const allItems = project?.procurementItems || [];
-              const hasItemsExplicitlyForSelectedSurat = allItems.some(i => i.suratPengajuanId === selectedPengajuanTxId);
-
-              const displayProcurementItems = allItems.filter(item => {
+              const allProcItems = project?.procurementItems || [];
+              const hasItemsExplicitlyForSelectedSurat = allProcItems.some(i => i.suratPengajuanId === selectedPengajuanTxId);
+              const displayProcurementItems = allProcItems.filter(item => {
                 if (selectedPengajuanTxId === 'semua') return true;
                 if (hasItemsExplicitlyForSelectedSurat) {
                   return item.suratPengajuanId === selectedPengajuanTxId;
                 }
                 return true;
               });
+              const hasProcurementSection = displayProcurementItems.length > 0;
 
-              if (displayProcurementItems.length === 0) return null;
+              const accountingChunks = splitTransactionsIntoAccountingPages(
+                tableRows,
+                paperSize === 'f4',
+                hasProcurementSection,
+                Boolean(project)
+              );
 
-              return (
-                <div className="my-5 page-break-inside-avoid">
-                  <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
-                      📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
-                    </h3>
-                    <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
-                  </div>
-                  <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
-                    <thead>
-                      <tr className="bg-slate-800 text-white text-[9px] uppercase tracking-wider font-bold">
-                        <th className="p-2 border border-slate-800 text-center w-8">No</th>
-                        <th className="p-2 border border-slate-800 text-left">Nama Item / Kebutuhan Pengadaan</th>
-                        <th className="p-2 border border-slate-800 text-center w-20">Volume / Satuan</th>
-                        <th className="p-2 border border-slate-800 text-right w-28">Harga Rencana (RAB)</th>
-                        <th className="p-2 border border-slate-800 text-right w-28">Harga Realisasi (Riil)</th>
-                        <th className="p-2 border border-slate-800 text-right w-32">Varians (Selisih)</th>
-                        <th className="p-2 border border-slate-800 text-center w-20">Status Belanja</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayProcurementItems.map((item, idx) => {
-                        const budget = item.hargaRencana || 0;
-                        const actual = item.hargaAktual || 0;
-                        const selisih = budget > 0 && actual > 0 ? budget - actual : 0;
-                        return (
-                          <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                            <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{idx + 1}</td>
-                            <td className="p-2 border border-slate-200 text-left font-bold text-slate-900">
-                              <div>{item.nama}</div>
-                              {item.kategori && <div className="text-[9px] text-slate-400 font-normal mt-0.5">{item.kategori}</div>}
+              return accountingChunks.map((chunk, chunkIdx) => (
+                <div key={chunkIdx} className="accounting-page-container">
+                  {/* HEADER & SUMMARY ONLY ON PAGE 1 */}
+                  {chunk.isFirstPage && (
+                    <>
+                      {/* EXACT OFFICIAL KOP HEADER */}
+                      <div>
+                        <div className="kop-container text-center pb-2 border-b-[2.5px] border-[#047857]">
+                          <h1 className="company-title text-xl font-black text-[#047857] tracking-tight uppercase">
+                            {companyName}
+                          </h1>
+                          <p className="company-info text-[10.5px] font-medium text-slate-700 mt-1 leading-relaxed">
+                            {companyAddress}<br />
+                            📞 {companyPhone} &nbsp;·&nbsp; ✉️ {companyEmail} &nbsp;·&nbsp; 🌐 {companyWebsite}
+                          </p>
+                        </div>
+                        <div className="kop-line-secondary border-b border-emerald-200 mt-0.5 mb-4" />
+                      </div>
+
+                      {/* DOCUMENT TITLE & METADATA */}
+                      <div className="doc-header text-center my-3">
+                        <h2 className="doc-title text-base font-extrabold text-[#047857] uppercase tracking-wide">{displayTitle}</h2>
+                        <p className="doc-subtitle text-xs text-slate-600 mt-1">
+                          {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
+                        </p>
+                        
+                        {project && (
+                          <div className="my-3 rounded-xl overflow-hidden bg-slate-50/70 p-3 text-left font-sans text-xs border border-slate-300">
+                            <table className="w-full border-collapse">
+                              <tbody>
+                                <tr>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider w-44">No. Surat Pengajuan</td>
+                                  <td className="py-1.5 px-1 font-bold text-slate-800 w-3">:</td>
+                                  <td className="py-1.5 font-extrabold text-blue-900 font-mono text-xs">{project.nomorSurat || '050/ARP/VII/OP/2026'}</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Instansi / Klien Tujuan</td>
+                                  <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900">{project.klien}</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Pemohon / Leader Teknik</td>
+                                  <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900">{project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}</td>
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">PIC Lapangan / Teknisi</td>
+                                  <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900">{project.teknisiPic || 'Fauzan'}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* EXECUTIVE FINANCIAL SUMMARY */}
+                      {project ? (
+                        isInternal ? (
+                          (() => {
+                            const hasPurchasedItems = displayProcurementItems.some(i => i.isPurchased && (i.hargaAktual || 0) > 0);
+                            const totalAktualItem = displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0);
+                            const totalBelanjaRiil = hasPurchasedItems ? totalAktualItem : (totalPengeluaranRiil - totalRefundMasuk);
+                            const dropDana = modalDisuntikkan > 0 ? modalDisuntikkan : displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0);
+                            const sisaDanaRiil = dropDana - totalBelanjaRiil;
+
+                            return (
+                              <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                                <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi / Drop Dana Kas</span>
+                                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(dropDana)}</p>
+                                </div>
+                                <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Belanja Riil Item</span>
+                                  <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalBelanjaRiil)}</p>
+                                </div>
+                                <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDanaRiil >= 0 ? 'card-green' : 'card-red'}`}>
+                                  <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                    {sisaDanaRiil > 0 ? 'Saldo Sisa (Wajib Refund)' : sisaDanaRiil < 0 ? 'Defisit (Reimbursement)' : 'Saldo Sisa Kas'}
+                                  </span>
+                                  <p className="summary-val text-sm font-black tabular-nums">
+                                    {formatSaldoRupiah(sisaDanaRiil)}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div className="summary-box flex flex-row justify-between items-stretch gap-3 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                            <div className="summary-card card-green flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                              <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Alokasi Modal Operasional</span>
+                              <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(modalDisuntikkan)}</p>
+                            </div>
+                            <div className="summary-card card-navy flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                              <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Invoice Klien</span>
+                              <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(pemasukanKlien)}</p>
+                            </div>
+                            <div className="summary-card card-red flex-1 flex flex-col justify-center p-3 rounded-xl border text-center">
+                              <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pengeluaran Riil</span>
+                              <p className="summary-val text-sm font-black tabular-nums">{formatRupiah(totalPengeluaranRiil - totalRefundMasuk)}</p>
+                            </div>
+                            <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk) >= 0 ? 'card-green' : 'card-red'}`}>
+                              <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Laba - Rugi (P&L)</span>
+                              <p className="summary-val text-sm font-black tabular-nums">
+                                {formatSaldoRupiah(pemasukanKlien - (totalPengeluaranRiil - totalRefundMasuk))}
+                              </p>
+                            </div>
+                            <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                              <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Proyek</span>
+                              <p className="summary-val text-sm font-black tabular-nums">
+                                {formatSaldoRupiah(sisaDana)}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="summary-box flex flex-row justify-between items-stretch gap-2.5 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
+                          <div className="summary-card card-green flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Omzet Riil Klien (P&L)</span>
+                            <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetRil)}</p>
+                          </div>
+                          <div className="summary-card card-navy flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Omzet Semu / Drop</span>
+                            <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetSemu)}</p>
+                          </div>
+                          <div className="summary-card card-red flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
+                            <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
+                          </div>
+                          <div className={`summary-card flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Akhir</span>
+                            <p className="summary-val text-xs sm:text-sm font-black tabular-nums">
+                              {formatSaldoRupiah(sisaDana)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SECTION 1: MATRIKS REALISASI ITEM PENGADAAN & VARIANS RAB */}
+                      {hasProcurementSection && (
+                        <div className="my-5 page-break-inside-avoid">
+                          <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
+                            <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
+                              📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
+                            </h3>
+                            <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
+                          </div>
+                          <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
+                            <thead>
+                              <tr className="bg-slate-800 text-white text-[9px] uppercase tracking-wider font-bold">
+                                <th className="p-2 border border-slate-800 text-center w-8">No</th>
+                                <th className="p-2 border border-slate-800 text-left">Nama Item / Kebutuhan Pengadaan</th>
+                                <th className="p-2 border border-slate-800 text-center w-20">Volume / Satuan</th>
+                                <th className="p-2 border border-slate-800 text-right w-28">Harga Rencana (RAB)</th>
+                                <th className="p-2 border border-slate-800 text-right w-28">Harga Realisasi (Riil)</th>
+                                <th className="p-2 border border-slate-800 text-right w-32">Varians (Selisih)</th>
+                                <th className="p-2 border border-slate-800 text-center w-20">Status Belanja</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {displayProcurementItems.map((item, idx) => {
+                                const budget = item.hargaRencana || 0;
+                                const actual = item.hargaAktual || 0;
+                                const selisih = budget > 0 && actual > 0 ? budget - actual : 0;
+                                return (
+                                  <tr key={item.id || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                    <td className="p-2 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{idx + 1}</td>
+                                    <td className="p-2 border border-slate-200 text-left font-bold text-slate-900">
+                                      <div>{item.nama}</div>
+                                      {item.kategori && <div className="text-[9px] text-slate-400 font-normal mt-0.5">{item.kategori}</div>}
+                                    </td>
+                                    <td className="p-2 border border-slate-200 text-center text-slate-700 font-medium">
+                                      {item.kuantitas} {item.satuan || ' unit'}
+                                    </td>
+                                    <td className="p-2 border border-slate-200 text-right font-semibold text-slate-700 tabular-nums">
+                                      {budget > 0 ? formatRupiah(budget) : '-'}
+                                    </td>
+                                    <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
+                                      {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
+                                    </td>
+                                    <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
+                                      {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
+                                    </td>
+                                    <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
+                                      {item.isCancelled ? (
+                                        <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
+                                      ) : item.isPurchased ? (
+                                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
+                                      ) : (
+                                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="bg-slate-100 font-bold border-t-2 border-slate-800">
+                                <td colSpan={3} className="p-2 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
+                                  TOTAL ESTIMASI RAB VS REALISASI ITEM
+                                </td>
+                                <td className="p-2 border border-slate-300 text-right text-slate-800 font-extrabold tabular-nums">
+                                  {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0))}
+                                </td>
+                                <td className="p-2 border border-slate-300 text-right text-blue-900 font-black tabular-nums">
+                                  {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
+                                </td>
+                                <td colSpan={2} className="p-2 border border-slate-300 text-center text-[10px] text-slate-600 font-semibold">
+                                  Audit Verified by Finance
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* SECTION 2: FORMAL ACCOUNTING JOURNAL TABLE FOR THIS CHUNK */}
+                  <div className="overflow-x-auto my-4">
+                    {chunk.isFirstPage && (
+                      <div className="border-b border-[#047857] pb-1 mb-2">
+                        <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
+                          📑 Jurnal Mutasi Realisasi Kas Lapangan (Rincian Transaksi Transparan)
+                        </h3>
+                      </div>
+                    )}
+                    <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
+                      <thead>
+                        <tr className="bg-[#047857] text-white text-[9.5px] uppercase tracking-wider font-bold">
+                          <th className="p-2.5 border border-[#047857] text-center w-10">No</th>
+                          <th className="p-2.5 border border-[#047857] text-center w-24">Tanggal</th>
+                          <th className="p-2.5 border border-[#047857] text-left">Uraian / Deskripsi Transaksi</th>
+                          <th className="p-2.5 border border-[#047857] text-left w-32">Kategori</th>
+                          <th className="p-2.5 border border-[#047857] text-right w-28">Debet (+)</th>
+                          <th className="p-2.5 border border-[#047857] text-right w-28">Kredit (-)</th>
+                          <th className="p-2.5 border border-[#047857] text-right w-32">Saldo Sisa (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* 1. Baris PINDAHAN jika halaman 2+ (Paling Atas) */}
+                        {!chunk.isFirstPage && (
+                          <tr className="bg-slate-100 font-bold border-y-2 border-slate-400">
+                            <td className="p-2.5 border border-slate-200 text-center font-bold text-slate-500">-</td>
+                            <td className="p-2.5 border border-slate-200 text-center font-bold text-slate-500">-</td>
+                            <td className="p-2.5 border border-slate-200 text-left font-bold text-[#047857] italic uppercase tracking-wider">
+                              PINDAHAN DARI HALAMAN SEBELUMNYA
                             </td>
-                            <td className="p-2 border border-slate-200 text-center text-slate-700 font-medium">
-                              {item.kuantitas} {item.satuan || ' unit'}
+                            <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">Saldo Pindahan</td>
+                            <td className="p-2.5 border border-slate-200 text-right font-bold text-emerald-700 tabular-nums">
+                              {chunk.pindahanDebet ? formatRupiah(chunk.pindahanDebet) : '-'}
                             </td>
-                            <td className="p-2 border border-slate-200 text-right font-semibold text-slate-700 tabular-nums">
-                              {budget > 0 ? formatRupiah(budget) : '-'}
+                            <td className="p-2.5 border border-slate-200 text-right font-bold text-rose-700 tabular-nums">
+                              {chunk.pindahanKredit ? formatRupiah(chunk.pindahanKredit) : '-'}
                             </td>
-                            <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
-                              {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
-                            </td>
-                            <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
-                              {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
-                            </td>
-                            <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
-                              {item.isCancelled ? (
-                                <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
-                              ) : item.isPurchased ? (
-                                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
-                              ) : (
-                                <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>
-                              )}
+                            <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${(chunk.pindahanSaldo || 0) >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
+                              {formatSaldoRupiah(chunk.pindahanSaldo || 0)}
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-800">
-                        <td colSpan={3} className="p-2 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
-                          TOTAL ESTIMASI RAB VS REALISASI ITEM
-                        </td>
-                        <td className="p-2 border border-slate-300 text-right text-slate-800 font-extrabold tabular-nums">
-                          {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaRencana || 0), 0))}
-                        </td>
-                        <td className="p-2 border border-slate-300 text-right text-blue-900 font-black tabular-nums">
-                          {formatRupiah(displayProcurementItems.reduce((acc, item) => acc + (item.hargaAktual || 0), 0))}
-                        </td>
-                        <td colSpan={2} className="p-2 border border-slate-300 text-center text-[10px] text-slate-600 font-semibold">
-                          Audit Verified by Finance
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                        )}
+
+                        {/* 2. Baris Transaksi di Halaman Ini */}
+                        {chunk.rows.map((row, idx) => (
+                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-emerald-50/20' : 'bg-[#F8FAFC] hover:bg-emerald-50/20'}>
+                            <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{row.no}</td>
+                            <td className="p-2.5 border border-slate-200 text-center font-medium whitespace-nowrap text-slate-700 tabular-nums">{row.tanggal}</td>
+                            <td className="p-2.5 border border-slate-200 text-left font-bold text-slate-900 break-words">{row.deskripsi}</td>
+                            <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">{row.kategori}</td>
+                            <td className="p-2.5 border border-slate-200 text-right font-semibold text-emerald-700 tabular-nums">
+                              {row.debet > 0 ? formatRupiah(row.debet) : '-'}
+                            </td>
+                            <td className="p-2.5 border border-slate-200 text-right font-semibold text-rose-700 tabular-nums">
+                              {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
+                            </td>
+                            <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${row.saldo >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
+                              {formatSaldoRupiah(row.saldo)}
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* 3. Baris JUMLAH DIPINDAHKAN jika BUKAN halaman terakhir (Paling Bawah Halaman Ini) */}
+                        {!chunk.isLastPage && (
+                          <tr className="bg-slate-100 font-bold border-y-2 border-slate-400">
+                            <td className="p-2.5 border border-slate-200 text-center font-bold text-slate-500">-</td>
+                            <td className="p-2.5 border border-slate-200 text-center font-bold text-slate-500">-</td>
+                            <td className="p-2.5 border border-slate-200 text-left font-bold text-[#047857] italic uppercase tracking-wider">
+                              JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA
+                            </td>
+                            <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">Saldo Dipindahkan</td>
+                            <td className="p-2.5 border border-slate-200 text-right font-bold text-emerald-700 tabular-nums">
+                              {chunk.dipindahkanDebet ? formatRupiah(chunk.dipindahkanDebet) : '-'}
+                            </td>
+                            <td className="p-2.5 border border-slate-200 text-right font-bold text-rose-700 tabular-nums">
+                              {chunk.dipindahkanKredit ? formatRupiah(chunk.dipindahkanKredit) : '-'}
+                            </td>
+                            <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${(chunk.dipindahkanSaldo || 0) >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
+                              {formatSaldoRupiah(chunk.dipindahkanSaldo || 0)}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+
+                      {/* 4. TOTAL AKHIR HANYA DI HALAMAN TERAKHIR */}
+                      {chunk.isLastPage && (
+                        <tfoot>
+                          <tr className="bg-slate-100 font-extrabold border-t-2 border-[#1A365D]">
+                            <td colSpan={4} className="p-3 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
+                              TOTAL &amp; POSISI SISA DANA
+                            </td>
+                            <td className="p-3 border border-slate-300 text-right text-emerald-700 font-extrabold tabular-nums">{formatRupiah(totalDebet)}</td>
+                            <td className="p-3 border border-slate-300 text-right text-rose-700 font-extrabold tabular-nums">{formatRupiah(totalKredit)}</td>
+                            <td className={`p-3 border border-slate-300 text-right font-black tabular-nums ${sisaDana >= 0 ? 'text-blue-900' : 'text-rose-700'}`}>
+                              {formatSaldoRupiah(sisaDana)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+
+                  {/* 5. FORMAL SIGNATURE BOX HANYA DI HALAMAN TERAKHIR */}
+                  {chunk.isLastPage && (
+                    <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                      {/* Slot 1: Teknisi (If 4 columns) */}
+                      {sigCount === 4 && (
+                        <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                          <p className="text-xs text-slate-600 font-medium mb-1">{sig1Header}</p>
+                          <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {sig1Img ? (
+                              <img src={sig1Img} alt="TTD Slot 1" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
+                            ) : null}
+                          </div>
+                          <div className="signature-line text-xs font-bold text-[#047857]">
+                            {sig1Nama}
+                          </div>
+                          <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig1Jabatan}</p>
+                        </div>
+                      )}
+
+                      {/* Slot 2: Leader Teknik */}
+                      {sigCount >= 3 && (
+                        <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                          <p className="text-xs text-slate-600 font-medium mb-1">{sig2Header}</p>
+                          <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {sig2Img ? (
+                              <img src={sig2Img} alt="TTD Slot 2" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
+                            ) : null}
+                          </div>
+                          <div className="signature-line text-xs font-bold text-[#047857]">
+                            {sig2Nama}
+                          </div>
+                          <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig2Jabatan}</p>
+                        </div>
+                      )}
+
+                      {/* Slot 3: Admin Keuangan */}
+                      <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                        <p className="text-xs text-slate-600 font-medium mb-1">{sig3Header}</p>
+                        <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {sig3Img ? (
+                            <img src={sig3Img} alt="TTD Slot 3" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
+                          ) : null}
+                        </div>
+                        <div className="signature-line text-xs font-bold text-[#047857]">
+                          {sig3Nama}
+                        </div>
+                        <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig3Jabatan}</p>
+                      </div>
+
+                      {/* Slot 4: Direktur Utama */}
+                      <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                        <p className="text-xs text-slate-600 font-medium mb-1">{sig4Header}</p>
+                        <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {sig4Img ? (
+                            <img src={sig4Img} alt="TTD Slot 4" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
+                          ) : null}
+                        </div>
+                        <div className="signature-line text-xs font-bold text-[#047857]">
+                          {sig4Nama}
+                        </div>
+                        <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig4Jabatan}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. FORCED PHYSICAL PAGE BREAK ANTAR HALAMAN */}
+                  {!chunk.isLastPage && (
+                    <div className="page-break-divider" style={{ pageBreakAfter: 'always', breakAfter: 'page', height: '0px' }} />
+                  )}
                 </div>
-              );
+              ));
             })()}
-
-            {/* SECTION 2: FORMAL ACCOUNTING JOURNAL TABLE */}
-            <div className="overflow-x-auto my-4">
-              <div className="border-b border-[#047857] pb-1 mb-2">
-                <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
-                  📑 Jurnal Mutasi Realisasi Kas Lapangan (Rincian Transaksi Transparan)
-                </h3>
-              </div>
-              <table className="journal-table w-full border-collapse text-xs mb-4 font-sans">
-                <thead>
-                  <tr className="bg-[#047857] text-white text-[9.5px] uppercase tracking-wider font-bold">
-                    <th className="p-2.5 border border-[#047857] text-center w-10">No</th>
-                    <th className="p-2.5 border border-[#047857] text-center w-24">Tanggal</th>
-                    <th className="p-2.5 border border-[#047857] text-left">Uraian / Deskripsi Transaksi</th>
-                    <th className="p-2.5 border border-[#047857] text-left w-32">Kategori</th>
-                    <th className="p-2.5 border border-[#047857] text-right w-28">Debet (+)</th>
-                    <th className="p-2.5 border border-[#047857] text-right w-28">Kredit (-)</th>
-                    <th className="p-2.5 border border-[#047857] text-right w-32">Saldo Sisa (Rp)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginateTableRowsForAccounting(tableRows, Boolean(project)).map((row, idx) => (
-                    <tr
-                      key={idx}
-                      className={
-                        row.isPindahan || row.isDipindahkan
-                          ? 'bg-slate-100/90 font-bold border-y-2 border-slate-400'
-                          : idx % 2 === 0
-                          ? 'bg-white hover:bg-emerald-50/20'
-                          : 'bg-[#F8FAFC] hover:bg-emerald-50/20'
-                      }
-                    >
-                      <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-bold tabular-nums">{row.no}</td>
-                      <td className="p-2.5 border border-slate-200 text-center font-medium whitespace-nowrap text-slate-700 tabular-nums">{row.tanggal}</td>
-                      <td className={`p-2.5 border border-slate-200 text-left font-bold break-words ${row.isPindahan || row.isDipindahkan ? 'text-[#047857] italic uppercase tracking-wider' : 'text-slate-900'}`}>
-                        {row.deskripsi}
-                      </td>
-                      <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">{row.kategori}</td>
-                      <td className="p-2.5 border border-slate-200 text-right font-bold text-emerald-700 tabular-nums">
-                        {row.debet > 0 ? formatRupiah(row.debet) : '-'}
-                      </td>
-                      <td className="p-2.5 border border-slate-200 text-right font-bold text-rose-700 tabular-nums">
-                        {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
-                      </td>
-                      <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${row.saldo >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
-                        {formatSaldoRupiah(row.saldo)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-100 font-extrabold border-t-2 border-[#1A365D]">
-                    <td colSpan={4} className="p-3 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
-                      TOTAL &amp; POSISI SISA DANA
-                    </td>
-                    <td className="p-3 border border-slate-300 text-right text-emerald-700 font-extrabold tabular-nums">{formatRupiah(totalDebet)}</td>
-                    <td className="p-3 border border-slate-300 text-right text-rose-700 font-extrabold tabular-nums">{formatRupiah(totalKredit)}</td>
-                    <td className={`p-3 border border-slate-300 text-right font-black tabular-nums ${sisaDana >= 0 ? 'text-blue-900' : 'text-rose-700'}`}>
-                      {formatSaldoRupiah(sisaDana)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* FORMAL FLEXIBLE 2/3/4 COLUMN SIGNATURE BOX WITH DIGITAL SIGNATURE IMAGE EMBEDDING */}
-            <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
-              {/* Slot 1: Teknisi (If 4 columns) */}
-              {sigCount === 4 && (
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">{sig1Header}</p>
-                  <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {sig1Img ? (
-                      <img src={sig1Img} alt="TTD Slot 1" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
-                    ) : null}
-                  </div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    {sig1Nama}
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig1Jabatan}</p>
-                </div>
-              )}
-
-              {/* Slot 2: Leader Teknik */}
-              {sigCount >= 3 && (
-                <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
-                  <p className="text-xs text-slate-600 font-medium mb-1">{sig2Header}</p>
-                  <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {sig2Img ? (
-                      <img src={sig2Img} alt="TTD Slot 2" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
-                    ) : null}
-                  </div>
-                  <div className="signature-line text-xs font-bold text-[#047857]">
-                    {sig2Nama}
-                  </div>
-                  <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig2Jabatan}</p>
-                </div>
-              )}
-
-              {/* Slot 3: Admin Keuangan */}
-              <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
-                <p className="text-xs text-slate-600 font-medium mb-1">{sig3Header}</p>
-                <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {sig3Img ? (
-                    <img src={sig3Img} alt="TTD Slot 3" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
-                  ) : null}
-                </div>
-                <div className="signature-line text-xs font-bold text-[#047857]">
-                  {sig3Nama}
-                </div>
-                <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig3Jabatan}</p>
-              </div>
-
-              {/* Slot 4: Direktur Utama */}
-              <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
-                <p className="text-xs text-slate-600 font-medium mb-1">{sig4Header}</p>
-                <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {sig4Img ? (
-                    <img src={sig4Img} alt="TTD Slot 4" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
-                  ) : null}
-                </div>
-                <div className="signature-line text-xs font-bold text-[#047857]">
-                  {sig4Nama}
-                </div>
-                <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig4Jabatan}</p>
-              </div>
-            </div>
-
           </div>
         </div>
+      </div>
     </Modal>
   );
 }
