@@ -48,6 +48,90 @@ export function isCapitalInjectionTx(t: Transaction): boolean {
   return isMutasiInternal(t) || k.includes('mutasi') || d.includes('modal') || d.includes('pengajuan') || d.includes('drop dana') || d.includes('surat pengajuan') || d.includes('budget');
 }
 
+export interface AccountingDisplayRow {
+  no: number | string;
+  tanggal: string;
+  deskripsi: string;
+  kategori: string;
+  debet: number;
+  kredit: number;
+  saldo: number;
+  isPindahan?: boolean;
+  isDipindahkan?: boolean;
+}
+
+/**
+ * Standard Indonesian Accounting Pagination
+ * Splits transactions across pages and injects:
+ * - "JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA" at bottom of split pages
+ * - "PINDAHAN DARI HALAMAN SEBELUMNYA" at top of subsequent pages
+ */
+export function paginateTableRowsForAccounting(
+  rows: { no: number | string; tanggal: string; deskripsi: string; kategori: string; debet: number; kredit: number; saldo: number }[],
+  hasHeaderKopAndSummary: boolean = true
+): AccountingDisplayRow[] {
+  if (rows.length <= 16) {
+    return rows;
+  }
+
+  const ROWS_FIRST_PAGE = hasHeaderKopAndSummary ? 15 : 22;
+  const ROWS_SUBSEQUENT_PAGE = 24;
+
+  const result: AccountingDisplayRow[] = [];
+  let currentIndex = 0;
+  let runningDebet = 0;
+  let runningKredit = 0;
+  let pageIdx = 1;
+
+  while (currentIndex < rows.length) {
+    const limit = pageIdx === 1 ? ROWS_FIRST_PAGE : ROWS_SUBSEQUENT_PAGE;
+    const chunk = rows.slice(currentIndex, currentIndex + limit);
+    const isLastPage = currentIndex + limit >= rows.length;
+
+    // If page 2+, inject "PINDAHAN DARI HALAMAN SEBELUMNYA"
+    if (pageIdx > 1) {
+      result.push({
+        no: '-',
+        tanggal: '-',
+        deskripsi: 'PINDAHAN DARI HALAMAN SEBELUMNYA',
+        kategori: 'Saldo Pindahan',
+        debet: runningDebet,
+        kredit: runningKredit,
+        saldo: runningDebet - runningKredit,
+        isPindahan: true,
+      });
+    }
+
+    for (const r of chunk) {
+      runningDebet += r.debet;
+      runningKredit += r.kredit;
+      result.push({
+        ...r,
+        saldo: runningDebet - runningKredit,
+      });
+    }
+
+    // If NOT last page, inject "JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA"
+    if (!isLastPage) {
+      result.push({
+        no: '-',
+        tanggal: '-',
+        deskripsi: 'JUMLAH DIPINDAHKAN KE HALAMAN BERIKUTNYA',
+        kategori: 'Saldo Dipindahkan',
+        debet: runningDebet,
+        kredit: runningKredit,
+        saldo: runningDebet - runningKredit,
+        isDipindahkan: true,
+      });
+    }
+
+    currentIndex += limit;
+    pageIdx++;
+  }
+
+  return result;
+}
+
 export function PdfReportModal({
   isOpen,
   onClose,
@@ -736,10 +820,13 @@ export function PdfReportModal({
               page-break-inside: auto;
             }
             table.journal-table thead {
-              display: table-header-group;
+              display: table-header-group !important;
+            }
+            table.journal-table tfoot {
+              display: table-row-group !important;
             }
             table.journal-table tbody {
-              display: table-row-group;
+              display: table-row-group !important;
             }
             table.journal-table tr {
               page-break-inside: avoid !important;
@@ -1358,16 +1445,27 @@ export function PdfReportModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {tableRows.map((row, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-emerald-50/20' : 'bg-[#F8FAFC] hover:bg-emerald-50/20'}>
-                      <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{row.no}</td>
+                  {paginateTableRowsForAccounting(tableRows, Boolean(project)).map((row, idx) => (
+                    <tr
+                      key={idx}
+                      className={
+                        row.isPindahan || row.isDipindahkan
+                          ? 'bg-slate-100/90 font-bold border-y-2 border-slate-400'
+                          : idx % 2 === 0
+                          ? 'bg-white hover:bg-emerald-50/20'
+                          : 'bg-[#F8FAFC] hover:bg-emerald-50/20'
+                      }
+                    >
+                      <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-bold tabular-nums">{row.no}</td>
                       <td className="p-2.5 border border-slate-200 text-center font-medium whitespace-nowrap text-slate-700 tabular-nums">{row.tanggal}</td>
-                      <td className="p-2.5 border border-slate-200 text-left font-bold text-slate-900 break-words">{row.deskripsi}</td>
+                      <td className={`p-2.5 border border-slate-200 text-left font-bold break-words ${row.isPindahan || row.isDipindahkan ? 'text-[#047857] italic uppercase tracking-wider' : 'text-slate-900'}`}>
+                        {row.deskripsi}
+                      </td>
                       <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">{row.kategori}</td>
-                      <td className="p-2.5 border border-slate-200 text-right font-semibold text-emerald-700 tabular-nums">
+                      <td className="p-2.5 border border-slate-200 text-right font-bold text-emerald-700 tabular-nums">
                         {row.debet > 0 ? formatRupiah(row.debet) : '-'}
                       </td>
-                      <td className="p-2.5 border border-slate-200 text-right font-semibold text-rose-700 tabular-nums">
+                      <td className="p-2.5 border border-slate-200 text-right font-bold text-rose-700 tabular-nums">
                         {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
                       </td>
                       <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${row.saldo >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
