@@ -256,6 +256,47 @@ export function TransactionDetailModal({
     });
   };
 
+  // Clipboard Paste (Ctrl + V / Cmd + V) Support for Screenshots & Images in Edit Modal
+  useEffect(() => {
+    if (!isOpen || !isEditing) return;
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      if (!e.clipboardData) return;
+      const items = Array.from(e.clipboardData.items || []);
+      const extractedFiles: File[] = [];
+
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+            const ext = file.type.includes('png') ? '.png' : (file.type.includes('pdf') ? '.pdf' : '.jpg');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const customName = file.name && file.name !== 'image.png' && file.name !== 'blob'
+              ? file.name
+              : `Screenshot_${timestamp}${ext}`;
+            extractedFiles.push(new File([file], customName, { type: file.type }));
+          }
+        }
+      }
+
+      if (extractedFiles.length > 0) {
+        e.preventDefault();
+        const newStaged: StagedAttachment[] = extractedFiles.map(file => ({
+          nama: file.name,
+          tipe: file.type || 'image/jpeg',
+          dataUrl: '',
+          previewUrl: URL.createObjectURL(file),
+          fileObj: file,
+        }));
+        setStagedAttachments(prev => [...prev, ...newStaged]);
+        addToast('success', `📋 ${newStaged.length} foto/screenshot dari clipboard (Ctrl+V) berhasil ditempel!`);
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => window.removeEventListener('paste', handleWindowPaste);
+  }, [isOpen, isEditing, addToast]);
+
   const handleSave = async () => {
     (document.activeElement as HTMLElement)?.blur(); // Dismiss mobile keyboard smoothly
     const nominal = parseRupiahInput(editForm.nominalStr);
@@ -948,7 +989,12 @@ export function TransactionDetailModal({
                     <Plus size={18} />
                   </div>
                   <p className="text-xs font-bold text-gray-700">Belum ada lampiran.</p>
-                  <p className="text-[10px] text-gray-400">Klik di sini atau tombol "+ Tambah Foto" untuk melampirkan resi/nota/PDF.</p>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
+                      📋 Bisa langsung Ctrl + V (Paste Screenshot)
+                    </span>
+                    <span className="text-[10px] text-gray-400">Klik / Seret file foto/PDF ke sini</span>
+                  </div>
                 </label>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
