@@ -692,9 +692,15 @@ export function PdfReportModal({
     }
 
     const sanitizeName = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dateFormatted = new Date().toISOString().split('T')[0];
     const dynamicDocTitle = project
-      ? `Laporan_Realisasi_${sanitizeName(project.nama)}_${new Date().toISOString().split('T')[0]}`
-      : `Laporan_Keuangan_${reportScope}_${new Date().toISOString().split('T')[0]}`;
+      ? (selectedPengajuanTxId !== 'semua'
+          ? `Laporan_Realisasi_${sanitizeName(project.nama)}_LPJ_${dateFormatted}`
+          : `Laporan_Realisasi_${sanitizeName(project.nama)}_${dateFormatted}`)
+      : `Laporan_Keuangan_${reportScope === 'konsolidasi' ? 'Konsolidasi' : 'Kas_Utama'}_${dateFormatted}`;
+
+    const prevDocTitle = document.title;
+    document.title = dynamicDocTitle;
 
     frameDoc.open();
     frameDoc.write(`
@@ -998,6 +1004,12 @@ export function PdfReportModal({
     setTimeout(() => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
+
+      const restoreDocTitle = () => {
+        document.title = prevDocTitle;
+      };
+      window.addEventListener('afterprint', restoreDocTitle, { once: true });
+      setTimeout(restoreDocTitle, 4000);
     }, 350);
   };
 
