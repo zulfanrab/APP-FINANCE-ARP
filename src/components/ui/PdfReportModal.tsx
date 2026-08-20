@@ -81,7 +81,11 @@ export function splitTransactionsIntoAccountingPages(
   hasProcurementItems: boolean = false,
   hasKopAndSummary: boolean = true
 ): AccountingPageChunk[] {
-  const singlePageLimit = hasProcurementItems ? (isF4 ? 16 : 14) : (isF4 ? 22 : 18);
+  // If everything fits on a single page
+  const singlePageLimit = hasProcurementItems
+    ? (isF4 ? 20 : 16)
+    : (isF4 ? 25 : 20);
+
   if (rows.length <= singlePageLimit) {
     return [{
       pageNumber: 1,
@@ -91,8 +95,14 @@ export function splitTransactionsIntoAccountingPages(
     }];
   }
 
-  const firstPageLimit = hasProcurementItems ? (isF4 ? 14 : 12) : (isF4 ? 19 : 15);
-  const subsequentPageLimit = isF4 ? 24 : 20;
+  // Multi-page layout limits:
+  // Page 1: Kop + Info + Summary + (Optional Procurement Matrix)
+  const firstPageLimit = hasProcurementItems
+    ? (isF4 ? 18 : 14)
+    : (isF4 ? 23 : 18);
+
+  // Subsequent pages: Full height table
+  const subsequentPageLimit = isF4 ? 30 : 24;
 
   const chunks: AccountingPageChunk[] = [];
   let currentIndex = 0;
@@ -696,7 +706,7 @@ export function PdfReportModal({
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             @page {
               size: ${paperSize === 'f4' ? '215mm 330mm' : 'A4 portrait'};
-              margin: 12mm 10mm 12mm 10mm;
+              margin: 10mm 10mm 10mm 10mm;
             }
             .page-break-divider {
               page-break-after: always !important;
@@ -708,6 +718,17 @@ export function PdfReportModal({
             }
             .accounting-page-container {
               page-break-inside: auto;
+            }
+            /* Anti-Orphan Heading & Section Rules */
+            h1, h2, h3, h4, h5, h6, .doc-header, .section-title, .table-title {
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            .page-break-inside-avoid, .summary-box, .signature-container, .kop-container {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             * {
               box-sizing: border-box;
@@ -835,7 +856,7 @@ export function PdfReportModal({
             table.journal-table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 25px;
+              margin-bottom: 12px;
               page-break-inside: auto;
             }
             table.journal-table thead {
@@ -858,16 +879,16 @@ export function PdfReportModal({
               font-weight: 700;
               text-transform: uppercase;
               letter-spacing: 0.4px;
-              padding: 9px 8px;
+              padding: 7px 6px;
               border: 1px solid #047857;
-              line-height: 1.3;
+              line-height: 1.25;
               vertical-align: middle;
             }
             table.journal-table td {
-              padding: 8px 8px;
+              padding: 6.5px 6px;
               border: 1px solid #E2E8F0;
               font-size: 9.5px;
-              line-height: 1.4;
+              line-height: 1.35;
               vertical-align: top;
               word-wrap: break-word;
               overflow-wrap: break-word;
