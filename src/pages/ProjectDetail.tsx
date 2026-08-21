@@ -10,7 +10,8 @@ import {
   ArrowLeft, Wallet, TrendingUp, TrendingDown, PlusCircle,
   Clock, CheckCircle2, AlertTriangle, Layers, Calendar, User,
   Building2, Trash2, Edit3, PieChart as PieIcon, ExternalLink,
-  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp, FileUp, Ban
+  Download, ArrowUpRight, RotateCcw, Printer, Paperclip, Sparkles, FileText, CheckSquare, Square, ChevronDown, ChevronUp, FileUp, Ban,
+  Search, SlidersHorizontal, X
 } from 'lucide-react';
 import { getProjectById, updateProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject, addTransaction, updateTransaction, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
@@ -257,6 +258,12 @@ export function ProjectDetail() {
   }, [transactions]);
 
   const [filterType, setFilterType] = useState<'semua' | 'masuk' | 'keluar'>('semua');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterKategori, setFilterKategori] = useState('semua');
+  const [filterPengajuanId, setFilterPengajuanId] = useState('semua');
+  const [filterDivisi, setFilterDivisi] = useState<'semua' | 'admin' | 'it' | 'ahli' | 'umum'>('semua');
+  const [filterLampiran, setFilterLampiran] = useState<'semua' | 'ada' | 'tanpa'>('semua');
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   // Edit Modal
@@ -441,11 +448,85 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
   const usagePercentage = totalModalDinamis > 0 ? Math.min(Math.round((financials.totalPengeluaran / totalModalDinamis) * 100), 100) : 0;
 
-  const filteredTx = transactions.filter(t => {
-    if (filterType === 'masuk') return t.jenis === 'masuk';
-    if (filterType === 'keluar') return t.jenis === 'keluar';
-    return true;
-  });
+  const projectCategories = React.useMemo(() => {
+    return Array.from(new Set(transactions.map(t => t.kategori).filter(Boolean)));
+  }, [transactions]);
+
+  const activeProjectFiltersCount = React.useMemo(() => {
+    let count = 0;
+    if (filterType !== 'semua') count++;
+    if (searchQuery.trim()) count++;
+    if (filterKategori !== 'semua') count++;
+    if (filterPengajuanId !== 'semua') count++;
+    if (filterDivisi !== 'semua') count++;
+    if (filterLampiran !== 'semua') count++;
+    return count;
+  }, [filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
+
+  const resetAllProjectFilters = () => {
+    setFilterType('semua');
+    setSearchQuery('');
+    setFilterKategori('semua');
+    setFilterPengajuanId('semua');
+    setFilterDivisi('semua');
+    setFilterLampiran('semua');
+  };
+
+  const filteredTx = React.useMemo(() => {
+    return transactions.filter(t => {
+      // Filter Type: Masuk / Keluar
+      if (filterType === 'masuk' && t.jenis !== 'masuk') return false;
+      if (filterType === 'keluar' && t.jenis !== 'keluar') return false;
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchDesc = t.deskripsi.toLowerCase().includes(q);
+        const matchKat = t.kategori.toLowerCase().includes(q);
+        const matchNom = t.nominal.toString().includes(q);
+        const matchPen = (t.penerimaDetail || '').toLowerCase().includes(q);
+        const matchTgl = t.tanggal.includes(q);
+        if (!matchDesc && !matchKat && !matchNom && !matchPen && !matchTgl) return false;
+      }
+
+      // Kategori Filter
+      if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
+
+      // Surat Pengajuan Filter
+      if (filterPengajuanId !== 'semua') {
+        const matchSurat = t.suratPengajuanId === filterPengajuanId || t.id === filterPengajuanId;
+        if (!matchSurat) return false;
+      }
+
+      // Sub-Divisi Filter
+      if (filterDivisi !== 'semua' && t.divisi !== filterDivisi) return false;
+
+      // Lampiran Filter
+      if (filterLampiran === 'ada') {
+        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
+        if (!hasAtt) return false;
+      } else if (filterLampiran === 'tanpa') {
+        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
+        if (hasAtt) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
+
+  const projectFilterSummary = React.useMemo(() => {
+    let masuk = 0;
+    let keluar = 0;
+    filteredTx.forEach(t => {
+      if (t.jenis === 'masuk') masuk += t.nominal;
+      else if (t.jenis === 'keluar') keluar += t.nominal;
+    });
+    return {
+      masuk,
+      keluar,
+      net: masuk - keluar,
+    };
+  }, [filteredTx]);
 
   const handleSaveEdit = async () => {
     if (!project) return;
@@ -965,32 +1046,32 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
       )}
 
       {/* Transactions Section */}
-      <Card className="!p-5 border border-gray-100 shadow-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-100">
+      <Card className="!p-5 border border-gray-100 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-gray-100">
           <div>
             <h2 className="text-base font-bold text-gray-900">Daftar Transaksi Proyek ({filteredTx.length})</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Pengeluaran & refund internal — TIDAK mempengaruhi kas utama</p>
+            <p className="text-xs text-gray-500 mt-0.5">Pengeluaran &amp; refund internal — TIDAK mempengaruhi kas utama</p>
           </div>
 
           <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full">
               <button
                 onClick={() => setFilterType('semua')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'semua' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'semua' ? 'bg-white text-gray-900 shadow-sm font-bold' : 'text-gray-500'}`}
               >
                 Semua
               </button>
               <button
                 onClick={() => setFilterType('keluar')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'keluar' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'keluar' ? 'bg-white text-red-600 shadow-sm font-bold' : 'text-gray-500'}`}
               >
-                Pengeluaran
+                ▼ Pengeluaran
               </button>
               <button
                 onClick={() => setFilterType('masuk')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'masuk' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500'}`}
+                className={`px-3 py-1.5 rounded-lg transition-all ${filterType === 'masuk' ? 'bg-white text-emerald-600 shadow-sm font-bold' : 'text-gray-500'}`}
               >
-                Refund / Masuk
+                ▲ Refund / Masuk
               </button>
             </div>
 
@@ -1006,6 +1087,143 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Project Search & Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+          {/* Search Input with Clear Button */}
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Cari transaksi belanja (deskripsi, nominal, toko, penerima)..."
+              className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Advanced Filter Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsAdvancedFilterOpen(prev => !prev)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all border ${
+              isAdvancedFilterOpen || activeProjectFiltersCount > (filterType !== 'semua' ? 1 : 0) + (searchQuery ? 1 : 0)
+                ? 'bg-blue-50 border-blue-300 text-blue-800'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            <span>Filter Lanjutan</span>
+            {activeProjectFiltersCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9.5px] flex items-center justify-center font-black">
+                {activeProjectFiltersCount}
+              </span>
+            )}
+            {isAdvancedFilterOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+        </div>
+
+        {/* Expanded In-Project Advanced Filter Grid */}
+        {isAdvancedFilterOpen && (
+          <div className="p-3 bg-gray-50/80 border border-gray-200 rounded-2xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 animate-fade-in text-xs font-semibold">
+            {/* Filter Surat Pengajuan (LPJ Segment) */}
+            {injectionTxns.length > 1 && (
+              <div>
+                <label className="text-[10.5px] font-bold text-gray-600 block mb-1">📄 Surat Pengajuan (LPJ)</label>
+                <select
+                  value={filterPengajuanId}
+                  onChange={e => setFilterPengajuanId(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="semua">Semua Pengajuan (Akumulasi)</option>
+                  {injectionTxns.map((inj, idx) => (
+                    <option key={inj.id} value={inj.id}>
+                      Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Filter Kategori Proyek */}
+            <div>
+              <label className="text-[10.5px] font-bold text-gray-600 block mb-1">🏷️ Kategori Belanja</label>
+              <select
+                value={filterKategori}
+                onChange={e => setFilterKategori(e.target.value)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="semua">Semua Kategori</option>
+                {projectCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* Filter Sub-Divisi */}
+            <div>
+              <label className="text-[10.5px] font-bold text-gray-600 block mb-1">👥 Sub-Divisi</label>
+              <select
+                value={filterDivisi}
+                onChange={e => setFilterDivisi(e.target.value as any)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="semua">Semua Sub-Divisi</option>
+                <option value="admin">💼 Admin</option>
+                <option value="it">💻 IT</option>
+                <option value="ahli">🛠️ Ahli</option>
+                <option value="umum">🌐 Umum</option>
+              </select>
+            </div>
+
+            {/* Filter Lampiran / Struk */}
+            <div>
+              <label className="text-[10.5px] font-bold text-gray-600 block mb-1">📎 Status Struk / Nota</label>
+              <select
+                value={filterLampiran}
+                onChange={e => setFilterLampiran(e.target.value as any)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="semua">Semua (Ada/Tanpa)</option>
+                <option value="ada">📎 Ada Foto / PDF</option>
+                <option value="tanpa">⚠️ Tanpa Lampiran</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* In-Project Live Filter Summary Strip & Reset */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pt-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-gray-500 font-medium">Hasil Filter ({filteredTx.length} transaksi):</span>
+            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded-lg font-bold border border-amber-200/60">
+              Belanja: {formatRupiah(projectFilterSummary.keluar)}
+            </span>
+            {projectFilterSummary.masuk > 0 && (
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg font-bold border border-emerald-200/60">
+                Refund: {formatRupiah(projectFilterSummary.masuk)}
+              </span>
+            )}
+          </div>
+
+          {activeProjectFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={resetAllProjectFilters}
+              className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 rounded-xl transition-all border border-red-200/60"
+            >
+              <RotateCcw size={11} />
+              <span>Reset Filter ({activeProjectFiltersCount})</span>
+            </button>
+          )}
         </div>
 
         {(() => {
