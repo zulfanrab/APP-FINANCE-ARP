@@ -197,10 +197,8 @@ export function TransactionDetailModal({
 
   // Use currentTx for display; fallback to prop
   const displayTx = currentTx || transaction;
-  if (!displayTx) return null;
-
-  const projectObj = cachedProjects.find(p => p.id === displayTx.proyekId);
-  const isKasUtama = !displayTx.proyekId;
+  const projectObj = displayTx ? cachedProjects.find(p => p.id === displayTx.proyekId) : null;
+  const isKasUtama = displayTx ? !displayTx.proyekId : true;
 
   // Instant zero-lag Blob Object URL file staging for mobile HP
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,6 +299,7 @@ export function TransactionDetailModal({
   }, [isOpen, isEditing, addToast]);
 
   const handleSave = async () => {
+    if (!displayTx) return;
     (document.activeElement as HTMLElement)?.blur(); // Dismiss mobile keyboard smoothly
     const nominal = parseRupiahInput(editForm.nominalStr);
     if (!nominal || nominal <= 0) {
@@ -394,6 +393,7 @@ export function TransactionDetailModal({
   };
 
   const handleDelete = async () => {
+    if (!displayTx) return;
     if (window.confirm(`Yakin ingin menghapus transaksi "${displayTx.deskripsi}"?`)) {
       setDeleting(true);
       try {
@@ -409,6 +409,8 @@ export function TransactionDetailModal({
       }
     }
   };
+
+  if (!isOpen || !displayTx) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Transaksi' : 'Detail Transaksi'} size="lg">

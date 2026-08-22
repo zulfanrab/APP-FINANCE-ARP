@@ -46,6 +46,10 @@ export function TransactionsList() {
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
+  // Drag & Drop / Reorder State
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
   const getProjectName = (proyekId?: string): string => {
     if (!proyekId) return '';
     const p = projects.find(prj => prj.id === proyekId);
@@ -208,10 +212,6 @@ export function TransactionsList() {
     const start = (page - 1) * pageSize;
     return displaySorted.slice(start, start + pageSize);
   }, [displaySorted, page, pageSize]);
-
-  // Drag & Drop / Reorder State
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const handleReorderList = async (newList: Transaction[]) => {
     const withUrutan = newList.map((t, idx) => ({

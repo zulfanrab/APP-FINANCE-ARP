@@ -53,7 +53,8 @@ export interface UnifiedCompanyLedger {
   accountBalances: Record<AccountId, number>; // Saldo riil per Saku/Rekening
 }
 
-export function isApproved(t: Transaction): boolean {
+export function isApproved(t?: Transaction | null): boolean {
+  if (!t || typeof t !== 'object') return false;
   return t.status === 'disetujui' || t.status === 'selesai';
 }
 
@@ -61,7 +62,23 @@ export function isApproved(t: Transaction): boolean {
  * Single Source of Truth for Transaction Classification.
  * Strictly relies on Category sets and explicit project IDs. No string-matching guesswork.
  */
-export function classifyTransaction(t: Transaction, _projects: Project[] = []): TransactionClassification {
+export function classifyTransaction(t?: Transaction | null, _projects: Project[] = []): TransactionClassification {
+  if (!t || typeof t !== 'object') {
+    return {
+      isApproved: false,
+      isMutasiInternal: false,
+      isKasUtamaTransaction: true,
+      isKasUtamaInflow: false,
+      isKasUtamaOutflow: false,
+      isCapitalInjectionToProject: false,
+      isExternalCapital: false,
+      isRefundToKasUtama: false,
+      isVendorRefund: false,
+      isAdminFee: false,
+      resolvedProjectId: undefined,
+    };
+  }
+
   const approved = isApproved(t);
   const categoryNormalized = (t.kategori || '').trim();
 
