@@ -166,9 +166,12 @@ export function TransactionDetailModal({
       const propAtts = normalizeAttachments(transaction.lampiran);
       const currAtts = currentTx ? normalizeAttachments(currentTx.lampiran) : [];
 
+      const txTime = transaction.diupdatePada ? new Date(transaction.diupdatePada).getTime() : 0;
+      const currTime = (currentTx && currentTx.diupdatePada) ? new Date(currentTx.diupdatePada).getTime() : 0;
+
       const isUpdatedTx = currentTx && (
         propAtts.length > currAtts.length ||
-        (new Date(transaction.diupdatePada).getTime() > new Date(currentTx.diupdatePada).getTime() && propAtts.length >= currAtts.length)
+        (txTime > currTime && propAtts.length >= currAtts.length)
       );
 
       if (isNewTx || isUpdatedTx) {

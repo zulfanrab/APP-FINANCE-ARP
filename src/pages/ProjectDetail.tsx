@@ -266,6 +266,96 @@ export function ProjectDetail() {
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
+  const projectCategories = React.useMemo(() => {
+    return Array.from(new Set(transactions.map(t => t.kategori).filter(Boolean)));
+  }, [transactions]);
+
+  const activeProjectFiltersCount = React.useMemo(() => {
+    let count = 0;
+    if (filterType !== 'semua') count++;
+    if (searchQuery.trim()) count++;
+    if (filterKategori !== 'semua') count++;
+    if (filterPengajuanId !== 'semua') count++;
+    if (filterDivisi !== 'semua') count++;
+    if (filterLampiran !== 'semua') count++;
+    return count;
+  }, [filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
+
+  const resetAllProjectFilters = () => {
+    setFilterType('semua');
+    setSearchQuery('');
+    setFilterKategori('semua');
+    setFilterPengajuanId('semua');
+    setFilterDivisi('semua');
+    setFilterLampiran('semua');
+  };
+
+  const filteredTx = React.useMemo(() => {
+    if (!transactions || !Array.isArray(transactions)) return [];
+
+    return transactions.filter(t => {
+      if (!t || typeof t !== 'object') return false;
+
+      // Filter Type: Masuk / Keluar
+      if (filterType === 'masuk' && t.jenis !== 'masuk') return false;
+      if (filterType === 'keluar' && t.jenis !== 'keluar') return false;
+
+      const deskripsi = t.deskripsi || '';
+      const kategori = t.kategori || '';
+      const nominal = t.nominal != null ? Number(t.nominal) : 0;
+      const tanggal = t.tanggal || '';
+
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchDesc = deskripsi.toLowerCase().includes(q);
+        const matchKat = kategori.toLowerCase().includes(q);
+        const matchNom = nominal.toString().includes(q);
+        const matchPen = (t.penerimaDetail || '').toLowerCase().includes(q);
+        const matchTgl = tanggal.includes(q);
+        if (!matchDesc && !matchKat && !matchNom && !matchPen && !matchTgl) return false;
+      }
+
+      // Kategori Filter
+      if (filterKategori !== 'semua' && kategori !== filterKategori) return false;
+
+      // Surat Pengajuan Filter
+      if (filterPengajuanId !== 'semua') {
+        const matchSurat = t.suratPengajuanId === filterPengajuanId || t.id === filterPengajuanId;
+        if (!matchSurat) return false;
+      }
+
+      // Sub-Divisi Filter
+      if (filterDivisi !== 'semua' && t.divisi !== filterDivisi) return false;
+
+      // Lampiran Filter
+      if (filterLampiran === 'ada') {
+        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
+        if (!hasAtt) return false;
+      } else if (filterLampiran === 'tanpa') {
+        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
+        if (hasAtt) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
+
+  const projectFilterSummary = React.useMemo(() => {
+    let masuk = 0;
+    let keluar = 0;
+    filteredTx.forEach(t => {
+      const nom = Number(t?.nominal) || 0;
+      if (t?.jenis === 'masuk') masuk += nom;
+      else if (t?.jenis === 'keluar') keluar += nom;
+    });
+    return {
+      masuk,
+      keluar,
+      net: masuk - keluar,
+    };
+  }, [filteredTx]);
+
   // Edit Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editNama, setEditNama] = useState('');
@@ -447,96 +537,6 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     : financials.labaRugiProyek;
 
   const usagePercentage = totalModalDinamis > 0 ? Math.min(Math.round((financials.totalPengeluaran / totalModalDinamis) * 100), 100) : 0;
-
-  const projectCategories = React.useMemo(() => {
-    return Array.from(new Set(transactions.map(t => t.kategori).filter(Boolean)));
-  }, [transactions]);
-
-  const activeProjectFiltersCount = React.useMemo(() => {
-    let count = 0;
-    if (filterType !== 'semua') count++;
-    if (searchQuery.trim()) count++;
-    if (filterKategori !== 'semua') count++;
-    if (filterPengajuanId !== 'semua') count++;
-    if (filterDivisi !== 'semua') count++;
-    if (filterLampiran !== 'semua') count++;
-    return count;
-  }, [filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
-
-  const resetAllProjectFilters = () => {
-    setFilterType('semua');
-    setSearchQuery('');
-    setFilterKategori('semua');
-    setFilterPengajuanId('semua');
-    setFilterDivisi('semua');
-    setFilterLampiran('semua');
-  };
-
-  const filteredTx = React.useMemo(() => {
-    if (!transactions || !Array.isArray(transactions)) return [];
-
-    return transactions.filter(t => {
-      if (!t || typeof t !== 'object') return false;
-
-      // Filter Type: Masuk / Keluar
-      if (filterType === 'masuk' && t.jenis !== 'masuk') return false;
-      if (filterType === 'keluar' && t.jenis !== 'keluar') return false;
-
-      const deskripsi = t.deskripsi || '';
-      const kategori = t.kategori || '';
-      const nominal = t.nominal != null ? Number(t.nominal) : 0;
-      const tanggal = t.tanggal || '';
-
-      // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchDesc = deskripsi.toLowerCase().includes(q);
-        const matchKat = kategori.toLowerCase().includes(q);
-        const matchNom = nominal.toString().includes(q);
-        const matchPen = (t.penerimaDetail || '').toLowerCase().includes(q);
-        const matchTgl = tanggal.includes(q);
-        if (!matchDesc && !matchKat && !matchNom && !matchPen && !matchTgl) return false;
-      }
-
-      // Kategori Filter
-      if (filterKategori !== 'semua' && kategori !== filterKategori) return false;
-
-      // Surat Pengajuan Filter
-      if (filterPengajuanId !== 'semua') {
-        const matchSurat = t.suratPengajuanId === filterPengajuanId || t.id === filterPengajuanId;
-        if (!matchSurat) return false;
-      }
-
-      // Sub-Divisi Filter
-      if (filterDivisi !== 'semua' && t.divisi !== filterDivisi) return false;
-
-      // Lampiran Filter
-      if (filterLampiran === 'ada') {
-        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
-        if (!hasAtt) return false;
-      } else if (filterLampiran === 'tanpa') {
-        const hasAtt = (Array.isArray(t.lampiran) && t.lampiran.length > 0) || Boolean(t.buktiTransfer);
-        if (hasAtt) return false;
-      }
-
-      return true;
-    });
-  }, [transactions, filterType, searchQuery, filterKategori, filterPengajuanId, filterDivisi, filterLampiran]);
-
-  const projectFilterSummary = React.useMemo(() => {
-    let masuk = 0;
-    let keluar = 0;
-    filteredTx.forEach(t => {
-      const nom = Number(t?.nominal) || 0;
-      if (t?.jenis === 'masuk') masuk += nom;
-      else if (t?.jenis === 'keluar') keluar += nom;
-    });
-    return {
-      masuk,
-      keluar,
-      net: masuk - keluar,
-    };
-  }, [filteredTx]);
 
   const handleSaveEdit = async () => {
     if (!project) return;
