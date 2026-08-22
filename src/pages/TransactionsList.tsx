@@ -92,6 +92,8 @@ export function TransactionsList() {
   }, [scope, search, filterJenis, filterKategori, filterProyekId, filterDivisi, filterRekening, filterLampiran, datePreset, dateFrom, dateTo]);
 
   const filtered = React.useMemo(() => {
+    if (!rawTransactions || !Array.isArray(rawTransactions)) return [];
+
     const todayStr = new Date().toISOString().split('T')[0];
     const now = new Date();
     const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -100,11 +102,19 @@ export function TransactionsList() {
     const currentYear = `${now.getFullYear()}`;
 
     return rawTransactions.filter(t => {
+      if (!t || typeof t !== 'object') return false;
+
+      const deskripsi = t.deskripsi || '';
+      const kategori = t.kategori || '';
+      const nominal = t.nominal != null ? Number(t.nominal) : 0;
+      const tanggal = t.tanggal || '';
+
       const isSuntikan =
-        t.deskripsi.startsWith('Suntikan Modal Proyek:') ||
-        t.kategori === 'Suntikan Modal Proyek' ||
-        t.kategori === 'Mutasi Internal / Transfer Kas' ||
-        t.kategori === 'Refund Dana Proyek ke Kas Utama';
+        deskripsi.startsWith('Suntikan Modal Proyek:') ||
+        deskripsi.startsWith('Alokasi Modal Proyek:') ||
+        kategori === 'Suntikan Modal Proyek' ||
+        kategori === 'Mutasi Internal / Transfer Kas' ||
+        kategori === 'Refund Dana Proyek ke Kas Utama';
 
       if (scope === 'kas_utama' && t.proyekId && !isSuntikan) return false;
       if (scope === 'proyek' && !t.proyekId) return false;
@@ -117,12 +127,12 @@ export function TransactionsList() {
       // Search Query
       if (search.trim()) {
         const q = search.toLowerCase().trim();
-        const matchDesc = t.deskripsi.toLowerCase().includes(q);
-        const matchKat = t.kategori.toLowerCase().includes(q);
-        const matchNom = t.nominal.toString().includes(q);
+        const matchDesc = deskripsi.toLowerCase().includes(q);
+        const matchKat = kategori.toLowerCase().includes(q);
+        const matchNom = nominal.toString().includes(q);
         const matchPrj = getProjectName(t.proyekId).toLowerCase().includes(q);
         const matchPen = (t.penerimaDetail || '').toLowerCase().includes(q);
-        const matchTgl = t.tanggal.includes(q);
+        const matchTgl = tanggal.includes(q);
         if (!matchDesc && !matchKat && !matchNom && !matchPrj && !matchPen && !matchTgl) return false;
       }
       
@@ -138,7 +148,7 @@ export function TransactionsList() {
       }
 
       // Kategori Filter
-      if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
+      if (filterKategori !== 'semua' && kategori !== filterKategori) return false;
 
       // Sub-Divisi Filter
       if (filterDivisi !== 'semua' && t.divisi !== filterDivisi) return false;
@@ -157,16 +167,16 @@ export function TransactionsList() {
 
       // Date Preset Filter
       if (datePreset === 'hari_ini') {
-        if (t.tanggal !== todayStr) return false;
+        if (tanggal !== todayStr) return false;
       } else if (datePreset === 'bulan_ini') {
-        if (!t.tanggal.startsWith(currentYearMonth)) return false;
+        if (!tanggal.startsWith(currentYearMonth)) return false;
       } else if (datePreset === 'bulan_lalu') {
-        if (!t.tanggal.startsWith(prevYearMonth)) return false;
+        if (!tanggal.startsWith(prevYearMonth)) return false;
       } else if (datePreset === 'tahun_ini') {
-        if (!t.tanggal.startsWith(currentYear)) return false;
+        if (!tanggal.startsWith(currentYear)) return false;
       } else if (datePreset === 'custom') {
-        if (dateFrom && t.tanggal < dateFrom) return false;
-        if (dateTo && t.tanggal > dateTo) return false;
+        if (dateFrom && tanggal < dateFrom) return false;
+        if (dateTo && tanggal > dateTo) return false;
       }
 
       return true;
@@ -178,8 +188,9 @@ export function TransactionsList() {
     let masuk = 0;
     let keluar = 0;
     filtered.forEach(t => {
-      if (t.jenis === 'masuk') masuk += t.nominal;
-      else if (t.jenis === 'keluar') keluar += t.nominal;
+      const nom = Number(t?.nominal) || 0;
+      if (t?.jenis === 'masuk') masuk += nom;
+      else if (t?.jenis === 'keluar') keluar += nom;
     });
     return {
       masuk,
@@ -551,7 +562,8 @@ export function TransactionsList() {
             {/* MOBILE CARD VIEW WITH DRAG & DROP & UP/DOWN REORDER CONTROLS */}
             <div className="md:hidden space-y-3.5">
               {paginatedSorted.map((tx, idx) => {
-                const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
+                const desc = tx.deskripsi || '';
+                const isSuntikan = desc.startsWith('Suntikan Modal Proyek:') || desc.startsWith('Alokasi Modal Proyek:');
                 const isKas = !tx.proyekId || isSuntikan;
                 const prjName = getProjectName(tx.proyekId);
 
@@ -587,7 +599,7 @@ export function TransactionsList() {
                             🏗️ {prjName}
                           </span>
                         )}
-                        <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal)}</span>
+                        <span className="text-[11px] text-gray-400 font-semibold">{formatDate(tx.tanggal || '')}</span>
                       </div>
                       <StatusBadge status={tx.status} />
                     </div>
@@ -602,10 +614,10 @@ export function TransactionsList() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-gray-900 leading-snug break-words">
-                            {tx.deskripsi}
+                            {tx.deskripsi || '-'}
                           </p>
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5 min-w-0 max-w-full">
-                            <p className="text-xs text-gray-500 font-medium whitespace-nowrap">{tx.kategori}</p>
+                            <p className="text-xs text-gray-500 font-medium whitespace-nowrap">{tx.kategori || '-'}</p>
                             {tx.jenis === 'masuk' && (
                               isOmzetRil(tx) ? (
                                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
@@ -628,7 +640,7 @@ export function TransactionsList() {
 
                       <div className="text-right flex-shrink-0 flex items-center gap-1 min-w-max ml-1">
                         <p className={`font-extrabold text-xs sm:text-sm md:text-base whitespace-nowrap tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                          {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal || 0)}
                         </p>
                         <ChevronRight size={16} className="text-gray-400 ml-0.5 flex-shrink-0" />
                       </div>
@@ -654,7 +666,8 @@ export function TransactionsList() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedSorted.map((tx, idx) => {
-                    const isSuntikan = tx.deskripsi.startsWith('Suntikan Modal Proyek:') || tx.deskripsi.startsWith('Alokasi Modal Proyek:');
+                    const desc = tx.deskripsi || '';
+                    const isSuntikan = desc.startsWith('Suntikan Modal Proyek:') || desc.startsWith('Alokasi Modal Proyek:');
                     const isKas = !tx.proyekId || isSuntikan;
                     const prjName = getProjectName(tx.proyekId);
 
@@ -709,11 +722,11 @@ export function TransactionsList() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal || '')}</td>
                         <td className="px-4 py-3">
-                          <p className="font-bold text-gray-900 break-words">{tx.deskripsi}</p>
+                          <p className="font-bold text-gray-900 break-words">{tx.deskripsi || '-'}</p>
                           <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                            <p className="text-xs text-gray-500 font-medium">{tx.kategori || '-'}</p>
                             {tx.jenis === 'masuk' && (
                               isOmzetRil(tx) ? (
                                 <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
@@ -734,7 +747,7 @@ export function TransactionsList() {
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <span className={`font-extrabold tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
+                            {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal || 0)}
                           </span>
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>

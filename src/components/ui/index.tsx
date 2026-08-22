@@ -152,15 +152,19 @@ export function EmptyState({
 
 // ---- Currency Formatter ----
 export function formatRupiah(amount: number): string {
+  const safeNum = typeof amount === 'number' && !isNaN(amount) ? amount : (Number(amount) || 0);
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(safeNum);
 }
 
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('id-ID', {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString('id-ID', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -172,5 +176,6 @@ export { Skeleton, DashboardSkeleton, TransactionListSkeleton, ProjectsSkeleton,
 export { TransactionDetailModal } from './TransactionDetailModal';
 export { PdfReportModal } from './PdfReportModal';
 export { AutoUpdateBanner } from './AutoUpdateBanner';
+export { ErrorBoundary } from './ErrorBoundary';
 
 

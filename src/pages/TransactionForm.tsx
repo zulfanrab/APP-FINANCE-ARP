@@ -13,7 +13,7 @@ import {
 import Tesseract from 'tesseract.js';
 import { addTransaction, getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
-import { getCategories, addCategory, deleteCategory } from '../services/categoryService';
+import { getCategories, addCategory, deleteCategory, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../services/categoryService';
 import { uploadAttachmentFile, compressFileToAttachment } from '../services/storageService';
 import { type Project, type Attachment, type JalurTransfer, type AccountId } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
@@ -42,9 +42,7 @@ export function TransactionForm() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [historicalRecipients, setHistoricalRecipients] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_EXPENSE_CATEGORIES);
   const [loading, setLoading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -65,7 +63,7 @@ export function TransactionForm() {
     jenis: 'keluar' as 'masuk' | 'keluar',
     deskripsi: '',
     nominalStr: '',
-    kategori: '',
+    kategori: DEFAULT_EXPENSE_CATEGORIES[0],
     tag: 'operasional' as 'operasional' | 'pribadi',
     proyekId: urlProyekId || '',
     lampiran: [] as Attachment[],
@@ -81,32 +79,45 @@ export function TransactionForm() {
   // Approval Flow Switch
   const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
 
+  // Memoized historical recipients so it never lags during typing
+  const historicalRecipients = React.useMemo(() => {
+    return extractHistoricalRecipients(cachedTransactions);
+  }, [cachedTransactions]);
+
+  // Detected Bank calculation memoized based on recipient text
+  const detectedBank = React.useMemo(() => {
+    if (!form.penerimaDetail.trim()) return null;
+    return parseRecipientString(form.penerimaDetail);
+  }, [form.penerimaDetail]);
+
   useEffect(() => {
-    setProjects(cachedProjects);
-    setHistoricalRecipients(extractHistoricalRecipients(cachedTransactions));
     if (urlProyekId) {
       setForm(f => ({ ...f, proyekId: urlProyekId }));
       setAutoApprove(true);
     }
-  }, [urlProyekId, cachedProjects, cachedTransactions]);
+  }, [urlProyekId]);
 
   useEffect(() => {
     if (form.proyekId) {
-      setAutoApprove(true); // Project internal transactions are auto-approved by default
+      setAutoApprove(true);
     }
   }, [form.proyekId]);
 
   useEffect(() => {
-    loadCategoryList(form.jenis);
-  }, [form.jenis]);
+    const defaults = form.jenis === 'masuk' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES;
+    setCategories(defaults);
+    setForm(f => ({
+      ...f,
+      kategori: defaults.includes(f.kategori) ? f.kategori : defaults[0]
+    }));
 
-  const loadCategoryList = async (jenis: 'masuk' | 'keluar') => {
-    const list = await getCategories(jenis);
-    setCategories(list);
-    if (list.length > 0) {
-      setForm(f => ({ ...f, kategori: list[0] }));
-    }
-  };
+    // Async enrich categories in background without blocking UI
+    getCategories(form.jenis).then(list => {
+      if (list && list.length > 0) {
+        setCategories(list);
+      }
+    }).catch(() => {});
+  }, [form.jenis]);
 
   const setField = (key: string, value: any) => setForm(f => ({ ...f, [key]: value }));
 
@@ -315,7 +326,7 @@ export function TransactionForm() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 40)); // Yield to main thread so loading spinner renders smoothly
     try {
-      const currentProject = projects.find(p => p.id === (form.proyekId || urlProyekId));
+      const currentProject = cachedProjects.find(p => p.id === (form.proyekId || urlProyekId));
 
       const uploadedAttachments: Attachment[] = await Promise.all(
         stagedFiles.map(async (staged) => {
@@ -525,29 +536,26 @@ export function TransactionForm() {
                 </div>
 
                 {/* Live Bank Auto-Detection Badge */}
-                {form.penerimaDetail.trim() !== '' && (() => {
-                  const detected = parseRecipientString(form.penerimaDetail);
-                  return (
-                    <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs flex items-center justify-between gap-2 shadow-sm animate-fade-in">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
-                        <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detected.bankName}</span>
-                        {detected.accountNumber && (
-                          <span className="text-slate-300 font-mono text-[11px] truncate">({detected.accountNumber})</span>
-                        )}
-                      </div>
-                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
-                        Jalur Disarankan: {
-                          detected.suggestedJalur === 'sesama_bca'
-                            ? (detected.isQrisOrVa ? 'QRIS/VA (Rp0)' : 'Sesama BCA (Rp0)')
-                            : detected.suggestedJalur === 'ewallet'
-                            ? 'Top Up E-Wallet (Rp1.000)'
-                            : 'BI-FAST (Rp2.500)'
-                        }
-                      </span>
+                {detectedBank && (
+                  <div className="p-2.5 bg-slate-900 text-white rounded-xl text-xs flex items-center justify-between gap-2 shadow-sm animate-fade-in">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping flex-shrink-0" />
+                      <span className="font-bold text-emerald-400">⚡ Bank Terdeteksi: {detectedBank.bankName}</span>
+                      {detectedBank.accountNumber && (
+                        <span className="text-slate-300 font-mono text-[11px] truncate">({detectedBank.accountNumber})</span>
+                      )}
                     </div>
-                  );
-                })()}
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex-shrink-0">
+                      Jalur Disarankan: {
+                        detectedBank.suggestedJalur === 'sesama_bca'
+                          ? (detectedBank.isQrisOrVa ? 'QRIS/VA (Rp0)' : 'Sesama BCA (Rp0)')
+                          : detectedBank.suggestedJalur === 'ewallet'
+                          ? 'Top Up E-Wallet (Rp1.000)'
+                          : 'BI-FAST (Rp2.500)'
+                      }
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -682,7 +690,7 @@ export function TransactionForm() {
                         form.jalurTransfer === 'bi_fast' ? 'Rp 2.500' :
                         form.jalurTransfer === 'online_rtgs' ? 'Rp 6.500' :
                         `Rp ${form.adminNominalCustomStr || '0'}`
-                      })</strong> secara otomatis yang <strong>terikat ke alokasi proyek yang sama ({form.proyekId ? projects.find(p => p.id === form.proyekId)?.nama : 'Kas Utama'})</strong>.
+                      })</strong> secara otomatis yang <strong>terikat ke alokasi proyek yang sama ({form.proyekId ? cachedProjects.find(p => p.id === form.proyekId)?.nama : 'Kas Utama'})</strong>.
                     </p>
                   </div>
                 )}
@@ -820,7 +828,7 @@ export function TransactionForm() {
                   <div>
                     <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Tertaut Otomatis ke Proyek</p>
                     <p className="text-sm font-extrabold text-gray-900">
-                      {projects.find(p => p.id === urlProyekId)?.nama || 'Proyek'}
+                      {cachedProjects.find(p => p.id === urlProyekId)?.nama || 'Proyek'}
                     </p>
                   </div>
                 </div>
@@ -828,14 +836,14 @@ export function TransactionForm() {
                   <Lock size={12} /> Terkunci
                 </span>
               </div>
-            ) : projects.length > 0 ? (
+            ) : cachedProjects.length > 0 ? (
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Tautkan ke Proyek / Pos Operasional (Opsional)</label>
                 <select
                   value={form.proyekId}
                   onChange={e => {
                     const selectedId = e.target.value;
-                    const proj = projects.find(p => p.id === selectedId);
+                    const proj = cachedProjects.find(p => p.id === selectedId);
                     const isOps = !selectedId || proj?.tipe === 'operasional_kantor';
                     setForm(f => ({
                       ...f,
@@ -846,7 +854,7 @@ export function TransactionForm() {
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 >
                   <option value="">-- Tanpa Alokasi (Kas Utama) --</option>
-                  {projects.map(p => (
+                  {cachedProjects.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.tipe === 'operasional_kantor' ? '💼 Pos Kantor: ' : '🏢 Proyek: '}{p.nama} ({p.klien})
                     </option>
@@ -936,7 +944,7 @@ export function TransactionForm() {
 
             {/* Conditional Sub-Divisi Selector (Admin, IT, Ahli) */}
             {(() => {
-              const selectedProject = projects.find(p => p.id === form.proyekId);
+              const selectedProject = cachedProjects.find(p => p.id === form.proyekId);
               // HANYA muncul jika Kas Utama (kosong) ATAU tipe proyek operasional_kantor
               const isOperasionalPos = !form.proyekId || selectedProject?.tipe === 'operasional_kantor';
 
@@ -987,7 +995,7 @@ export function TransactionForm() {
                   <span>💡</span> Drop Dana / Saldo Operasional Proyek
                 </p>
                 <p className="leading-relaxed text-emerald-800">
-                  Uang sebesar <strong>Rp {form.nominalStr || '0'}</strong> yang dialokasikan dari Kas Utama ini akan <strong>otomatis mengisi Saldo Kas Operasional Proyek ({projects.find(p => p.id === form.proyekId)?.nama})</strong>. Saldo proyek akan menjadi positif dan otomatis berkurang seiring pengeluaran belanja lapangan.
+                  Uang sebesar <strong>Rp {form.nominalStr || '0'}</strong> yang dialokasikan dari Kas Utama ini akan <strong>otomatis mengisi Saldo Kas Operasional Proyek ({cachedProjects.find(p => p.id === form.proyekId)?.nama})</strong>. Saldo proyek akan menjadi positif dan otomatis berkurang seiring pengeluaran belanja lapangan.
                 </p>
               </div>
             )}

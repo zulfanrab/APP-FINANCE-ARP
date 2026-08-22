@@ -757,14 +757,16 @@ export function groupAndSortTransactions(
   transactions: Transaction[],
   order: 'asc' | 'desc' = 'asc'
 ): Transaction[] {
-  if (!transactions || transactions.length === 0) return [];
+  if (!transactions || !Array.isArray(transactions) || transactions.length === 0) return [];
+
+  const cleanTransactions = transactions.filter(t => t && typeof t === 'object' && t.id);
 
   const parentTxs: Transaction[] = [];
   const childrenMap = new Map<string, Transaction[]>();
   const processedChildIds = new Set<string>();
 
   // 1. Index children by parentTransactionId
-  for (const t of transactions) {
+  for (const t of cleanTransactions) {
     if (t.parentTransactionId) {
       const existing = childrenMap.get(t.parentTransactionId) || [];
       existing.push(t);
@@ -776,20 +778,20 @@ export function groupAndSortTransactions(
 
   // 2. Sort parent transactions by urutan (if custom order is defined), then date & created_at
   const sortedParents = [...parentTxs].sort((a, b) => {
-    if (a.urutan !== undefined && b.urutan !== undefined && a.urutan !== b.urutan) {
+    if (a.urutan != null && b.urutan != null && a.urutan !== b.urutan) {
       return a.urutan - b.urutan; // urutan 1 is always top position!
     }
-    if (a.urutan !== undefined && b.urutan === undefined) return -1;
-    if (a.urutan === undefined && b.urutan !== undefined) return 1;
+    if (a.urutan != null && b.urutan == null) return -1;
+    if (a.urutan == null && b.urutan != null) return 1;
 
-    const timeA = new Date(a.tanggal).getTime();
-    const timeB = new Date(b.tanggal).getTime();
-    if (timeA !== timeB) {
+    const timeA = a.tanggal ? new Date(a.tanggal).getTime() : 0;
+    const timeB = b.tanggal ? new Date(b.tanggal).getTime() : 0;
+    if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB)) {
       return order === 'asc' ? timeA - timeB : timeB - timeA;
     }
-    const createdA = new Date(a.dibuatPada || a.tanggal).getTime();
-    const createdB = new Date(b.dibuatPada || b.tanggal).getTime();
-    return order === 'asc' ? createdA - createdB : createdB - createdA;
+    const createdA = a.dibuatPada || a.tanggal ? new Date(a.dibuatPada || a.tanggal).getTime() : 0;
+    const createdB = b.dibuatPada || b.tanggal ? new Date(b.dibuatPada || b.tanggal).getTime() : 0;
+    return order === 'asc' ? (createdA || 0) - (createdB || 0) : (createdB || 0) - (createdA || 0);
   });
 
   // 3. Glue children immediately below their parent
@@ -801,9 +803,9 @@ export function groupAndSortTransactions(
     const children = childrenMap.get(parent.id);
     if (children && children.length > 0) {
       const sortedChildren = [...children].sort((a, b) => {
-        const createdA = new Date(a.dibuatPada || a.tanggal).getTime();
-        const createdB = new Date(b.dibuatPada || b.tanggal).getTime();
-        return createdA - createdB;
+        const createdA = a.dibuatPada || a.tanggal ? new Date(a.dibuatPada || a.tanggal).getTime() : 0;
+        const createdB = b.dibuatPada || b.tanggal ? new Date(b.dibuatPada || b.tanggal).getTime() : 0;
+        return (createdA || 0) - (createdB || 0);
       });
 
       for (const child of sortedChildren) {
@@ -814,7 +816,7 @@ export function groupAndSortTransactions(
   }
 
   // 4. Preserve orphan children whose parent is not present in the current array
-  for (const t of transactions) {
+  for (const t of cleanTransactions) {
     if (t.parentTransactionId && !processedChildIds.has(t.id)) {
       result.push(t);
     }

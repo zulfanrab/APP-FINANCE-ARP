@@ -9,7 +9,7 @@ import { AppProvider } from './context/AppContext';
 import { Layout } from './components/layout/Layout';
 import { hasPin } from './services/authService';
 import { initAutoUpdateEngine } from './services/autoUpdateService';
-import { LoadingSpinner, AutoUpdateBanner } from './components/ui';
+import { LoadingSpinner, AutoUpdateBanner, ErrorBoundary } from './components/ui';
 import { ToastContainer } from './components/ui/Toast';
 
 // Lazy loaded page components
@@ -184,12 +184,14 @@ function AppInner() {
 // ---- Root App ----
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppProvider>
-        <AuthProvider>
-          <AppInner />
-        </AuthProvider>
-      </AppProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppProvider>
+          <AuthProvider>
+            <AppInner />
+          </AuthProvider>
+        </AppProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

@@ -473,24 +473,33 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
   };
 
   const filteredTx = React.useMemo(() => {
+    if (!transactions || !Array.isArray(transactions)) return [];
+
     return transactions.filter(t => {
+      if (!t || typeof t !== 'object') return false;
+
       // Filter Type: Masuk / Keluar
       if (filterType === 'masuk' && t.jenis !== 'masuk') return false;
       if (filterType === 'keluar' && t.jenis !== 'keluar') return false;
 
+      const deskripsi = t.deskripsi || '';
+      const kategori = t.kategori || '';
+      const nominal = t.nominal != null ? Number(t.nominal) : 0;
+      const tanggal = t.tanggal || '';
+
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchDesc = t.deskripsi.toLowerCase().includes(q);
-        const matchKat = t.kategori.toLowerCase().includes(q);
-        const matchNom = t.nominal.toString().includes(q);
+        const matchDesc = deskripsi.toLowerCase().includes(q);
+        const matchKat = kategori.toLowerCase().includes(q);
+        const matchNom = nominal.toString().includes(q);
         const matchPen = (t.penerimaDetail || '').toLowerCase().includes(q);
-        const matchTgl = t.tanggal.includes(q);
+        const matchTgl = tanggal.includes(q);
         if (!matchDesc && !matchKat && !matchNom && !matchPen && !matchTgl) return false;
       }
 
       // Kategori Filter
-      if (filterKategori !== 'semua' && t.kategori !== filterKategori) return false;
+      if (filterKategori !== 'semua' && kategori !== filterKategori) return false;
 
       // Surat Pengajuan Filter
       if (filterPengajuanId !== 'semua') {
@@ -518,8 +527,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
     let masuk = 0;
     let keluar = 0;
     filteredTx.forEach(t => {
-      if (t.jenis === 'masuk') masuk += t.nominal;
-      else if (t.jenis === 'keluar') keluar += t.nominal;
+      const nom = Number(t?.nominal) || 0;
+      if (t?.jenis === 'masuk') masuk += nom;
+      else if (t?.jenis === 'keluar') keluar += nom;
     });
     return {
       masuk,
