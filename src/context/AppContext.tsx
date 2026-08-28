@@ -42,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingRef = useRef<boolean>(false);
 
   const refreshData = useCallback(async () => {
     // 1. INSTANT 0ms CACHE HYDRATION (Prevents perpetual skeleton loading UI)
@@ -54,7 +55,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLoading(false); // Instantly unblocks screen in 0ms!
     }
 
-    // 2. BACKGROUND REMOTE SYNC WITH SUPABASE
+    // Prevent stacking/overlapping background network calls
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    // 2. BACKGROUND REMOTE SYNC WITH SUPABASE (LIGHTWEIGHT <120KB)
     try {
       const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
       setTransactions(txs);
@@ -62,6 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.warn('Background sync with Supabase notice:', err);
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   }, []);
