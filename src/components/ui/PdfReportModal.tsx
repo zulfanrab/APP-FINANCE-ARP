@@ -207,6 +207,23 @@ export function PdfReportModal({
   const [parafNama, setParafNama] = useState<string>(() => localStorage.getItem('paraf_nama') || (project?.teknisiPic || 'Fauzan'));
   const [parafImg, setParafImg] = useState<string>(() => localStorage.getItem('signature_paraf') || '');
 
+  // Editable Document Metadata (Allows instant on-the-fly adjustment before print)
+  const [docPerihal, setDocPerihal] = useState<string>(() => project?.nama || '');
+  const [docNomorSurat, setDocNomorSurat] = useState<string>(() => project?.nomorSurat || '');
+  const [docKlien, setDocKlien] = useState<string>(() => project?.klien || '');
+  const [docPemohon, setDocPemohon] = useState<string>(() => project?.pemohonNama || 'Rama Regawa Sri Anggayana');
+  const [docPic, setDocPic] = useState<string>(() => project?.teknisiPic || 'Fauzan');
+
+  useEffect(() => {
+    if (project) {
+      setDocPerihal(project.nama || '');
+      setDocNomorSurat(project.nomorSurat || '');
+      setDocKlien(project.klien || '');
+      setDocPemohon(project.pemohonNama || 'Rama Regawa Sri Anggayana');
+      setDocPic(project.teknisiPic || 'Fauzan');
+    }
+  }, [project]);
+
   const handleParafUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -263,23 +280,6 @@ export function PdfReportModal({
       (project.klien || '').toLowerCase().includes('internal')
     )
   );
-
-  // Editable Document Metadata (Allows instant on-the-fly adjustment before print)
-  const [docPerihal, setDocPerihal] = useState<string>(() => project?.nama || '');
-  const [docNomorSurat, setDocNomorSurat] = useState<string>(() => project?.nomorSurat || '');
-  const [docKlien, setDocKlien] = useState<string>(() => project?.klien || '');
-  const [docPemohon, setDocPemohon] = useState<string>(() => project?.pemohonNama || 'Rama Regawa Sri Anggayana');
-  const [docPic, setDocPic] = useState<string>(() => project?.teknisiPic || 'Fauzan');
-
-  useEffect(() => {
-    if (project) {
-      setDocPerihal(project.nama || '');
-      setDocNomorSurat(project.nomorSurat || '');
-      setDocKlien(project.klien || '');
-      setDocPemohon(project.pemohonNama || 'Rama Regawa Sri Anggayana');
-      setDocPic(project.teknisiPic || 'Fauzan');
-    }
-  }, [project]);
 
   let displayTitle = title;
   let displaySubtitle = subtitle;
