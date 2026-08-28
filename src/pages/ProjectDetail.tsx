@@ -367,8 +367,23 @@ export function ProjectDetail() {
   const [editAnggaran, setEditAnggaran] = useState('');
   const [editPdfFile, setEditPdfFile] = useState<File | null>(null);
 
-  useEffect(() => {
+  const openEditModal = () => {
     if (project) {
+      setEditNama(project.nama);
+      setEditNomorSurat(project.nomorSurat ?? '');
+      setEditKlien(project.klien);
+      setEditPemohonNama(project.pemohonNama ?? 'Rama Regawa Sri Anggayana');
+      setEditPemohonJabatan(project.pemohonJabatan ?? 'Leader Teknik');
+      setEditTeknisiPic(project.teknisiPic ?? 'Fauzan');
+      setEditAnggaran(project.anggaran ? String(project.anggaran) : '');
+      setEditPdfFile(null);
+    }
+    setEditModalOpen(true);
+  };
+
+  useEffect(() => {
+    // Only hydrate form from project when modal is NOT currently open (prevents wiping user typing during polling!)
+    if (project && !editModalOpen) {
       setEditNama(project.nama);
       setEditNomorSurat(project.nomorSurat ?? '');
       setEditKlien(project.klien);
@@ -378,7 +393,7 @@ export function ProjectDetail() {
       setEditAnggaran(project.anggaran ? String(project.anggaran) : '');
       setEditPdfFile(null);
     }
-  }, [project]);
+  }, [project, editModalOpen]);
 
   // Procurement Checklist
   const [newChecklistItem, setNewChecklistItem] = useState('');
@@ -865,7 +880,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
                   Tandai Selesai
                 </Button>
               )}
-              <Button variant="secondary" size="sm" icon={<Edit3 size={15} />} onClick={() => setEditModalOpen(true)}>
+              <Button variant="secondary" size="sm" icon={<Edit3 size={15} />} onClick={openEditModal}>
                 Edit
               </Button>
               <Button variant="danger" size="sm" icon={<Trash2 size={15} />} onClick={handleDeleteProject}>
@@ -1405,22 +1420,58 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Pemohon / Leader Teknik</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-700">Pemohon / Leader Teknik</label>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setEditPemohonNama('Rama Regawa Sri Anggayana'); setEditPemohonJabatan('Leader Teknik'); }}
+                  className="text-[10px] bg-white hover:bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md border border-emerald-200 shadow-xs transition-colors"
+                >
+                  ⚡ Rama Regawa (Leader)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditPemohonNama('Habsi Gufira Pradana'); setEditPemohonJabatan('Direktur Utama'); }}
+                  className="text-[10px] bg-white hover:bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md border border-blue-200 shadow-xs transition-colors"
+                >
+                  Habsi G. (Direktur)
+                </button>
+              </div>
               <input
                 type="text"
                 value={editPemohonNama}
                 onChange={e => setEditPemohonNama(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary font-medium"
                 placeholder="Contoh: Rama Regawa Sri Anggayana"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">PIC Lapangan / Teknisi</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-700">PIC Lapangan / Teknisi</label>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEditTeknisiPic('Fauzan')}
+                  className="text-[10px] bg-white hover:bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-md border border-emerald-200 shadow-xs transition-colors"
+                >
+                  ⚡ Fauzan (PIC)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditTeknisiPic('Rama Regawa Sri Anggayana')}
+                  className="text-[10px] bg-white hover:bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded-md border border-purple-200 shadow-xs transition-colors"
+                >
+                  Rama Regawa
+                </button>
+              </div>
               <input
                 type="text"
                 value={editTeknisiPic}
                 onChange={e => setEditTeknisiPic(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary font-medium"
                 placeholder="Contoh: Fauzan"
               />
             </div>

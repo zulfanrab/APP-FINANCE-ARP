@@ -199,6 +199,31 @@ export function PdfReportModal({
   const [sig4Jabatan, setSig4Jabatan] = useState<string>(() => localStorage.getItem('sig4_jabatan') || 'Direktur Utama');
   const [sig4Img, setSig4Img] = useState<string>(() => localStorage.getItem('signature_slot4') || localStorage.getItem('signature_direktur') || '');
 
+  // Paraf Pembuat Draft (Dekat Lead Teknik)
+  const [parafEnabled, setParafEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('paraf_enabled');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [parafNama, setParafNama] = useState<string>(() => localStorage.getItem('paraf_nama') || (project?.teknisiPic || 'Fauzan'));
+  const [parafImg, setParafImg] = useState<string>(() => localStorage.getItem('signature_paraf') || '');
+
+  const handleParafUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        setParafImg(dataUrl);
+        localStorage.setItem('signature_paraf', dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleParafClear = () => {
+    setParafImg('');
+    localStorage.removeItem('signature_paraf');
+  };
+
   const handleSignatureUpload = (slotNum: 1 | 2 | 3 | 4, file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1247,6 +1272,48 @@ export function PdfReportModal({
                       className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
                     />
                   </div>
+
+                  {/* Opsi Tambahan: Paraf Pembuat Draft (Dekat TTD Leader) */}
+                  <div className="p-2 bg-slate-800/80 rounded-xl border border-amber-500/40 flex flex-col justify-between space-y-1.5 col-span-2 sm:col-span-1">
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center space-x-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={parafEnabled}
+                          onChange={e => {
+                            setParafEnabled(e.target.checked);
+                            localStorage.setItem('paraf_enabled', String(e.target.checked));
+                          }}
+                          className="rounded text-amber-500 focus:ring-amber-400 w-3 h-3"
+                        />
+                        <span className="text-[10px] font-bold text-amber-400">✍️ Paraf Draft</span>
+                      </label>
+                      {parafImg && (
+                        <button onClick={handleParafClear} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
+                      )}
+                    </div>
+                    {parafEnabled && (
+                      <>
+                        {parafImg ? (
+                          <div className="h-9 bg-white rounded-lg border border-amber-300 p-1 flex items-center justify-center">
+                            <img src={parafImg} alt="Paraf Draft" className="max-h-full max-w-full object-contain" />
+                          </div>
+                        ) : (
+                          <label className="h-9 bg-amber-950/30 hover:bg-amber-900/40 rounded-lg border border-dashed border-amber-500/60 flex items-center justify-center text-[9.5px] text-amber-200 cursor-pointer transition-colors">
+                            + Drop Paraf
+                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleParafUpload(e.target.files[0])} />
+                          </label>
+                        )}
+                        <input
+                          type="text"
+                          value={parafNama}
+                          placeholder="Nama Pembuat Draft (Paraf)"
+                          onChange={e => { setParafNama(e.target.value); localStorage.setItem('paraf_nama', e.target.value); }}
+                          className="bg-slate-900/90 text-amber-200 text-[10px] font-bold px-2 py-1 rounded border border-amber-500/50 w-full focus:outline-none"
+                        />
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1614,7 +1681,32 @@ export function PdfReportModal({
 
                       {/* Slot 2: Leader Teknik */}
                       {sigCount >= 3 && (
-                        <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                        <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px', position: 'relative' }}>
+                          {parafEnabled && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '-2px',
+                              right: '2px',
+                              border: '1px dashed #94a3b8',
+                              borderRadius: '4px',
+                              padding: '1px 3px',
+                              backgroundColor: '#ffffff',
+                              textAlign: 'center',
+                              maxWidth: '56px',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                              zIndex: 5
+                            }}>
+                              <span style={{ fontSize: '6.5px', fontWeight: '700', color: '#64748b', display: 'block', lineHeight: 1 }}>Paraf</span>
+                              {parafImg ? (
+                                <img src={parafImg} alt="Paraf" style={{ maxHeight: '18px', maxWidth: '48px', objectFit: 'contain', margin: '1px auto' }} />
+                              ) : (
+                                <div style={{ height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: '6.5px', fontStyle: 'italic', color: '#94a3b8' }}>[Paraf]</span>
+                                </div>
+                              )}
+                              <span style={{ fontSize: '6px', fontWeight: '600', color: '#334155', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{parafNama}</span>
+                            </div>
+                          )}
                           <p className="text-xs text-slate-600 font-medium mb-1">{sig2Header}</p>
                           <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {sig2Img ? (
