@@ -5,7 +5,7 @@
 // Universal Hidden-Iframe Printing for 100% Mobile HP & Desktop Compatibility
 // ============================================================
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Printer, FileText } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Modal } from './Modal';
@@ -263,6 +263,23 @@ export function PdfReportModal({
       (project.klien || '').toLowerCase().includes('internal')
     )
   );
+
+  // Editable Document Metadata (Allows instant on-the-fly adjustment before print)
+  const [docPerihal, setDocPerihal] = useState<string>(() => project?.nama || '');
+  const [docNomorSurat, setDocNomorSurat] = useState<string>(() => project?.nomorSurat || '');
+  const [docKlien, setDocKlien] = useState<string>(() => project?.klien || '');
+  const [docPemohon, setDocPemohon] = useState<string>(() => project?.pemohonNama || 'Rama Regawa Sri Anggayana');
+  const [docPic, setDocPic] = useState<string>(() => project?.teknisiPic || 'Fauzan');
+
+  useEffect(() => {
+    if (project) {
+      setDocPerihal(project.nama || '');
+      setDocNomorSurat(project.nomorSurat || '');
+      setDocKlien(project.klien || '');
+      setDocPemohon(project.pemohonNama || 'Rama Regawa Sri Anggayana');
+      setDocPic(project.teknisiPic || 'Fauzan');
+    }
+  }, [project]);
 
   let displayTitle = title;
   let displaySubtitle = subtitle;
@@ -1107,6 +1124,78 @@ export function PdfReportModal({
             </div>
           </div>
 
+          {/* Quick Document Metadata Customizer for Project / Pos Kantor */}
+          {project && (
+            <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  📝 Sesuaikan Keterangan Kop &amp; Pengajuan Sebelum Cetak
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Bisa diedit manual langsung di sini</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    {isInternal ? 'Perihal / Judul Pengajuan' : 'Nama Pekerjaan / Proyek'}
+                  </label>
+                  <input
+                    type="text"
+                    value={docPerihal}
+                    onChange={e => setDocPerihal(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Contoh: Permohonan Budget Operasional..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">No. Surat Pengajuan</label>
+                  <input
+                    type="text"
+                    value={docNomorSurat}
+                    onChange={e => setDocNomorSurat(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Contoh: 050/ARP/VII/OP/2026"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    {isInternal ? 'Peruntukan / Instansi' : 'Instansi / Klien Tujuan'}
+                  </label>
+                  <input
+                    type="text"
+                    value={docKlien}
+                    onChange={e => setDocKlien(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Contoh: DJKA Area Bogor-Sukabumi / Internal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    {isInternal ? 'Pemohon / Pengaju' : 'Pemohon / Leader Teknik'}
+                  </label>
+                  <input
+                    type="text"
+                    value={docPemohon}
+                    onChange={e => setDocPemohon(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Nama Pemohon..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    {isInternal ? 'PIC / Penanggung Jawab' : 'PIC Lapangan / Teknisi'}
+                  </label>
+                  <input
+                    type="text"
+                    value={docPic}
+                    onChange={e => setDocPic(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="Nama PIC..."
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Digital Signatures Upload & Otorisasi Control Bar */}
           <div className="p-3.5 bg-slate-900 text-white rounded-2xl space-y-3 border border-slate-800 shadow-md">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
@@ -1371,24 +1460,39 @@ export function PdfReportModal({
                             <table className="w-full border-collapse">
                               <tbody>
                                 <tr>
-                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider w-44">No. Surat Pengajuan</td>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider w-44">
+                                    {isInternal ? 'Perihal / Judul Pengajuan' : 'Nama Pekerjaan / Proyek'}
+                                  </td>
                                   <td className="py-1.5 px-1 font-bold text-slate-800 w-3">:</td>
-                                  <td className="py-1.5 font-extrabold text-blue-900 font-mono text-xs">{project.nomorSurat || '050/ARP/VII/OP/2026'}</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900 text-xs">{docPerihal || project.nama}</td>
                                 </tr>
                                 <tr>
-                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Instansi / Klien Tujuan</td>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">No. Surat Pengajuan</td>
                                   <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                                  <td className="py-1.5 font-extrabold text-slate-900">{project.klien}</td>
+                                  <td className="py-1.5 font-extrabold text-blue-900 font-mono text-xs">{docNomorSurat || project.nomorSurat || '050/ARP/VII/OP/2026'}</td>
+                                </tr>
+                                {((docKlien || project.klien) && (docKlien || project.klien) !== '-') && (
+                                  <tr>
+                                    <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">
+                                      {isInternal ? 'Peruntukan / Instansi' : 'Instansi / Klien Tujuan'}
+                                    </td>
+                                    <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                                    <td className="py-1.5 font-extrabold text-slate-900">{docKlien || project.klien}</td>
+                                  </tr>
+                                )}
+                                <tr>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">
+                                    {isInternal ? 'Pemohon / Pengaju' : 'Pemohon / Leader Teknik'}
+                                  </td>
+                                  <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900">{docPemohon || project.pemohonNama || 'Rama Regawa Sri Anggayana'}</td>
                                 </tr>
                                 <tr>
-                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">Pemohon / Leader Teknik</td>
+                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">
+                                    {isInternal ? 'PIC / Penanggung Jawab' : 'PIC Lapangan / Teknisi'}
+                                  </td>
                                   <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                                  <td className="py-1.5 font-extrabold text-slate-900">{project.pemohonNama || 'Rama Regawa Sri Anggayana'}{project.pemohonJabatan ? ` (${project.pemohonJabatan})` : ''}</td>
-                                </tr>
-                                <tr>
-                                  <td className="py-1.5 pr-2 font-bold text-slate-600 text-[10.5px] uppercase tracking-wider">PIC Lapangan / Teknisi</td>
-                                  <td className="py-1.5 px-1 font-bold text-slate-800">:</td>
-                                  <td className="py-1.5 font-extrabold text-slate-900">{project.teknisiPic || 'Fauzan'}</td>
+                                  <td className="py-1.5 font-extrabold text-slate-900">{docPic || project.teknisiPic || 'Fauzan'}</td>
                                 </tr>
                               </tbody>
                             </table>
@@ -1418,11 +1522,14 @@ export function PdfReportModal({
                                 </div>
                                 <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDanaRiil >= 0 ? 'card-green' : 'card-red'}`}>
                                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                                    {sisaDanaRiil > 0 ? 'Saldo Sisa (Wajib Refund)' : sisaDanaRiil < 0 ? 'Defisit (Reimbursement)' : 'Saldo Sisa Kas'}
+                                    {sisaDanaRiil > 0 ? 'Sisa Saldo Kas Operasional' : sisaDanaRiil < 0 ? 'Kekurangan Biaya (Reimbursement)' : 'Saldo Kas Akhir (Nihil)'}
                                   </span>
                                   <p className="summary-val text-sm font-black tabular-nums">
                                     {formatSaldoRupiah(sisaDanaRiil)}
                                   </p>
+                                  <span className="text-[8px] font-semibold text-slate-500 mt-0.5 block">
+                                    {sisaDanaRiil > 0 ? '(Sisa Lebih Bayar)' : sisaDanaRiil < 0 ? '(Perlu Penggantian Kas)' : '(Pas Sesuai Anggaran)'}
+                                  </span>
                                 </div>
                               </div>
                             );
