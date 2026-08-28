@@ -7,7 +7,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, FolderOpen, Edit2, CheckCircle, Trash2, RotateCcw,
-  TrendingUp, TrendingDown, DollarSign, Calendar, Users, Wallet, ChevronRight
+  TrendingUp, TrendingDown, DollarSign, Calendar, Users, Wallet, ChevronRight,
+  Search, FileText
 } from 'lucide-react';
 import { getProjects, addProject, updateProject, completeProject, deleteProject } from '../services/projectService';
 import { getTransactionsByProject } from '../services/transactionService';
@@ -28,11 +29,15 @@ interface ProjectWithStats extends Project {
 function formatRupiahInput(value: string): string {
   const num = value.replace(/\D/g, '');
   if (!num) return '';
-  return new Intl.NumberFormat('id-ID').format(Number(num));
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(parseInt(num, 10));
 }
 
 function parseRupiahInput(value: string): number {
-  return Number(value.replace(/\./g, '').replace(',', ''));
+  return Number(value.replace(/\./g, '').replace(',', '').replace(/[^0-9]/g, ''));
 }
 
 export function Projects() {
@@ -63,6 +68,7 @@ export function Projects() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
   const [tabFilter, setTabFilter] = useState<'semua' | 'proyek_klien' | 'operasional_kantor'>('semua');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Form
   const [form, setForm] = useState({
@@ -209,8 +215,17 @@ export function Projects() {
   if (globalLoading) return <ProjectsSkeleton />;
 
   const filteredProjects = projects.filter(p => {
-    if (tabFilter === 'proyek_klien') return (p.tipe ?? 'proyek_klien') === 'proyek_klien';
-    if (tabFilter === 'operasional_kantor') return p.tipe === 'operasional_kantor';
+    if (tabFilter === 'proyek_klien' && (p.tipe ?? 'proyek_klien') !== 'proyek_klien') return false;
+    if (tabFilter === 'operasional_kantor' && p.tipe !== 'operasional_kantor') return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchNama = (p.nama || '').toLowerCase().includes(q);
+      const matchNomor = (p.nomorSurat || '').toLowerCase().includes(q);
+      const matchKlien = (p.klien || '').toLowerCase().includes(q);
+      const matchPemohon = (p.pemohonNama || '').toLowerCase().includes(q);
+      const matchPic = (p.teknisiPic || '').toLowerCase().includes(q);
+      if (!matchNama && !matchNomor && !matchKlien && !matchPemohon && !matchPic) return false;
+    }
     return true;
   });
 
@@ -235,38 +250,52 @@ export function Projects() {
         </div>
       </div>
 
-      {/* Category Type Filter Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-gray-100/80 rounded-2xl w-fit border border-gray-200/60">
-        <button
-          onClick={() => setTabFilter('semua')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            tabFilter === 'semua'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🌐 Semua Alokasi ({projects.length})
-        </button>
-        <button
-          onClick={() => setTabFilter('proyek_klien')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            tabFilter === 'proyek_klien'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🏢 Proyek Klien ({projects.filter(p => (p.tipe ?? 'proyek_klien') === 'proyek_klien').length})
-        </button>
-        <button
-          onClick={() => setTabFilter('operasional_kantor')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            tabFilter === 'operasional_kantor'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          💼 Operasional Kantor ({projects.filter(p => p.tipe === 'operasional_kantor').length})
-        </button>
+      {/* Category Type Filter Tabs & Quick Search */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 p-1 bg-gray-100/80 rounded-2xl w-fit border border-gray-200/60 overflow-x-auto max-w-full">
+          <button
+            onClick={() => setTabFilter('semua')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              tabFilter === 'semua'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🌐 Semua ({projects.length})
+          </button>
+          <button
+            onClick={() => setTabFilter('proyek_klien')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              tabFilter === 'proyek_klien'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🏢 Proyek Klien ({projects.filter(p => (p.tipe ?? 'proyek_klien') === 'proyek_klien').length})
+          </button>
+          <button
+            onClick={() => setTabFilter('operasional_kantor')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              tabFilter === 'operasional_kantor'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            💼 Pos Kantor ({projects.filter(p => p.tipe === 'operasional_kantor').length})
+          </button>
+        </div>
+
+        {/* Quick Search Input */}
+        <div className="relative w-full sm:w-72">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Cari No. Surat / Nama / Klien..."
+            className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-gray-800 placeholder-gray-400 shadow-2xs"
+          />
+        </div>
       </div>
 
       {/* Active Projects / Pos */}
@@ -611,6 +640,12 @@ function ProjectCard({
           <Badge variant={completed ? 'gray' : isKantor ? 'blue' : 'green'}>
             {completed ? 'Selesai' : isKantor ? '💼 Pos Kantor' : '🏢 Proyek Klien'}
           </Badge>
+          {project.nomorSurat && (
+            <span className="text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800 border border-blue-200/80 flex items-center gap-1 shadow-2xs">
+              <FileText size={11} className="text-blue-600" />
+              {project.nomorSurat}
+            </span>
+          )}
         </div>
         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
           <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Edit Proyek">

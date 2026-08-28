@@ -1522,13 +1522,13 @@ export function PdfReportModal({
                                 </div>
                                 <div className={`summary-card flex-1 flex flex-col justify-center p-3 rounded-xl border text-center ${sisaDanaRiil >= 0 ? 'card-green' : 'card-red'}`}>
                                   <span className="summary-label text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                                    {sisaDanaRiil > 0 ? 'Sisa Saldo Kas Operasional' : sisaDanaRiil < 0 ? 'Kekurangan Biaya (Reimbursement)' : 'Saldo Kas Akhir (Nihil)'}
+                                    {sisaDanaRiil > 0 ? 'Sisa Saldo Kas (Refund)' : sisaDanaRiil < 0 ? 'Kekurangan Dana (Reimburse)' : 'Saldo Kas Akhir (Nihil)'}
                                   </span>
                                   <p className="summary-val text-sm font-black tabular-nums">
                                     {formatSaldoRupiah(sisaDanaRiil)}
                                   </p>
                                   <span className="text-[8px] font-semibold text-slate-500 mt-0.5 block">
-                                    {sisaDanaRiil > 0 ? '(Sisa Lebih Bayar)' : sisaDanaRiil < 0 ? '(Perlu Penggantian Kas)' : '(Pas Sesuai Anggaran)'}
+                                    {sisaDanaRiil > 0 ? '(Sisa Dana Refund ke Perusahaan)' : sisaDanaRiil < 0 ? '(Reimbursement Penggantian Kas)' : '(Pas Sesuai Anggaran)'}
                                   </span>
                                 </div>
                               </div>
@@ -1754,12 +1754,25 @@ export function PdfReportModal({
                         <tfoot>
                           <tr className="bg-slate-100 font-extrabold border-t-2 border-[#1A365D]">
                             <td colSpan={4} className="p-3 border border-slate-300 text-right uppercase text-slate-700 tracking-wider">
-                              TOTAL &amp; POSISI SISA DANA
+                              {isInternal ? (
+                                sisaDana > 0 
+                                  ? 'TOTAL & STATUS KAS AKHIR (REFUND)' 
+                                  : sisaDana < 0 
+                                  ? 'TOTAL & STATUS KAS AKHIR (REIMBURSE)' 
+                                  : 'TOTAL & POSISI SISA DANA (NIHIL)'
+                              ) : (
+                                'TOTAL & POSISI SISA DANA'
+                              )}
                             </td>
                             <td className="p-3 border border-slate-300 text-right text-emerald-700 font-extrabold tabular-nums">{formatRupiah(totalDebet)}</td>
                             <td className="p-3 border border-slate-300 text-right text-rose-700 font-extrabold tabular-nums">{formatRupiah(totalKredit)}</td>
                             <td className={`p-3 border border-slate-300 text-right font-black tabular-nums ${sisaDana >= 0 ? 'text-blue-900' : 'text-rose-700'}`}>
-                              {formatSaldoRupiah(sisaDana)}
+                              <div>{formatSaldoRupiah(sisaDana)}</div>
+                              {isInternal && (
+                                <div className={`text-[8.5px] font-extrabold uppercase mt-0.5 tracking-wider ${sisaDana > 0 ? 'text-emerald-700' : sisaDana < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
+                                  {sisaDana > 0 ? '📥 [REFUND]' : sisaDana < 0 ? '📤 [REIMBURSE]' : '[NIHIL]'}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         </tfoot>
