@@ -1,10 +1,7 @@
-// ============================================================
-// ARKA Finance — Project Service (LocalStorage + Supabase Sync)
-// ============================================================
-
 import { type Project, type Transaction } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { broadcastSyncEvent } from './realtimeSync';
 
 function generateId(): string {
   return `prj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -167,7 +164,7 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
   }
 }
 
-function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 15000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`Operation timed out after ${timeoutMs}ms`));
@@ -189,7 +186,7 @@ export async function getProjects(includeDeleted: boolean = false): Promise<Proj
   const localData = getItem<Project[]>(KEYS.PROJECTS, []);
   const trashProjects = getItem<Project[]>(KEYS.TRASH_PROJECTS, []);
   const trashIds = new Set(trashProjects.map(p => p.id));
-  const timeoutMs = localData.length === 0 ? 10000 : 4000;
+  const timeoutMs = 15000;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -284,10 +281,7 @@ export async function addProject(
       console.warn('Supabase add project error:', err);
     }
   }
-
-  // if (newProject.anggaran && newProject.anggaran > 0) {
-  //   await syncProjectBudgetTransaction(newProject);
-  // }
+  broadcastSyncEvent('projects', 'insert', newProject.id);
 
   return newProject;
 }
@@ -337,6 +331,7 @@ export async function updateProject(
       console.warn('Supabase update project error:', err);
     }
   }
+  broadcastSyncEvent('projects', 'update', id);
 
   return updated;
 }
@@ -376,4 +371,5 @@ export async function deleteProject(id: string): Promise<void> {
       console.warn('Supabase delete project exception:', err);
     }
   }
+  broadcastSyncEvent('projects', 'delete', id);
 }

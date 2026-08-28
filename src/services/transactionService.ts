@@ -9,6 +9,7 @@ import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
 import { calculateCompanyLedger, classifyTransaction, type UnifiedCompanyLedger } from './financialEngine';
+import { broadcastSyncEvent } from './realtimeSync';
 
 function generateId(): string {
   return `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -20,7 +21,16 @@ function now(): string {
 
 async function safeSupabaseInsert(table: string, payload: any[]) {
   if (!supabase) return { error: null };
-  let retryRows = [...payload];
+  let retryRows = payload.map(row => {
+    const copy = { ...row };
+    // Stringify lampiran array for PostgreSQL JSONB/TEXT column safety
+    if (Array.isArray(copy.lampiran)) {
+      try {
+        copy.lampiran = JSON.stringify(copy.lampiran);
+      } catch { /* ignore */ }
+    }
+    return copy;
+  });
   let { error } = await supabase.from(table).insert(retryRows);
   
   while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
@@ -79,7 +89,7 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
     setTimeout(() => {
       console.warn(`Supabase update timeout on table "${table}" (id: ${id}). Proceeding with local cache.`);
       resolve({ error: null });
-    }, 7000)
+    }, 10000)
   );
 
   return Promise.race([performUpdate(), timeoutPromise]);
@@ -167,7 +177,7 @@ function mapTransactionToRow(t: Transaction): any {
   return row;
 }
 
-function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 3000): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T>, timeoutMs: number = 15000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`Operation timed out after ${timeoutMs}ms`));
@@ -189,7 +199,7 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
   const localData = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
   const trashTxs = getItem<Transaction[]>(KEYS.TRASH_TRANSACTIONS, []);
   const trashIds = new Set(trashTxs.map(t => t.id));
-  const timeoutMs = localData.length === 0 ? 10000 : 4000;
+  const timeoutMs = 15000;
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -264,8 +274,24 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {
-  const all = await getTransactions();
-  return all.find(t => t.id === id) ?? null;
+  const localData = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+  const localTx = localData.find(t => t.id === id);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!error && data) {
+        return mapRowToTransaction(data);
+      }
+    } catch {
+      // fallback to local
+    }
+  }
+  return localTx ?? null;
 }
 
 export async function getTransactionsByProject(proyekId: string): Promise<Transaction[]> {
@@ -446,10 +472,13 @@ export async function addTransaction(
         console.error('Supabase add transaction error:', error);
         throw new Error(`Gagal Sinkronisasi Cloud (Supabase Error: ${error.message})`);
       }
+      broadcastSyncEvent('transactions', 'insert', newTransaction.id);
     } catch (err: any) {
       console.error('Supabase add transaction error:', err);
       throw err;
     }
+  } else {
+    broadcastSyncEvent('transactions', 'insert', newTransaction.id);
   }
 
   return newTransaction;
@@ -582,10 +611,13 @@ export async function updateTransaction(
       } else if (childToDeleteId) {
         await supabase.from('transactions').delete().eq('id', childToDeleteId);
       }
+      broadcastSyncEvent('transactions', 'update', id);
     } catch (err: any) {
       console.error('Supabase update transaction error:', err);
       throw err;
     }
+  } else {
+    broadcastSyncEvent('transactions', 'update', id);
   }
 
   return updated;
@@ -660,6 +692,7 @@ export async function deleteTransaction(id: string): Promise<void> {
       console.warn('Supabase delete transaction warning:', err);
     }
   }
+  broadcastSyncEvent('transactions', 'delete', id);
 }
 
 export async function restoreTransaction(id: string): Promise<void> {
@@ -686,6 +719,7 @@ export async function restoreTransaction(id: string): Promise<void> {
       console.warn('Supabase restore transaction warning:', err);
     }
   }
+  broadcastSyncEvent('transactions', 'update', id);
 }
 
 export async function permanentDeleteTransaction(id: string): Promise<void> {
@@ -703,6 +737,7 @@ export async function permanentDeleteTransaction(id: string): Promise<void> {
       console.warn('Supabase permanent delete error:', err);
     }
   }
+  broadcastSyncEvent('transactions', 'delete', id);
 }
 
 export async function emptyTrashBin(): Promise<void> {
@@ -848,9 +883,12 @@ export async function saveTransactionCustomOrder(orderedIds: string[]): Promise<
         safeSupabaseUpdate('transactions', { urutan }, id)
       );
       await Promise.all(updates);
+      broadcastSyncEvent('transactions', 'reorder');
     } catch (err) {
       console.warn('Supabase reorder sync warning:', err);
     }
+  } else {
+    broadcastSyncEvent('transactions', 'reorder');
   }
 
   return updatedTransactions;

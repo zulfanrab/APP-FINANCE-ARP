@@ -97,15 +97,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Debounced refresh trigger — prevents rapid stacking re-renders on mobile
+  // Instant optimistic + debounced remote refresh trigger
   const triggerRefresh = useCallback(() => {
+    // 1. INSTANT 0ms OPTIMISTIC UI HYDRATION: Update React state immediately from local storage
+    const localTxs = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+    const localProjs = getItem<Project[]>(KEYS.PROJECTS, []);
+    if (localTxs.length > 0) setTransactions(localTxs);
+    if (localProjs.length > 0) setProjects(localProjs);
+    setRefreshKey(k => k + 1);
+
+    // 2. Schedule fast remote background sync
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
     refreshTimerRef.current = setTimeout(() => {
-      setRefreshKey(k => k + 1);
       refreshData();
-    }, 250);
+    }, 100);
   }, [refreshData]);
 
   // Initial load
@@ -113,7 +120,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refreshData();
   }, [refreshData]);
 
-  // 1. REALTIME CROSS-DEVICE SYNC WITH SUPABASE REALTIME CHANNEL
+  // 1. REALTIME CROSS-DEVICE SYNC (Postgres Changes + Instant Broadcast WebSockets)
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -123,7 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'transactions' },
         (payload) => {
-          console.info('⚡ Realtime Supabase event received for transactions:', payload.eventType);
+          console.info('⚡ Realtime Postgres event received for transactions:', payload.eventType);
           triggerRefresh();
         }
       )
@@ -131,7 +138,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'projects' },
         (payload) => {
-          console.info('⚡ Realtime Supabase event received for projects:', payload.eventType);
+          console.info('⚡ Realtime Postgres event received for projects:', payload.eventType);
+          triggerRefresh();
+        }
+      )
+      .on(
+        'broadcast',
+        { event: 'sync_event' },
+        (payload) => {
+          console.info('⚡ Realtime Broadcast sync event received:', payload);
           triggerRefresh();
         }
       )
@@ -145,7 +160,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // 2. AUTO-SYNC ON MOBILE APP RESUME / WINDOW FOCUS / BACK ONLINE
   useEffect(() => {
     const handleResumeOrOnline = () => {
-      console.info('📱 App resumed or came online. Triggering automatic background sync...');
+      console.info('📱 App resumed or came online. Triggering background sync...');
       triggerRefresh();
     };
 
@@ -164,6 +179,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [triggerRefresh]);
+
+  // 3. CONTINUOUS BACKGROUND HEARTBEAT POLLING FOR ROCK-SOLID MULTI-DEVICE SYNC
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      // Only poll when page is active/visible
+      if (document.visibilityState === 'visible') {
+        refreshData();
+      }
+    }, 4500);
+
+    return () => clearInterval(pollInterval);
+  }, [refreshData]);
 
 
 
