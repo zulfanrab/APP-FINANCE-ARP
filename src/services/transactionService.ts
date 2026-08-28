@@ -236,10 +236,9 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
             return tx;
           });
         const remoteIds = new Set(remoteTxs.map(t => t.id));
-
-        // Only keep local transactions that were explicitly created offline and never synced to Supabase
+        // Keep all valid local transactions that are not yet in remote and not in trash
         const unsyncedLocal = localData.filter(
-          t => !remoteIds.has(t.id) && !trashIds.has(t.id) && (t as any).isLocalUnsynced === true
+          t => !remoteIds.has(t.id) && !trashIds.has(t.id)
         );
 
         if (unsyncedLocal.length > 0) {
@@ -247,7 +246,6 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
           const rowsToInsert = unsyncedLocal.map(mapTransactionToRow);
           safeSupabaseInsert('transactions', rowsToInsert).then(({ error: syncErr }) => {
             if (!syncErr) {
-              unsyncedLocal.forEach(ut => delete (ut as any).isLocalUnsynced);
               setItem(KEYS.TRANSACTIONS, [...remoteTxs, ...unsyncedLocal]);
             }
           });
