@@ -811,21 +811,22 @@ export function groupAndSortTransactions(
     }
   }
 
-  // 2. Sort parent transactions by urutan (if custom order is defined), then date & created_at
+  // 2. Sort parent transactions: Primary by date (descending for latest), secondary by created_at / urutan
   const sortedParents = [...parentTxs].sort((a, b) => {
-    if (a.urutan != null && b.urutan != null && a.urutan !== b.urutan) {
-      return a.urutan - b.urutan; // urutan 1 is always top position!
-    }
-    if (a.urutan != null && b.urutan == null) return -1;
-    if (a.urutan == null && b.urutan != null) return 1;
-
     const timeA = a.tanggal ? new Date(a.tanggal).getTime() : 0;
     const timeB = b.tanggal ? new Date(b.tanggal).getTime() : 0;
     if (timeA !== timeB && !isNaN(timeA) && !isNaN(timeB)) {
       return order === 'asc' ? timeA - timeB : timeB - timeA;
     }
-    const createdA = a.dibuatPada || a.tanggal ? new Date(a.dibuatPada || a.tanggal).getTime() : 0;
-    const createdB = b.dibuatPada || b.tanggal ? new Date(b.dibuatPada || b.tanggal).getTime() : 0;
+
+    // Within the same date: check explicit custom order if both have it
+    if (a.urutan != null && b.urutan != null && a.urutan !== b.urutan) {
+      return a.urutan - b.urutan;
+    }
+
+    // Otherwise newest created appears first (descending)
+    const createdA = a.dibuatPada ? new Date(a.dibuatPada).getTime() : (a.tanggal ? new Date(a.tanggal).getTime() : 0);
+    const createdB = b.dibuatPada ? new Date(b.dibuatPada).getTime() : (b.tanggal ? new Date(b.tanggal).getTime() : 0);
     return order === 'asc' ? (createdA || 0) - (createdB || 0) : (createdB || 0) - (createdA || 0);
   });
 

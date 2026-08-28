@@ -392,7 +392,7 @@ export function TransactionForm() {
       } else if (searchParams.get('returnUrl')) {
         navigate(searchParams.get('returnUrl')!);
       } else {
-        navigate(-1);
+        navigate('/transaksi');
       }
     } catch (err: any) {
       console.error('Gagal menyimpan transaksi:', err);
