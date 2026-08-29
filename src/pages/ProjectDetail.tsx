@@ -35,6 +35,26 @@ function formatRupiahInput(value: string): string {
   return new Intl.NumberFormat('id-ID').format(Number(num));
 }
 
+function convertBase64ToBlobUrl(dataUrl: string): string {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+  try {
+    const parts = dataUrl.split(',');
+    const mimeMatch = parts[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const bstr = atob(parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    const blob = new Blob([u8arr], { type: mime });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.error('Failed to convert base64 to Blob URL:', e);
+    return dataUrl;
+  }
+}
+
 function splitIgnoreInParens(str: string, delimiter: string = ','): string[] {
   const parts: string[] = [];
   let current = '';
@@ -243,9 +263,28 @@ export function ProjectDetail() {
   const { role } = useAuth();
   const { transactions: allTransactions, projects: allProjects, loading: globalLoading, addToast, triggerRefresh } = useApp();
 
+  const [detailedProject, setDetailedProject] = useState<Project | null>(null);
+  const [viewPdfModalOpen, setViewPdfModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      getProjectById(id).then(res => {
+        if (res) setDetailedProject(res);
+      });
+    }
+  }, [id, allProjects]);
+
   const project = React.useMemo(() => {
-    return allProjects.find(p => p.id === id) || null;
-  }, [allProjects, id]);
+    const base = allProjects.find(p => p.id === id) || null;
+    if (detailedProject && detailedProject.id === id) {
+      return {
+        ...base,
+        ...detailedProject,
+        suratPengajuanPdf: detailedProject.suratPengajuanPdf || base?.suratPengajuanPdf,
+      };
+    }
+    return base;
+  }, [allProjects, id, detailedProject]);
 
   const transactions = React.useMemo(() => {
     return allTransactions.filter(t => t.proyekId === id);
@@ -848,7 +887,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               variant="secondary"
               size="sm"
               icon={<FileText size={15} className="text-blue-600" />}
-              onClick={() => window.open(project.suratPengajuanPdf, '_blank')}
+              onClick={() => setViewPdfModalOpen(true)}
             >
               Lihat PDF Pengajuan
             </Button>
@@ -1646,6 +1685,119 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         transactions={transactions}
         project={project}
       />
+
+      {/* In-App Fullscreen Surat Pengajuan PDF Viewer Modal */}
+      {viewPdfModalOpen && project.suratPengajuanPdf && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-6 animate-fade-in"
+          onClick={() => setViewPdfModalOpen(false)}
+        >
+          <div
+            className="relative max-w-5xl w-full bg-slate-900 border border-white/10 text-white rounded-3xl overflow-hidden shadow-2xl animate-scale-up flex flex-col h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-4 sm:px-6 py-3 bg-slate-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-400 flex items-center justify-center flex-shrink-0">
+                  <FileText size={18} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm text-white truncate leading-tight">
+                    Dokumen PDF Surat Pengajuan - {project.nama}
+                  </h3>
+                  <p className="text-[10.5px] text-slate-400 font-medium mt-0.5">
+                    {project.nomorSurat ? `No: ${project.nomorSurat}` : 'Berkas Pengajuan Resmi'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {project.suratPengajuanPdf.includes('drive.google.com') ? (
+                  <a
+                    href={project.suratPengajuanPdf}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                  >
+                    <ExternalLink size={14} /> Google Drive
+                  </a>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const blobUrl = convertBase64ToBlobUrl(project.suratPengajuanPdf!);
+                        window.open(blobUrl, '_blank');
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <ExternalLink size={14} /> Buka Tab Baru
+                    </button>
+                    <a
+                      href={convertBase64ToBlobUrl(project.suratPengajuanPdf)}
+                      download={`Surat_Pengajuan_${project.nama.replace(/\s+/g, '_')}.pdf`}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <Download size={14} /> Unduh PDF
+                    </a>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewPdfModalOpen(false)}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors ml-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Viewport */}
+            <div className="relative flex-1 bg-slate-950 p-2 overflow-hidden flex flex-col">
+              {project.suratPengajuanPdf.includes('drive.google.com') ? (
+                <iframe
+                  src={project.suratPengajuanPdf.replace('/view', '/preview')}
+                  title="Surat Pengajuan PDF"
+                  className="w-full h-full rounded-2xl border-0 bg-white"
+                />
+              ) : (
+                <object
+                  data={convertBase64ToBlobUrl(project.suratPengajuanPdf)}
+                  type="application/pdf"
+                  className="w-full h-full rounded-2xl border-0 bg-white"
+                >
+                  <iframe
+                    src={convertBase64ToBlobUrl(project.suratPengajuanPdf)}
+                    title="Surat Pengajuan PDF"
+                    className="w-full h-full rounded-2xl border-0 bg-white"
+                  >
+                    <div className="flex flex-col items-center justify-center h-full p-6 text-center text-slate-300 bg-slate-900 rounded-2xl">
+                      <FileText size={44} className="text-blue-400 mb-2" />
+                      <h4 className="text-sm font-bold text-white mb-1">
+                        Dokumen Surat Pengajuan
+                      </h4>
+                      <p className="text-xs text-slate-400 mb-4 max-w-sm">
+                        Browser Anda memblokir preview PDF di dalam frame. Silakan klik tombol di bawah untuk membuka di tab baru atau mengunduh dokumen.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blobUrl = convertBase64ToBlobUrl(project.suratPengajuanPdf!);
+                          window.open(blobUrl, '_blank');
+                        }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <ExternalLink size={14} /> Buka PDF di Tab Baru
+                      </button>
+                    </div>
+                  </iframe>
+                </object>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

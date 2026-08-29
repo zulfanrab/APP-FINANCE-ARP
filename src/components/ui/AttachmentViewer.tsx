@@ -294,19 +294,22 @@ export function AttachmentViewer({ attachments }: AttachmentViewerProps) {
                     </button>
                   </div>
                 ) : (
-                  <img
-                    src={imgUrl}
-                    alt={att.nama}
-                    className="max-h-[240px] w-full object-contain rounded-xl cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleOpenImagePreview(att, imgUrl)}
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (isGoogleDrive && driveId && !target.dataset.fallback) {
-                        target.dataset.fallback = 'true';
-                        target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
-                      }
-                    }}
-                  />
+                  <div className="w-full h-full flex items-center justify-center min-h-[160px] bg-slate-900/80 rounded-xl overflow-hidden relative">
+                    <img
+                      src={imgUrl}
+                      alt={att.nama}
+                      loading="lazy"
+                      className="max-h-[240px] w-full object-contain rounded-xl cursor-pointer hover:scale-[1.02] transition-transform duration-300 ease-out"
+                      onClick={() => handleOpenImagePreview(att, imgUrl)}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (isGoogleDrive && driveId && !target.dataset.fallback) {
+                          target.dataset.fallback = 'true';
+                          target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+                        }
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             </div>
