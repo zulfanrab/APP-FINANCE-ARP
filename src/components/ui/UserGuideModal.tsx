@@ -137,10 +137,19 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
 
                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
                   <h4 className="font-bold text-gray-900 text-xs flex items-center gap-2">
-                    <FileSpreadsheet size={14} className="text-emerald-600" /> 2. Fitur OCR Scan Struk & Export Excel
+                    <FileSpreadsheet size={14} className="text-emerald-600" /> 2. Fitur OCR Scan Struk &amp; Export Excel
                   </h4>
                   <p className="text-xs text-gray-600">
-                    Gunakan tombol <strong>"Scan Struk (AI OCR)"</strong> untuk membaca total nominal fisik resi secara otomatis. Hasil rekap bulanan dapat diunduh dalam format Excel & PDF di halaman Laporan/Proyek.
+                    Gunakan tombol <strong>"Scan Struk (AI OCR)"</strong> untuk membaca total nominal fisik resi secara otomatis. Hasil rekap bulanan dapat diunduh dalam format Excel &amp; PDF di halaman Laporan/Proyek.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1">
+                  <h4 className="font-bold text-emerald-950 text-xs flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-emerald-600" /> 3. Modul Hutang &amp; Piutang (AP &amp; AR Hub)
+                  </h4>
+                  <p className="text-xs text-emerald-800">
+                    Gunakan menu <strong>Hutang &amp; Piutang</strong> untuk mencatat tagihan invoice ke Klien yang belum lunas (AR) dan kewajiban tagihan ke vendor (AP). Anda dapat mencatat cicilan/pelunasan dan memilih opsi <strong>"Otomatis catat transaksi di Jurnal Kas"</strong> agar tidak perlu menginput ulang ke kas secara manual.
                   </p>
                 </div>
               </div>
@@ -191,6 +200,14 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
                   <h4 className="font-bold text-gray-900 text-sm">4. Sub-Divisi Kantor</h4>
                   <p className="text-gray-700">
                     Tombol Divisi (Admin, IT, Ahli) HANYA muncul untuk transaksi di Kas Utama atau Proyek Operasional Kantor. Proyek lapangan akan menyembunyikan opsi ini agar pengeluaran dicatat secara <i>gelondongan</i> (langsung ke proyek).
+                  </p>
+                </div>
+
+                {/* 5. Hutang & Piutang */}
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                  <h4 className="font-bold text-emerald-950 text-sm">5. Hub Hutang &amp; Piutang (AR &amp; AP)</h4>
+                  <p className="text-emerald-900">
+                    Mencatat tagihan berjalan di luar mutasi kas riil. Tagihan klien (Piutang) dan tagihan vendor (Hutang) dimonitor statusnya secara otomatis (Belum Bayar, Cicilan, Lunas, atau Jatuh Tempo). Saat cicilan dicatat, Anda dapat mengaktifkan fitur pencatatan otomatis ke Jurnal Kas.
                   </p>
                 </div>
               </div>

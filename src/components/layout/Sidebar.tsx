@@ -10,6 +10,7 @@ import {
   PlusCircle,
   FolderKanban,
   BarChart3,
+  Receipt,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
     icon: <FolderKanban size={20} />,
     label: 'Proyek',
   },
+  { to: '/hutang-piutang', icon: <Receipt size={20} />, label: 'Hutang & Piutang' },
   { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
   { to: '/trash', icon: <Trash2 size={20} />, label: 'Kotak Sampah' },
 ];

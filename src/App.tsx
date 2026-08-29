@@ -22,6 +22,7 @@ const TransactionsList = lazy(() => import('./pages/TransactionsList').then(m =>
 const Projects = lazy(() => import('./pages/Projects').then(m => ({ default: m.Projects })));
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail').then(m => ({ default: m.ProjectDetail })));
 const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const DebtHub = lazy(() => import('./pages/DebtHub'));
 const TrashPage = lazy(() => import('./pages/TrashPage').then(m => ({ default: m.TrashPage })));
 
 // ---- Protected Route ----
@@ -152,6 +153,16 @@ function AppInner() {
             <ProtectedRoute>
               <Layout>
                 <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/hutang-piutang"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DebtHub />
               </Layout>
             </ProtectedRoute>
           }

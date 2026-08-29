@@ -136,3 +136,39 @@ export interface FilterOptions {
   proyekId?: string;
   jenis?: TransactionType | 'semua';
 }
+
+export interface DebtPaymentHistory {
+  id: string;
+  tanggal: string;
+  nominal: number;
+  catatan?: string;
+  transaksiId?: string;
+  metodePembayaran?: string;
+  rekeningId?: string;
+  buktiBayar?: string;
+}
+
+export type DebtType = 'piutang' | 'hutang';
+export type DebtStatus = 'belum_lunas' | 'cicilan' | 'lunas' | 'jatuh_tempo';
+
+export interface DebtItem {
+  id: string;
+  tipe: DebtType; // piutang = tagihan klien (AR), hutang = kewajiban vendor (AP)
+  judul: string; // misal: "Tagihan Invoice #082 - Riksa Uji Sampoerna"
+  kontakNama: string; // Nama Klien / Vendor / Kreditor
+  kontakHp?: string;
+  proyekId?: string; // Link ke proyek terkait (opsional)
+  nomorInvoice?: string; // No. Faktur / Tagihan / PO
+  totalNominal: number; // Nilai total tagihan
+  dibayarNominal: number; // Akumulasi yang sudah dibayar
+  sisaNominal: number; // totalNominal - dibayarNominal
+  tanggalTerbit: string; // YYYY-MM-DD
+  tanggalJatuhTempo: string; // YYYY-MM-DD
+  status: DebtStatus;
+  keterangan?: string;
+  lampiran?: Attachment[];
+  riwayatPembayaran: DebtPaymentHistory[];
+  dibuatPada: string;
+  diupdatePada: string;
+}
+
