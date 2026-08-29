@@ -550,6 +550,10 @@ export function PdfReportModal({
         nominal: number;
         jenis?: string;
         kategori?: string;
+        isClientPayment?: boolean;
+        isDropDana?: boolean;
+        isFieldExpense?: boolean;
+        hasOnlineLink?: boolean;
         qrDataUrl?: string;
       }> = [];
 
@@ -568,57 +572,93 @@ export function PdfReportModal({
         return url;
       };
 
-      // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
-      for (const t of reportTxs) {
-        const txAtts: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
+      const extractAttachmentObjects = (t: Transaction): Array<{ nama: string; tipe: string; dataUrl: string }> => {
+        const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
 
-        // 1. Include Bukti Transfer if present
-        if (t.buktiTransfer && t.buktiTransfer.trim()) {
-          txAtts.push({
+        // 1. Check buktiTransfer
+        if (t.buktiTransfer && typeof t.buktiTransfer === 'string' && t.buktiTransfer.trim()) {
+          const bt = t.buktiTransfer.trim();
+          const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
+          result.push({
             nama: 'Bukti Transfer Bank',
-            tipe: 'image/png',
-            dataUrl: t.buktiTransfer.trim(),
+            tipe: isPdf ? 'application/pdf' : 'image/png',
+            dataUrl: bt,
           });
         }
 
-        // 2. Include all items from Lampiran array
-        const rawLampiran = t.lampiran;
-        let parsedLampiran: any[] = [];
-        if (Array.isArray(rawLampiran)) {
-          parsedLampiran = rawLampiran;
-        } else if (typeof rawLampiran === 'string' && (rawLampiran as string).trim().startsWith('[')) {
-          try {
-            const parsed = JSON.parse(rawLampiran as string);
-            if (Array.isArray(parsed)) parsedLampiran = parsed;
-          } catch { /* ignore */ }
+        // 2. Check lampiran field
+        const raw = t.lampiran;
+        let list: any[] = [];
+        if (Array.isArray(raw)) {
+          list = raw;
+        } else if (typeof raw === 'string') {
+          const strVal: string = raw as string;
+          const trimmed = strVal.trim();
+          if (trimmed.startsWith('[')) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (Array.isArray(parsed)) list = parsed;
+            } catch { /* ignore */ }
+          } else if (trimmed) {
+            list = [trimmed];
+          }
         }
 
-        parsedLampiran.forEach(att => {
-          if (att && att.dataUrl && !txAtts.some(a => a.dataUrl === att.dataUrl)) {
-            txAtts.push({
-              nama: att.nama || 'Lampiran Transaksi',
-              tipe: att.tipe || (att.dataUrl.toLowerCase().includes('.pdf') ? 'application/pdf' : 'image/jpeg'),
-              dataUrl: att.dataUrl,
-            });
+        list.forEach(item => {
+          if (!item) return;
+          if (typeof item === 'string') {
+            const url = item.trim();
+            if (!url) return;
+            if (!result.some(r => r.dataUrl === url)) {
+              const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
+              result.push({
+                nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
+                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+                dataUrl: url,
+              });
+            }
+          } else if (typeof item === 'object') {
+            const url = item.dataUrl || item.url || item.fileUrl || item.link || '';
+            if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
+              const cleanUrl = url.trim();
+              const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
+              result.push({
+                nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
+                tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+                dataUrl: cleanUrl,
+              });
+            }
           }
         });
 
+        return result;
+      };
+
+      // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
+      for (const t of reportTxs) {
+        const txAtts = extractAttachmentObjects(t);
         const totalAtts = txAtts.length;
+
+        const isClientPayment = t.jenis === 'masuk' && isOmzetRil(t);
+        const isDropDana = (t.jenis === 'masuk' && !isOmzetRil(t)) || isMutasiInternal(t) || (t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('drop dana');
+        const isFieldExpense = t.jenis === 'keluar' && !isDropDana;
 
         for (let i = 0; i < totalAtts; i++) {
           const att = txAtts[i];
           const isPdf =
             att.tipe?.includes('pdf') ||
             att.nama?.toLowerCase().endsWith('.pdf') ||
-            att.dataUrl.toLowerCase().includes('.pdf');
+            att.dataUrl.toLowerCase().includes('.pdf') ||
+            att.dataUrl.startsWith('data:application/pdf');
 
           const seqLabel = totalAtts > 1 ? ` (Lampiran ${i + 1} dari ${totalAtts})` : '';
 
           let qrDataUrl = '';
-          if (isPdf) {
+          const hasOnlineLink = att.dataUrl.startsWith('http://') || att.dataUrl.startsWith('https://');
+
+          if (isPdf && hasOnlineLink) {
             try {
-              const qrTarget = att.dataUrl.startsWith('http') ? att.dataUrl : `PDF: ${att.nama}`;
-              qrDataUrl = await QRCode.toDataURL(qrTarget, {
+              qrDataUrl = await QRCode.toDataURL(att.dataUrl, {
                 width: 300,
                 margin: 1,
                 color: { dark: '#0F172A', light: '#FFFFFF' },
@@ -638,14 +678,19 @@ export function PdfReportModal({
             nominal: t.nominal,
             jenis: t.jenis,
             kategori: t.kategori,
+            isClientPayment,
+            isDropDana,
+            isFieldExpense,
+            hasOnlineLink,
             qrDataUrl,
           });
         }
       }
 
       if (itemsToPrint.length > 0) {
-        const financeItems = itemsToPrint.filter(i => i.jenis === 'masuk' || (i.kategori || '').toLowerCase().includes('mutasi'));
-        const fieldItems = itemsToPrint.filter(i => i.jenis === 'keluar' && !(i.kategori || '').toLowerCase().includes('mutasi'));
+        const clientPaymentItems = itemsToPrint.filter(i => i.isClientPayment);
+        const dropDanaItems = itemsToPrint.filter(i => i.isDropDana);
+        const fieldExpenseItems = itemsToPrint.filter(i => i.isFieldExpense);
 
         attachmentsHtml += `
           <div style="page-break-before: always; padding-top: 10px;">
@@ -690,14 +735,16 @@ export function PdfReportModal({
                     ${
                       item.qrDataUrl
                         ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 100px; height: 100px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
-                        : `<div style="font-size: 32px; margin-bottom: 4px;">📄</div>`
+                        : `<div style="font-size: 36px; margin-bottom: 6px;">📄</div>`
                     }
                     <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
                       📄 ${item.nama}
                     </div>
-                    <div style="font-size: 8.5px; font-weight: 700; color: #4F46E5; margin-top: 2px;">DOKUMEN PDF CLOUD ARCHIVE</div>
+                    <div style="font-size: 8.5px; font-weight: 700; color: #047857; margin-top: 2px;">
+                      ${item.hasOnlineLink ? 'DOKUMEN PDF CLOUD ONLINE' : 'DOKUMEN PDF ARSIP SISTEM'}
+                    </div>
                     <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
-                      📱 Scan QR Code untuk melihat dokumen PDF asli
+                      ${item.hasOnlineLink ? '📱 Scan QR Code untuk membuka dokumen PDF di HP' : '💾 Dokumen tersimpan aman di database arsip internal'}
                     </div>
                   </div>
                   <div class="caption" style="margin-top: 6px;">
@@ -717,13 +764,25 @@ export function PdfReportModal({
           return gridHtml;
         };
 
-        if (financeItems.length > 0) {
-          attachmentsHtml += renderItemGrid(financeItems, '📌 BAGIAN A: OTORISASI & MUTASI DANA FINANCE (Pencairan Drop Dana & Transfer Panjar)');
+        if (clientPaymentItems.length > 0) {
+          attachmentsHtml += renderItemGrid(
+            clientPaymentItems,
+            '📌 BAGIAN A: BUKTI PEMBAYARAN & INVOICE PELUNASAN KLIEN (Penerimaan Omzet Usaha)'
+          );
         }
-        if (fieldItems.length > 0) {
-          attachmentsHtml += renderItemGrid(fieldItems, '📌 BAGIAN B: STRUK & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana)');
+        if (dropDanaItems.length > 0) {
+          attachmentsHtml += renderItemGrid(
+            dropDanaItems,
+            '📌 BAGIAN B: OTORISASI DROP DANA & PERPUTARAN KAS MODAL (Transfer Kas Internal & Panjar)'
+          );
         }
-        if (financeItems.length === 0 && fieldItems.length === 0) {
+        if (fieldExpenseItems.length > 0) {
+          attachmentsHtml += renderItemGrid(
+            fieldExpenseItems,
+            '📌 BAGIAN C: STRUK, NOTA & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana / Operasional)'
+          );
+        }
+        if (clientPaymentItems.length === 0 && dropDanaItems.length === 0 && fieldExpenseItems.length === 0) {
           attachmentsHtml += renderItemGrid(itemsToPrint, '📌 LAMPIRAN BUKTI TRANSAKSI & STRUK');
         }
 
