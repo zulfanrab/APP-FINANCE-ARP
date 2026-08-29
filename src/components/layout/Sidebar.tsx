@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
     to: '/transaksi/baru',
     icon: <PlusCircle size={20} />,
     label: 'Input Transaksi',
-    roles: ['admin'],
+    roles: ['admin', 'staff'],
   },
   {
     to: '/proyek',
@@ -46,8 +46,8 @@ const navItems: NavItem[] = [
     label: 'Proyek',
   },
   { to: '/hutang-piutang', icon: <Receipt size={20} />, label: 'Hutang & Piutang' },
-  { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
-  { to: '/trash', icon: <Trash2 size={20} />, label: 'Kotak Sampah' },
+  { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan Pusat', roles: ['owner', 'admin'] },
+  { to: '/trash', icon: <Trash2 size={20} />, label: 'Kotak Sampah', roles: ['owner', 'admin'] },
 ];
 
 export function Sidebar() {
@@ -89,7 +89,7 @@ export function Sidebar() {
           <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
           {!collapsed && (
             <span className="font-semibold text-emerald-300 capitalize truncate">
-              {role === 'owner' ? '👑 Owner' : '💼 Admin Keuangan'}
+              {role === 'owner' ? '👑 Owner' : role === 'admin' ? '💼 Head of Finance' : '🤝 Asisten Keuangan'}
             </span>
           )}
         </div>

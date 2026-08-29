@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Crown, Calculator, BookOpen } from 'lucide-react';
 import logo from '../assets/logo.png';
-import { verifyPin } from '../services/authService';
+import { verifyPinRole } from '../services/authService';
 import { type UserRole } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -29,9 +29,12 @@ export function Login() {
     setLoading(true);
     setError('');
     try {
-      const valid = await verifyPin(pinValue);
-      if (valid) {
+      const roleResult = await verifyPinRole(pinValue);
+      if (roleResult === 'master') {
         setPinVerified(true);
+      } else if (roleResult === 'staff') {
+        login('staff');
+        addToast('success', 'Masuk sebagai Asisten Keuangan (Staf Operasional)');
       } else {
         setError('PIN salah. Coba lagi.');
         setPin('');

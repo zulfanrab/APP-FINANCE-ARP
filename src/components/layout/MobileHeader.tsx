@@ -43,7 +43,7 @@ export function MobileHeader() {
         </button>
 
         <span className="px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-semibold text-emerald-300 border border-emerald-500/20 capitalize">
-          {role === 'owner' ? '👑 Owner' : '💼 Admin'}
+          {role === 'owner' ? '👑 Owner' : role === 'admin' ? '💼 Admin' : '🤝 Staf'}
         </span>
 
         <button

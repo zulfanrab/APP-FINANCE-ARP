@@ -11,6 +11,7 @@ import {
   Plus,
   FolderKanban,
   BarChart3,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -20,7 +21,7 @@ export function MobileBottomNav() {
   const navItems = [
     { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
     { to: '/transaksi', icon: <ArrowLeftRight size={20} />, label: 'Transaksi' },
-    ...(role === 'admin'
+    ...(role === 'admin' || role === 'staff'
       ? [
           {
             to: '/transaksi/baru',
@@ -31,7 +32,9 @@ export function MobileBottomNav() {
         ]
       : []),
     { to: '/proyek', icon: <FolderKanban size={20} />, label: 'Proyek' },
-    { to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' },
+    ...(role === 'staff'
+      ? [{ to: '/hutang-piutang', icon: <Receipt size={20} />, label: 'Piutang' }]
+      : [{ to: '/laporan', icon: <BarChart3 size={20} />, label: 'Laporan' }]),
   ];
 
   return (

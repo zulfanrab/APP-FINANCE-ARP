@@ -79,6 +79,83 @@ export async function verifyPin(pin: string): Promise<boolean> {
   return false;
 }
 
+export async function setupStaffPin(pin: string): Promise<void> {
+  const hash = await hashPin(pin);
+  setItem(KEYS.STAFF_PIN_HASH, hash);
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      await supabase
+        .from('app_settings')
+        .upsert({ key: 'staff_pin_hash', value: hash });
+    } catch (err) {
+      console.warn('Supabase staff PIN save failed:', err);
+    }
+  }
+}
+
+export async function hasStaffPin(): Promise<boolean> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_pin_hash')
+        .maybeSingle();
+
+      if (!error && data?.value) {
+        setItem(KEYS.STAFF_PIN_HASH, data.value);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Supabase fetch staff PIN failed:', err);
+    }
+  }
+
+  const hash = getItem<string | null>(KEYS.STAFF_PIN_HASH, null);
+  return hash !== null;
+}
+
+export async function verifyStaffPin(pin: string): Promise<boolean> {
+  const storedHash = getItem<string | null>(KEYS.STAFF_PIN_HASH, null);
+  if (storedHash) {
+    const hash = await hashPin(pin);
+    if (hash === storedHash) return true;
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'staff_pin_hash')
+        .maybeSingle();
+
+      if (!error && data?.value) {
+        setItem(KEYS.STAFF_PIN_HASH, data.value);
+        const hash = await hashPin(pin);
+        return hash === data.value;
+      }
+    } catch (err) {
+      console.warn('Supabase staff pin verify error:', err);
+    }
+  }
+
+  return false;
+}
+
+export async function verifyPinRole(pin: string): Promise<'master' | 'staff' | null> {
+  // 1. Check Master PIN first (Full Access: Owner / Admin)
+  const isMaster = await verifyPin(pin);
+  if (isMaster) return 'master';
+
+  // 2. Check Staff PIN (Restricted Access: Asisten Keuangan)
+  const isStaff = await verifyStaffPin(pin);
+  if (isStaff) return 'staff';
+
+  return null;
+}
+
 export async function changePin(oldPin: string, newPin: string): Promise<boolean> {
   const valid = await verifyPin(oldPin);
   if (!valid) return false;

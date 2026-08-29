@@ -20,6 +20,7 @@ import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { isCapitalInjectionTx } from '../components/ui/PdfReportModal';
 import { parseRecipientString, extractHistoricalRecipients } from '../utils/bankHelper';
 
@@ -34,6 +35,7 @@ function parseRupiahInput(value: string): number {
 }
 
 export function TransactionForm() {
+  const { role } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlProyekId = searchParams.get('proyekId');
@@ -708,8 +710,12 @@ export function TransactionForm() {
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 required
               >
-                <option value="bca_utama">BCA Utama (Holding/Bos)</option>
-                <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                {role !== 'staff' && (
+                  <>
+                    <option value="bca_utama">BCA Utama (Holding/Bos)</option>
+                    <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                  </>
+                )}
                 <option value="kas_admin">Kas Operasional Admin</option>
               </select>
             </div>
@@ -726,8 +732,12 @@ export function TransactionForm() {
                   className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium text-blue-900"
                   required
                 >
-                  <option value="bca_utama">BCA Utama (Holding/Bos)</option>
-                  <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                  {role !== 'staff' && (
+                    <>
+                      <option value="bca_utama">BCA Utama (Holding/Bos)</option>
+                      <option value="bri_utama">BRI Utama (Holding/Bos)</option>
+                    </>
+                  )}
                   <option value="kas_admin">Kas Operasional Admin</option>
                 </select>
               </div>
@@ -907,8 +917,12 @@ export function TransactionForm() {
                     onChange={e => setField('rekeningId', e.target.value as AccountId)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                   >
-                    <option value="bca_utama">🏦 BCA Utama</option>
-                    <option value="bri_utama">🏦 BRI Utama</option>
+                    {role !== 'staff' && (
+                      <>
+                        <option value="bca_utama">🏦 BCA Utama</option>
+                        <option value="bri_utama">🏦 BRI Utama</option>
+                      </>
+                    )}
                     <option value="kas_admin">💵 Kas Operasional Admin</option>
                   </select>
                 </div>
@@ -919,8 +933,12 @@ export function TransactionForm() {
                     onChange={e => setField('rekeningTujuanId', e.target.value as AccountId)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                   >
-                    <option value="bca_utama">🏦 BCA Utama</option>
-                    <option value="bri_utama">🏦 BRI Utama</option>
+                    {role !== 'staff' && (
+                      <>
+                        <option value="bca_utama">🏦 BCA Utama</option>
+                        <option value="bri_utama">🏦 BRI Utama</option>
+                      </>
+                    )}
                     <option value="kas_admin">💵 Kas Operasional Admin</option>
                   </select>
                 </div>
@@ -935,8 +953,12 @@ export function TransactionForm() {
                   onChange={e => setField('rekeningId', e.target.value as AccountId)}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
                 >
-                  <option value="bca_utama">🏦 BCA Utama</option>
-                  <option value="bri_utama">🏦 BRI Utama</option>
+                  {role !== 'staff' && (
+                    <>
+                      <option value="bca_utama">🏦 BCA Utama</option>
+                      <option value="bri_utama">🏦 BRI Utama</option>
+                    </>
+                  )}
                   <option value="kas_admin">💵 Kas Operasional Admin</option>
                 </select>
               </div>

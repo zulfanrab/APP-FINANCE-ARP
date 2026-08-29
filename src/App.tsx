@@ -17,6 +17,7 @@ const SetupPin = lazy(() => import('./pages/SetupPin').then(m => ({ default: m.S
 const Login = lazy(() => import('./pages/Login').then(m => ({ default: m.Login })));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then(m => ({ default: m.OwnerDashboard })));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const StaffDashboard = lazy(() => import('./pages/StaffDashboard').then(m => ({ default: m.StaffDashboard })));
 const TransactionForm = lazy(() => import('./pages/TransactionForm').then(m => ({ default: m.TransactionForm })));
 const TransactionsList = lazy(() => import('./pages/TransactionsList').then(m => ({ default: m.TransactionsList })));
 const Projects = lazy(() => import('./pages/Projects').then(m => ({ default: m.Projects })));
@@ -46,6 +47,7 @@ function DashboardPage() {
   const { role } = useAuth();
   if (role === 'owner') return <OwnerDashboard />;
   if (role === 'admin') return <AdminDashboard />;
+  if (role === 'staff') return <StaffDashboard />;
   return <Navigate to="/login" replace />;
 }
 
@@ -120,7 +122,7 @@ function AppInner() {
         <Route
           path="/transaksi/baru"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'staff']}>
               <Layout>
                 <TransactionForm />
               </Layout>
@@ -150,7 +152,7 @@ function AppInner() {
         <Route
           path="/laporan"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
               <Layout>
                 <Reports />
               </Layout>
@@ -170,7 +172,7 @@ function AppInner() {
         <Route
           path="/trash"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={['owner', 'admin']}>
               <Layout>
                 <TrashPage />
               </Layout>

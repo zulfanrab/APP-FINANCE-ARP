@@ -6,13 +6,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, FolderOpen,
-  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight
+  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight, KeyRound
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getTransactions, filterTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getDashboardSummary, getMonthlyChartData } from '../services/analyticsService';
 import { classifyTransaction } from '../services/financialEngine';
+import { setupStaffPin, hasStaffPin } from '../services/authService';
 import {
   type Transaction, type FilterOptions, type DashboardSummary
 } from '../types';
@@ -20,6 +21,7 @@ import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState, DashboardSkeleton,
   formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal
 } from '../components/ui';
+import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
 
 type SortField = 'tanggal' | 'nominal' | 'deskripsi';
@@ -137,15 +139,54 @@ export function AdminDashboard() {
     return sortDir === 'asc' ? <ChevronUp size={12} className="text-primary" /> : <ChevronDown size={12} className="text-primary" />;
   };
 
+  // Staff PIN State
+  const [isStaffPinModalOpen, setIsStaffPinModalOpen] = useState(false);
+  const [staffPinInput, setStaffPinInput] = useState('');
+  const [staffPinSaving, setStaffPinSaving] = useState(false);
+  const [hasExistingStaffPin, setHasExistingStaffPin] = useState(false);
+
+  useEffect(() => {
+    hasStaffPin().then(exists => setHasExistingStaffPin(exists));
+  }, []);
+
+  const handleSaveStaffPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (staffPinInput.length !== 6 || !/^\d+$/.test(staffPinInput)) {
+      alert('PIN Asisten harus berupa 6 digit angka!');
+      return;
+    }
+    setStaffPinSaving(true);
+    try {
+      await setupStaffPin(staffPinInput);
+      addToast('success', 'PIN Asisten Keuangan berhasil disimpan!');
+      setHasExistingStaffPin(true);
+      setIsStaffPinModalOpen(false);
+      setStaffPinInput('');
+    } catch (err) {
+      addToast('error', 'Gagal menyimpan PIN Asisten');
+    } finally {
+      setStaffPinSaving(false);
+    }
+  };
+
   if (globalLoading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Dashboard Admin Keuangan</h1>
           <p className="text-gray-500 text-sm mt-1">Kelola semua transaksi keuangan</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsStaffPinModalOpen(true)}
+            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
+          >
+            <KeyRound size={15} className="text-emerald-400" />
+            <span>{hasExistingStaffPin ? '🔑 Ubah PIN Asisten' : '🔑 Buat PIN Asisten'}</span>
+          </button>
         </div>
       </div>
 
@@ -372,6 +413,55 @@ export function AdminDashboard() {
           if (updated) setSelectedTx(updated);
         }}
       />
+
+      {/* Staff PIN Management Modal */}
+      <Modal
+        isOpen={isStaffPinModalOpen}
+        onClose={() => setIsStaffPinModalOpen(false)}
+        title="🔑 Pengaturan PIN Khusus Asisten Keuangan"
+      >
+        <form onSubmit={handleSaveStaffPin} className="space-y-4">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              🤝 Pemisahan Akses Staf / Asisten
+            </p>
+            <p className="leading-relaxed text-emerald-800">
+              PIN ini digunakan khusus oleh Asisten Keuangan untuk login. Asisten dapat membantu input transaksi, nota belanja, dan hutang-piutang, namun <strong>saldo rekening induk master (BCA/BRI) &amp; laporan pusat akan disembunyikan otomatis</strong>.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Masukkan 6 Digit PIN Asisten:
+            </label>
+            <input
+              type="password"
+              maxLength={6}
+              placeholder="Contoh: 112233"
+              value={staffPinInput}
+              onChange={e => setStaffPinInput(e.target.value.replace(/\D/g, ''))}
+              className="w-full text-center font-mono text-xl tracking-[0.5em] px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-0 outline-none"
+              required
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsStaffPinModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              disabled={staffPinSaving || staffPinInput.length !== 6}
+            >
+              {staffPinSaving ? 'Menyimpan...' : 'Simpan PIN Asisten'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

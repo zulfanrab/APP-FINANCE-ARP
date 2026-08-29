@@ -17,56 +17,67 @@ interface UserGuideModalProps {
 }
 
 export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
-  const [activeTab, setActiveTab] = useState<'owner' | 'admin' | 'konsep' | 'install'>('owner');
+  const [activeTab, setActiveTab] = useState<'owner' | 'admin' | 'staff' | 'konsep' | 'install'>('owner');
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📖 Buku Panduan & Cara Install Aplikasi" size="xl">
       <div className="space-y-4">
         {/* Role Tab Switcher */}
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl gap-1 font-bold text-xs">
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl gap-1 font-bold text-xs overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => setActiveTab('owner')}
-            className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
               activeTab === 'owner'
                 ? 'bg-[#0F172A] text-emerald-400 shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Crown size={15} /> 👑 Direksi / Pimpinan
+            <Crown size={15} /> 👑 Direksi
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
               activeTab === 'admin'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Briefcase size={15} /> 💼 Admin Keuangan
+            <Briefcase size={15} /> 💼 Head of Finance
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('staff')}
+            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
+              activeTab === 'staff'
+                ? 'bg-teal-700 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <ShieldCheck size={15} /> 🤝 Asisten Keuangan
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('konsep')}
-            className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
               activeTab === 'konsep'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <BookOpen size={15} /> 📘 Konsep Aplikasi
+            <BookOpen size={15} /> 📘 Konsep
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('install')}
-            className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
               activeTab === 'install'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Smartphone size={15} /> 📲 Cara Install HP
+            <Smartphone size={15} /> 📲 Install HP
           </button>
         </div>
 
@@ -150,6 +161,47 @@ export function UserGuideModal({ isOpen, onClose }: UserGuideModalProps) {
                   </h4>
                   <p className="text-xs text-emerald-800">
                     Gunakan menu <strong>Hutang &amp; Piutang</strong> untuk mencatat tagihan invoice ke Klien yang belum lunas (AR) dan kewajiban tagihan ke vendor (AP). Anda dapat mencatat cicilan/pelunasan dan memilih opsi <strong>"Otomatis catat transaksi di Jurnal Kas"</strong> agar tidak perlu menginput ulang ke kas secara manual.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'staff' ? (
+            /* STAFF / ASISTEN GUIDE */
+            <div className="space-y-4 animate-fade-in">
+              <div className="p-3.5 bg-teal-900 text-white rounded-2xl space-y-1 shadow-md">
+                <h3 className="font-bold text-teal-300 text-sm flex items-center gap-2">
+                  <ShieldCheck size={16} /> Panduan Peran Asisten Keuangan (Staf Operasional)
+                </h3>
+                <p className="text-xs text-teal-100 leading-relaxed">
+                  Asisten Keuangan bertugas membantu pencatatan operasional harian, mengelola struk belanja, surat pengajuan tim, dan monitoring hutang-piutang.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                  <h4 className="font-bold text-gray-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-teal-600" /> 1. Input Belanja &amp; Upload Nota Fisik
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    Catat pengeluaran harian, bensin, konsumsi, atau upah lewat menu <strong>Input Transaksi</strong>. Foto atau scan struk secara jelas agar langsung tersimpan di Google Drive arsip.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                  <h4 className="font-bold text-gray-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-teal-600" /> 2. Monitoring Hutang &amp; Piutang
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    Bantu mencatat invoice tagihan ke klien serta tagihan dari vendor di menu <strong>Hutang &amp; Piutang</strong>.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
+                  <h4 className="font-bold text-gray-900 text-xs flex items-center gap-2">
+                    <CheckCircle2 size={14} className="text-teal-600" /> 3. Batasan Akses Rekening Master
+                  </h4>
+                  <p className="text-xs text-gray-600">
+                    Demi keamanan dan kerahasiaan kas besar perusahaan, saku rekening master (BCA/BRI) &amp; laporan laba-rugi pusat dikunci dan hanya dapat dikelola oleh Head of Finance dan Direktur Utama.
                   </p>
                 </div>
               </div>

@@ -81,7 +81,7 @@ export interface Project {
   diupdatePada: string;
 }
 
-export type UserRole = 'owner' | 'admin';
+export type UserRole = 'owner' | 'admin' | 'staff';
 
 export interface Session {
   role: UserRole;

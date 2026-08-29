@@ -7,6 +7,7 @@ const KEYS = {
   PROJECTS: 'arka_projects',
   CATEGORIES: 'arka_categories',
   PIN_HASH: 'arka_pin_hash',
+  STAFF_PIN_HASH: 'arka_staff_pin_hash',
   SESSION: 'arka_session',
   TRASH_TRANSACTIONS: 'arka_trash_transactions',
   TRASH_PROJECTS: 'arka_trash_projects',
