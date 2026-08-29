@@ -288,23 +288,23 @@ export function AdminDashboard() {
 
               {/* Desktop Table View (Clickable Rows) */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm text-left">
+                <table className="w-full text-sm text-left table-auto">
                   <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                     <tr>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Sumber Kas</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-36 whitespace-nowrap">Sumber Kas</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-32 whitespace-nowrap">
                         <button onClick={() => handleSort('tanggal')} className="flex items-center gap-1 hover:text-gray-700">
                           Tanggal <SortIcon field="tanggal" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Kategori</th>
-                      <th className="text-right px-4 py-3 text-gray-500 font-medium">
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium min-w-[220px]">Deskripsi &amp; Kategori</th>
+                      <th className="text-right px-4 py-3 text-gray-500 font-medium w-36 whitespace-nowrap">
                         <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
                           Nominal <SortIcon field="nominal" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Status</th>
-                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-16">Detail</th>
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-28 whitespace-nowrap">Status</th>
+                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-16 whitespace-nowrap">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -318,7 +318,7 @@ export function AdminDashboard() {
                           onClick={() => setSelectedTx(tx)}
                           className="hover:bg-emerald-50/40 transition-colors cursor-pointer"
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-36 whitespace-nowrap">
                             {isKas ? (
                               <span className="text-xs px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
                                 🏢 Kas Utama
@@ -329,18 +329,18 @@ export function AdminDashboard() {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
-                          <td className="px-4 py-3">
-                            <p className="font-bold text-gray-900">{tx.deskripsi}</p>
+                          <td className="px-4 py-3 w-32 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
+                          <td className="px-4 py-3 min-w-[220px]">
+                            <p className="font-bold text-gray-900 break-words">{tx.deskripsi}</p>
                             <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <span className={`font-extrabold ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <td className="px-4 py-3 w-36 text-right whitespace-nowrap">
+                            <span className={`font-extrabold tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                               {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                             </span>
                           </td>
-                          <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                          <td className="px-4 py-3 text-center">
+                          <td className="px-4 py-3 w-28 whitespace-nowrap"><StatusBadge status={tx.status} /></td>
+                          <td className="px-4 py-3 w-16 text-center text-gray-400">
                             <ChevronRight size={18} className="mx-auto text-emerald-600" />
                           </td>
                         </tr>

@@ -652,16 +652,16 @@ export function TransactionsList() {
 
             {/* DESKTOP TABLE VIEW WITH DRAG & DROP REORDERING */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left table-auto">
                 <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                   <tr>
-                    <th className="px-3 py-3 w-16 text-center">Urutan</th>
-                    <th className="px-4 py-3">Sumber Kas</th>
-                    <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Deskripsi &amp; Kategori</th>
-                    <th className="px-4 py-3 text-right">Nominal</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-center">Detail</th>
+                    <th className="px-3 py-3 w-16 text-center whitespace-nowrap">Urutan</th>
+                    <th className="px-4 py-3 w-36 whitespace-nowrap">Sumber Kas</th>
+                    <th className="px-4 py-3 w-32 whitespace-nowrap">Tanggal</th>
+                    <th className="px-4 py-3 min-w-[220px]">Deskripsi &amp; Kategori</th>
+                    <th className="px-4 py-3 w-36 text-right whitespace-nowrap">Nominal</th>
+                    <th className="px-4 py-3 w-28 text-center whitespace-nowrap">Status</th>
+                    <th className="px-4 py-3 w-16 text-center whitespace-nowrap">Detail</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -684,7 +684,7 @@ export function TransactionsList() {
                         } ${draggedIdx === idx ? 'opacity-40' : 'opacity-100'}`}
                       >
                         {/* Drag & Reorder Column */}
-                        <td className="px-3 py-3 w-16" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-3 w-16 text-center" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center gap-1 justify-center">
                             <span className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-emerald-600 p-1" title="Geser (Drag & Drop) untuk mengatur urutan">
                               <GripVertical size={16} />
@@ -711,7 +711,7 @@ export function TransactionsList() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 w-36 whitespace-nowrap">
                           {isKas ? (
                             <span className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
                               🏢 Kas Utama
@@ -722,8 +722,8 @@ export function TransactionsList() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal || '')}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 w-32 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal || '')}</td>
+                        <td className="px-4 py-3 min-w-[220px]">
                           <p className="font-bold text-gray-900 break-words">{tx.deskripsi || '-'}</p>
                           <div className="flex items-center gap-2 flex-wrap mt-0.5">
                             <p className="text-xs text-gray-500 font-medium">{tx.kategori || '-'}</p>
@@ -745,13 +745,13 @@ export function TransactionsList() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <td className="px-4 py-3 w-36 text-right whitespace-nowrap">
                           <span className={`font-extrabold tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                             {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal || 0)}
                           </span>
                         </td>
-                        <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
-                        <td className="px-4 py-3 text-center text-gray-400">
+                        <td className="px-4 py-3 w-28 text-center whitespace-nowrap"><StatusBadge status={tx.status} /></td>
+                        <td className="px-4 py-3 w-16 text-center text-gray-400">
                           <ChevronRight size={18} className="mx-auto text-emerald-600" />
                         </td>
                       </tr>
