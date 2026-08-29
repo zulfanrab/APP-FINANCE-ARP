@@ -288,23 +288,31 @@ export function AdminDashboard() {
 
               {/* Desktop Table View (Clickable Rows) */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm text-left table-auto">
+                <table className="w-full text-sm text-left table-fixed">
+                  <colgroup>
+                    <col className="w-32" />
+                    <col className="w-28" />
+                    <col className="w-auto" />
+                    <col className="w-36" />
+                    <col className="w-24" />
+                    <col className="w-12" />
+                  </colgroup>
                   <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-xs border-b border-gray-100">
                     <tr>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-36 whitespace-nowrap">Sumber Kas</th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-32 whitespace-nowrap">
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium whitespace-nowrap">Sumber Kas</th>
+                      <th className="text-left px-3 py-3 text-gray-500 font-medium whitespace-nowrap">
                         <button onClick={() => handleSort('tanggal')} className="flex items-center gap-1 hover:text-gray-700">
                           Tanggal <SortIcon field="tanggal" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium min-w-[220px]">Deskripsi &amp; Kategori</th>
-                      <th className="text-right px-4 py-3 text-gray-500 font-medium w-36 whitespace-nowrap">
+                      <th className="text-left px-4 py-3 text-gray-500 font-medium">Deskripsi &amp; Kategori</th>
+                      <th className="text-right px-3 py-3 text-gray-500 font-medium whitespace-nowrap">
                         <button onClick={() => handleSort('nominal')} className="flex items-center gap-1 hover:text-gray-700 ml-auto">
                           Nominal <SortIcon field="nominal" />
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-gray-500 font-medium w-28 whitespace-nowrap">Status</th>
-                      <th className="text-center px-4 py-3 text-gray-500 font-medium w-16 whitespace-nowrap">Detail</th>
+                      <th className="text-center px-3 py-3 text-gray-500 font-medium whitespace-nowrap">Status</th>
+                      <th className="text-center px-2 py-3 text-gray-500 font-medium whitespace-nowrap">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -318,29 +326,29 @@ export function AdminDashboard() {
                           onClick={() => setSelectedTx(tx)}
                           className="hover:bg-emerald-50/40 transition-colors cursor-pointer"
                         >
-                          <td className="px-4 py-3 w-36 whitespace-nowrap">
+                          <td className="px-3 py-3 whitespace-nowrap truncate">
                             {isKas ? (
                               <span className="text-xs px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold border border-emerald-200 whitespace-nowrap">
                                 🏢 Kas Utama
                               </span>
                             ) : (
-                              <span className="text-xs px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 whitespace-nowrap">
+                              <span className="text-xs px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full font-bold border border-blue-200 whitespace-nowrap truncate block max-w-full">
                                 🏗️ Dana Proyek
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 w-32 text-gray-600 whitespace-nowrap font-medium">{formatDate(tx.tanggal)}</td>
-                          <td className="px-4 py-3 min-w-[220px]">
-                            <p className="font-bold text-gray-900 break-words">{tx.deskripsi}</p>
-                            <p className="text-xs text-gray-500 font-medium">{tx.kategori}</p>
+                          <td className="px-3 py-3 text-gray-600 whitespace-nowrap font-medium text-xs">{formatDate(tx.tanggal)}</td>
+                          <td className="px-4 py-3 min-w-0">
+                            <p className="font-bold text-gray-900 break-words leading-tight">{tx.deskripsi}</p>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5">{tx.kategori}</p>
                           </td>
-                          <td className="px-4 py-3 w-36 text-right whitespace-nowrap">
+                          <td className="px-3 py-3 text-right whitespace-nowrap">
                             <span className={`font-extrabold tabular-nums ${tx.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                               {tx.jenis === 'masuk' ? '+' : '-'}{formatRupiah(tx.nominal)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 w-28 whitespace-nowrap"><StatusBadge status={tx.status} /></td>
-                          <td className="px-4 py-3 w-16 text-center text-gray-400">
+                          <td className="px-3 py-3 text-center whitespace-nowrap"><StatusBadge status={tx.status} /></td>
+                          <td className="px-2 py-3 text-center text-gray-400">
                             <ChevronRight size={18} className="mx-auto text-emerald-600" />
                           </td>
                         </tr>
