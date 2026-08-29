@@ -203,11 +203,11 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // LIGHTWEIGHT QUERY: Excludes massive 17.3MB base64 attachments so tables and totals load in <300ms!
+      // Query all columns including lampiran and bukti_transfer to ensure photos and receipts always display
       const { data, error } = await withTimeout(
         supabase
           .from('transactions')
-          .select('id, tanggal, jenis, deskripsi, nominal, kategori, tag, proyek_id, status, dibuat_pada, diupdate_pada, penerima_detail, jalur_transfer, parent_transaction_id, admin_nominal_custom, divisi, rekening_id, rekening_tujuan_id, catatan_penolakan')
+          .select('id, tanggal, jenis, deskripsi, nominal, kategori, tag, proyek_id, status, dibuat_pada, diupdate_pada, penerima_detail, jalur_transfer, parent_transaction_id, admin_nominal_custom, divisi, rekening_id, rekening_tujuan_id, catatan_penolakan, surat_pengajuan_id, lampiran, bukti_transfer')
           .order('tanggal', { ascending: false }),
         timeoutMs
       );
@@ -220,10 +220,9 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
             const tx = mapRowToTransaction(row);
             const local = localMap.get(tx.id);
             if (local) {
-              // CRITICAL: Always preserve local attachments
-              const localAtts = parseLampiranField(local.lampiran);
-              if (localAtts.length > 0) {
-                tx.lampiran = localAtts;
+              // Preserve local attachments if remote is somehow empty
+              if ((!tx.lampiran || tx.lampiran.length === 0) && local.lampiran && local.lampiran.length > 0) {
+                tx.lampiran = local.lampiran;
               }
               if (!tx.buktiTransfer && local.buktiTransfer) {
                 tx.buktiTransfer = local.buktiTransfer;

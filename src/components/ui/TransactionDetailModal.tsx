@@ -12,7 +12,7 @@ import {
 import { Modal } from './Modal';
 import { AttachmentViewer } from './AttachmentViewer';
 import { type Transaction, type Project, type JalurTransfer, type AccountId, type Attachment } from '../../types';
-import { updateTransaction, deleteTransaction, getTransactions } from '../../services/transactionService';
+import { updateTransaction, deleteTransaction, getTransactions, getTransactionById } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
 import { uploadAttachmentFile, compressFileToAttachment } from '../../services/storageService';
@@ -158,7 +158,7 @@ export function TransactionDetailModal({
     setIsEditing(true);
   };
 
-  // CRITICAL: Only reset form when a DIFFERENT transaction is opened or explicitly updated with more data
+  // CRITICAL: Reset form and fetch full attachments when modal is opened
   useEffect(() => {
     const txId = transaction?.id ?? null;
     if (isOpen && transaction) {
@@ -181,6 +181,16 @@ export function TransactionDetailModal({
         populateFormAndAttachments(transaction);
 
         getCategories(transaction.jenis).then(setCategories);
+      }
+
+      // Always ensure full attachment data is pulled from Supabase if not yet in state
+      if (txId) {
+        getTransactionById(txId).then(fullTx => {
+          if (fullTx && (fullTx.lampiran?.length || fullTx.buktiTransfer)) {
+            setCurrentTx(fullTx);
+            populateFormAndAttachments(fullTx);
+          }
+        });
       }
     }
     if (!isOpen) {
