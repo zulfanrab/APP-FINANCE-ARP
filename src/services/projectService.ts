@@ -194,7 +194,7 @@ export async function getProjects(includeDeleted: boolean = false): Promise<Proj
       const { data, error } = await withTimeout(
         supabase
           .from('projects')
-          .select('id, nama, klien, tanggal_mulai, tanggal_selesai, status, deskripsi, dibuat_pada, diupdate_pada, anggaran, tipe_proyek, procurement_items')
+          .select('id, nama, klien, nomor_surat, pemohon_nama, pemohon_jabatan, teknisi_pic, tanggal_mulai, tanggal_selesai, status, deskripsi, dibuat_pada, diupdate_pada, anggaran, tipe_proyek, procurement_items')
           .order('dibuat_pada', { ascending: false }),
         timeoutMs
       );
@@ -355,6 +355,10 @@ export async function updateProject(
       };
       if (updates.nama !== undefined) updateRow.nama = updates.nama;
       if (updates.klien !== undefined) updateRow.klien = updates.klien;
+      if (updates.nomorSurat !== undefined) updateRow.nomor_surat = updates.nomorSurat;
+      if (updates.pemohonNama !== undefined) updateRow.pemohon_nama = updates.pemohonNama;
+      if (updates.pemohonJabatan !== undefined) updateRow.pemohon_jabatan = updates.pemohonJabatan;
+      if (updates.teknisiPic !== undefined) updateRow.teknisi_pic = updates.teknisiPic;
       if (updates.anggaran !== undefined) updateRow.anggaran = updates.anggaran;
       if (updates.status !== undefined) updateRow.status = updates.status;
       if (updates.deskripsi !== undefined) updateRow.deskripsi = updates.deskripsi;
