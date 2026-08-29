@@ -7,7 +7,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   CheckSquare, Square, FileUp, ChevronDown, ChevronUp,
-  PlusCircle, Edit3, Trash2, Ban, Layers, CheckCircle2, DollarSign, RefreshCw
+  PlusCircle, Edit3, Trash2, Ban, Layers, CheckCircle2, DollarSign, RefreshCw,
+  Search, X, Filter
 } from 'lucide-react';
 import { type Project, type Transaction, type ProcurementItem } from '../../types';
 import { Card, Button, formatRupiah, formatDate } from '../ui';
@@ -30,23 +31,26 @@ function parseRupiahNumber(value: string): number | undefined {
 interface QuickAddFormProps {
   onAdd: (item: Omit<ProcurementItem, 'id' | 'isPurchased'>) => Promise<void>;
   injectionTxns: Transaction[];
+  defaultSuratPengajuanId?: string;
 }
 
 // 1. ISOLATED QUICK ADD FORM (Prevents page re-renders on keystroke)
-const QuickAddForm = React.memo(({ onAdd, injectionTxns }: QuickAddFormProps) => {
+const QuickAddForm = React.memo(({ onAdd, injectionTxns, defaultSuratPengajuanId }: QuickAddFormProps) => {
   const [nama, setNama] = useState('');
   const [kuantitas, setKuantitas] = useState('1');
   const [satuan, setSatuan] = useState('');
   const [hargaRencana, setHargaRencana] = useState('');
   const [kategori, setKategori] = useState('Operational Cost');
-  const [suratPengajuanId, setSuratPengajuanId] = useState('');
+  const [suratPengajuanId, setSuratPengajuanId] = useState(defaultSuratPengajuanId || '');
   const [submitting, setSubmitting] = useState(false);
 
   React.useEffect(() => {
-    if (injectionTxns.length > 0 && !suratPengajuanId) {
+    if (defaultSuratPengajuanId) {
+      setSuratPengajuanId(defaultSuratPengajuanId);
+    } else if (injectionTxns.length > 0 && !suratPengajuanId) {
       setSuratPengajuanId(injectionTxns[0].id);
     }
-  }, [injectionTxns]);
+  }, [defaultSuratPengajuanId, injectionTxns]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -374,30 +378,63 @@ export function ProcurementChecklistSection({
 
   const procurementItems = project.procurementItems || [];
 
-  // Group items by category
-  const groupedItems = useMemo(() => {
-    return procurementItems.reduce((acc, item) => {
-      const cat = item.kategori || 'Operational Cost';
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(item);
-      return acc;
-    }, {} as Record<string, ProcurementItem[]>);
-  }, [procurementItems]);
-
-  const categories = useMemo(() => Object.keys(groupedItems), [groupedItems]);
-
-  const progress = useMemo(() => {
-    const total = procurementItems.length;
-    const purchased = procurementItems.filter(i => i.isPurchased).length;
-    const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
-    return { total, purchased, pct };
-  }, [procurementItems]);
+  // Filter States
+  const [filterSuratPengajuan, setFilterSuratPengajuan] = useState<string>('semua');
+  const [searchItem, setSearchItem] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'semua' | 'unpurchased' | 'purchased' | 'cancelled'>('semua');
 
   const injectionTxns = useMemo(() => {
     return transactions
       .filter(t => t.proyekId === project.id && isCapitalInjectionTx(t))
       .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
   }, [transactions, project.id]);
+
+  // Filtered Items Calculation
+  const filteredProcurementItems = useMemo(() => {
+    return procurementItems.filter(item => {
+      // 1. Filter Surat Pengajuan
+      if (filterSuratPengajuan === 'unlinked') {
+        if (item.suratPengajuanId) return false;
+      } else if (filterSuratPengajuan !== 'semua') {
+        if (item.suratPengajuanId !== filterSuratPengajuan) return false;
+      }
+
+      // 2. Filter Status
+      if (filterStatus === 'purchased' && (!item.isPurchased || item.isCancelled)) return false;
+      if (filterStatus === 'unpurchased' && (item.isPurchased || item.isCancelled)) return false;
+      if (filterStatus === 'cancelled' && !item.isCancelled) return false;
+
+      // 3. Search Query
+      if (searchItem.trim()) {
+        const q = searchItem.toLowerCase();
+        const matchName = (item.nama || '').toLowerCase().includes(q);
+        const matchKat = (item.kategori || '').toLowerCase().includes(q);
+        const matchSat = (item.satuan || '').toLowerCase().includes(q);
+        if (!matchName && !matchKat && !matchSat) return false;
+      }
+
+      return true;
+    });
+  }, [procurementItems, filterSuratPengajuan, filterStatus, searchItem]);
+
+  // Group items by category from filtered list
+  const groupedItems = useMemo(() => {
+    return filteredProcurementItems.reduce((acc, item) => {
+      const cat = item.kategori || 'Operational Cost';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    }, {} as Record<string, ProcurementItem[]>);
+  }, [filteredProcurementItems]);
+
+  const categories = useMemo(() => Object.keys(groupedItems), [groupedItems]);
+
+  const progress = useMemo(() => {
+    const total = filteredProcurementItems.length;
+    const purchased = filteredProcurementItems.filter(i => i.isPurchased && !i.isCancelled).length;
+    const pct = total === 0 ? 0 : Math.round((purchased / total) * 100);
+    return { total, purchased, pct };
+  }, [filteredProcurementItems]);
 
   return (
     <Card className="!p-5 border border-gray-100 shadow-card animate-fade-in">
@@ -483,7 +520,103 @@ export function ProcurementChecklistSection({
           )}
 
           {/* Isolated Quick Add Form */}
-          <QuickAddForm onAdd={handleAddItem} injectionTxns={injectionTxns} />
+          <QuickAddForm
+            onAdd={handleAddItem}
+            injectionTxns={injectionTxns}
+            defaultSuratPengajuanId={filterSuratPengajuan !== 'semua' && filterSuratPengajuan !== 'unlinked' ? filterSuratPengajuan : undefined}
+          />
+
+          {/* Quick Filter Bar (Surat Pengajuan, Status & Search) */}
+          {procurementItems.length > 0 && (
+            <div className="p-3 bg-gray-50/90 border border-gray-200/80 rounded-2xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
+              {/* Left: Surat Pengajuan Selector & Search */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+                {/* Surat Pengajuan Filter Dropdown */}
+                {injectionTxns.length > 0 && (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[11px] font-bold text-gray-500 whitespace-nowrap">📄 Surat:</span>
+                    <select
+                      value={filterSuratPengajuan}
+                      onChange={e => setFilterSuratPengajuan(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px] truncate"
+                    >
+                      <option value="semua">🌐 Semua Surat ({procurementItems.length})</option>
+                      <option value="unlinked">⚠️ Belum Ditautkan ({procurementItems.filter(i => !i.suratPengajuanId).length})</option>
+                      {injectionTxns.map((inj, idx) => {
+                        const count = procurementItems.filter(i => i.suratPengajuanId === inj.id).length;
+                        return (
+                          <option key={inj.id} value={inj.id}>
+                            Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 20)} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+
+                {/* Search Item Bar */}
+                <div className="relative flex-1 min-w-[140px]">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchItem}
+                    onChange={e => setSearchItem(e.target.value)}
+                    placeholder="Cari item pengadaan..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+                  {searchItem && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchItem('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Status Pill Tabs */}
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200/70 text-xs font-semibold overflow-x-auto self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('semua')}
+                  className={`px-2.5 py-1 rounded-lg transition-all whitespace-nowrap text-[11px] font-bold ${
+                    filterStatus === 'semua' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Semua ({filteredProcurementItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('unpurchased')}
+                  className={`px-2.5 py-1 rounded-lg transition-all whitespace-nowrap text-[11px] font-bold ${
+                    filterStatus === 'unpurchased' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-600 hover:text-blue-700'
+                  }`}
+                >
+                  🛒 Belum Beli
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('purchased')}
+                  className={`px-2.5 py-1 rounded-lg transition-all whitespace-nowrap text-[11px] font-bold ${
+                    filterStatus === 'purchased' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-emerald-700'
+                  }`}
+                >
+                  ✅ Sudah Beli
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterStatus('cancelled')}
+                  className={`px-2.5 py-1 rounded-lg transition-all whitespace-nowrap text-[11px] font-bold ${
+                    filterStatus === 'cancelled' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-rose-700'
+                  }`}
+                >
+                  🚫 Batal
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Item List by Category */}
           {procurementItems.length === 0 ? (
@@ -500,6 +633,23 @@ export function ProcurementChecklistSection({
                 className="mt-2"
               >
                 Import Teks Praktis Sekarang
+              </Button>
+            </div>
+          ) : filteredProcurementItems.length === 0 ? (
+            <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 my-3 space-y-2">
+              <p className="text-sm font-semibold text-gray-700">Tidak ada item yang sesuai dengan filter</p>
+              <p className="text-xs text-gray-500">Coba ubah pilihan surat pengajuan, status, atau kata kunci pencarian Anda.</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFilterSuratPengajuan('semua');
+                  setFilterStatus('semua');
+                  setSearchItem('');
+                }}
+                className="mt-1"
+              >
+                Reset Filter Pengadaan
               </Button>
             </div>
           ) : (
