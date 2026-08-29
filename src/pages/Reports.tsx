@@ -407,41 +407,41 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
 
           <Card className="!p-4 bg-amber-50/60 border border-amber-200/80 shadow-card">
             <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>📥 Omzet Semu (Drop/Mutasi)</span>
-              <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 rounded-full font-bold">Non-Omzet</span>
+              <span>📥 Drop Dana / Modal Kas</span>
+              <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 rounded-full font-bold">Transfer Kas</span>
             </p>
             <p className="text-2xl font-extrabold text-amber-700">{formatRupiah(summary.dropDanaOwner)}</p>
             <p className="text-[11px] text-amber-700 font-medium mt-1">
-              {summary.omzetSemuCount} transfer modal &amp; refund
+              {summary.omzetSemuCount} transfer modal, suntikan kas &amp; refund
             </p>
           </Card>
 
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pengeluaran</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Pengeluaran (Beban)</p>
             <p className="text-2xl font-extrabold text-red-600">{formatRupiah(summary.totalKeluar)}</p>
             <p className="text-[11px] text-gray-400 mt-1">Ops: {formatRupiah(summary.opsBiaya)} | Prive: {formatRupiah(summary.privBiaya)}</p>
           </Card>
 
           <Card className="!p-4 bg-white border border-gray-100 shadow-card">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Laba Bersih P&amp;L (Net)</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Laba Bersih Usaha (P&amp;L)</p>
             <p className={`text-2xl font-extrabold ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {summary.net >= 0 ? '+' : ''}{formatRupiah(summary.net)}
             </p>
-            <p className="text-[11px] text-gray-400 mt-1">Omzet Riil Klien - Pengeluaran</p>
+            <p className="text-[11px] text-gray-400 mt-1">Pendapatan Klien - Total Pengeluaran</p>
           </Card>
         </div>
       )}
 
-      {/* 📊 AUDIT SECTION: ANALISIS PENETAPAN OMZET RIIL VS OMZET SEMU */}
+      {/* 📊 AUDIT SECTION: ANALISIS PENETAPAN OMZET RIIL VS DROP DANA MODAL */}
       {summary && (
         <Card className="!p-5 border border-emerald-100 shadow-card bg-white space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
             <div>
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <span>🔍</span> Audit &amp; Klasifikasi Omzet: Riil vs Semu
+                <span>🔍</span> Klasifikasi Kas: Pendapatan Klien vs Drop Dana Modal
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Pemisahan tegas penerimaan riil klien (pendapatan P&amp;L) dengan uang masuk non-omzet (drop dana modal &amp; mutasi)
+                Pemisahan penerimaan riil klien (pendapatan P&amp;L) dengan transfer modal kerja &amp; perputaran kas operasional
               </p>
             </div>
 
@@ -456,13 +456,13 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
                 onClick={() => setOmzetTab('riil')}
                 className={`px-3 py-1 rounded-lg transition-all ${omzetTab === 'riil' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:text-emerald-700'}`}
               >
-                💰 Omzet Riil ({summary.omzetRilCount})
+                💰 Omzet Klien ({summary.omzetRilCount})
               </button>
               <button
                 onClick={() => setOmzetTab('semu')}
                 className={`px-3 py-1 rounded-lg transition-all ${omzetTab === 'semu' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-600 hover:text-amber-700'}`}
               >
-                📥 Omzet Semu ({summary.omzetSemuCount})
+                📥 Drop Dana Modal ({summary.omzetSemuCount})
               </button>
             </div>
           </div>
@@ -471,10 +471,10 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
           <div className="space-y-1.5 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
             <div className="flex justify-between text-xs font-bold">
               <span className="text-emerald-700 flex items-center gap-1">
-                💰 Omzet Riil Klien: {formatRupiah(summary.omzetKlien)} ({summary.totalMasuk > 0 ? Math.round((summary.omzetKlien / summary.totalMasuk) * 100) : 0}%)
+                💰 Pendapatan Klien: {formatRupiah(summary.omzetKlien)} ({summary.totalMasuk > 0 ? Math.round((summary.omzetKlien / summary.totalMasuk) * 100) : 0}%)
               </span>
               <span className="text-amber-700 flex items-center gap-1">
-                📥 Omzet Semu / Drop Dana: {formatRupiah(summary.dropDanaOwner)} ({summary.totalMasuk > 0 ? Math.round((summary.dropDanaOwner / summary.totalMasuk) * 100) : 0}%)
+                📥 Drop Dana Modal: {formatRupiah(summary.dropDanaOwner)} ({summary.totalMasuk > 0 ? Math.round((summary.dropDanaOwner / summary.totalMasuk) * 100) : 0}%)
               </span>
             </div>
             <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden flex">

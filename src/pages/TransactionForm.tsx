@@ -447,7 +447,7 @@ export function TransactionForm() {
                     onClick={() => setForm(f => ({
                       ...f, 
                       jenis: j, 
-                      rekeningId: j === 'masuk' ? 'bri_utama' : 'kas_admin'
+                      rekeningId: j === 'masuk' ? 'bca_utama' : 'kas_admin'
                     }))}
                     className={`py-2.5 px-3 rounded-xl border-2 font-bold text-xs sm:text-sm transition-all active:scale-95 truncate
                       ${form.jenis === j

@@ -159,7 +159,7 @@ export function PdfReportModal({
   project,
 }: PdfReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama' | 'kas_admin' | 'bri_utama' | 'bca_utama'>('konsolidasi');
+  const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama'>('konsolidasi');
   const [paperSize, setPaperSize] = useState<'f4' | 'a4'>('f4');
   const [customPelaksanaName, setCustomPelaksanaName] = useState<string>('');
   const [selectedPengajuanTxId, setSelectedPengajuanTxId] = useState<string>('semua');
@@ -405,7 +405,7 @@ export function PdfReportModal({
 
     sortedPtx.forEach((t) => {
       const isInjection = isCapitalInjectionTx(t);
-      const isMasuk = t.jenis === 'masuk' || isInjection;
+      const isMasuk = t.jenis === 'masuk' || isInjection; // CAPITAL INJECTION IS ALWAYS DEBET (MASUK)!
 
       const debet = isMasuk ? t.nominal : 0;
       const kredit = !isMasuk ? t.nominal : 0;
@@ -424,7 +424,7 @@ export function PdfReportModal({
         currentBalance -= t.nominal;
         totalKredit += t.nominal;
         if ((t.kategori || '').toLowerCase().includes('refund')) {
-          totalRefundMasuk += t.nominal;
+           totalRefundMasuk += t.nominal;
         }
         if (!isMutasiInternal(t)) {
           totalPengeluaranRiil += t.nominal;
@@ -445,20 +445,13 @@ export function PdfReportModal({
     sisaDana = currentBalance;
   } else {
     // ============================================================
-    // GENERAL REPORT MATH (KONSOLIDASI vs KAS ADMIN vs BANK BRI vs BANK BCA vs KAS UTAMA)
+    // GENERAL REPORT MATH (MODE A: KONSOLIDASI 100% vs MODE B: KAS UTAMA ONLY)
     // ============================================================
     const mainTx = reportScope === 'konsolidasi'
       ? approvedTx
-      : reportScope === 'kas_utama'
-      ? approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama')
-      : approvedTx.filter(t => {
-          const acc = reportScope;
-          if (t.kategori === 'Mutasi Internal / Transfer Kas') {
-            return t.rekeningId === acc || t.rekeningTujuanId === acc;
-          }
-          const txAcc = t.rekeningId || (t.jenis === 'masuk' ? 'bri_utama' : (t.proyekId ? 'kas_admin' : 'bri_utama'));
-          return txAcc === acc;
-        });
+      : approvedTx.filter(
+          t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
+        );
 
     const sortedMain = groupAndSortTransactions(mainTx, 'asc');
 
@@ -471,7 +464,7 @@ export function PdfReportModal({
       if (reportScope === 'konsolidasi') {
         if (t.jenis === 'masuk') debet = t.nominal;
         else kredit = t.nominal;
-      } else if (reportScope === 'kas_utama') {
+      } else {
         const classification = classifyTransaction(t);
         if (!t.proyekId) {
           if (t.jenis === 'masuk') debet = t.nominal;
@@ -483,21 +476,23 @@ export function PdfReportModal({
             debet = t.nominal; // Money in to Kas Utama
           }
         }
-      } else {
-        // Specific Physical Pocket / Account (kas_admin, bri_utama, bca_utama)
-        const targetAcc = reportScope;
-        if (t.kategori === 'Mutasi Internal / Transfer Kas') {
-          if (t.rekeningTujuanId === targetAcc) debet = t.nominal;
-          if (t.rekeningId === targetAcc) kredit = t.nominal;
-        } else {
-          if (t.jenis === 'masuk') debet = t.nominal;
-          else kredit = t.nominal;
-        }
       }
 
       currentBalance += debet - kredit;
       totalDebet += debet;
       totalKredit += kredit;
+
+      if (debet > 0) {
+        if (isOmzetRil(t)) {
+          totalOmzetRil += debet;
+        } else {
+          totalOmzetSemu += debet;
+        }
+      }
+
+      if (!isMutasiInternal(t) && kredit > 0) {
+        totalPengeluaranRiil += kredit;
+      }
 
       tableRows.push({
         no: idx + 1,
@@ -1074,13 +1069,10 @@ export function PdfReportModal({
               {!project ? (
                 <select
                   value={reportScope}
-                  onChange={e => setReportScope(e.target.value as any)}
+                  onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
                   className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap Semua Rekening PT)</option>
-                  <option value="kas_admin">💵 Khusus Kas Admin (Petty Cash &amp; Operasional)</option>
-                  <option value="bri_utama">🏦 Khusus Rekening Bank BRI Utama</option>
-                  <option value="bca_utama">🏦 Khusus Rekening Bank BCA Utama</option>
+                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
                   <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
                 </select>
               ) : (
@@ -1573,19 +1565,19 @@ export function PdfReportModal({
                       ) : (
                         <div className="summary-box flex flex-row justify-between items-stretch gap-2.5 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
                           <div className="summary-card card-green flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Omzet Riil Klien (P&L)</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Pendapatan Klien (P&L)</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetRil)}</p>
                           </div>
                           <div className="summary-card card-navy flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Omzet Semu / Drop</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Drop Dana &amp; Modal</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetSemu)}</p>
                           </div>
                           <div className="summary-card card-red flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total Kredit (Pengeluaran)</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📉 Total Beban Pengeluaran</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
                           </div>
                           <div className={`summary-card flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Saldo Kas Akhir</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">🏦 Saldo Kas Akhir (Aset)</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">
                               {formatSaldoRupiah(sisaDana)}
                             </p>
