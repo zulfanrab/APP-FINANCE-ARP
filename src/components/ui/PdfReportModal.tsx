@@ -1204,7 +1204,28 @@ export function PdfReportModal({
                       ✍️ Pengaturan Otorisasi &amp; Drop Tanda Tangan Digital (Fleksibel)
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl text-[11px] font-bold">
+                  <div className="flex flex-wrap items-center gap-1 bg-slate-800 p-1 rounded-xl text-[10.5px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => updateSigCount(0)}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 0 ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      🚫 Tanpa TTD
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSigCount(1)}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 1 ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      👤 1 Kolom (Dibuat Oleh: Finance Saja)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSigCount(2)}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 2 ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      2 Kolom (Finance + Direktur)
+                    </button>
                     <button
                       type="button"
                       onClick={() => updateSigCount(3)}
@@ -1217,150 +1238,152 @@ export function PdfReportModal({
                       onClick={() => updateSigCount(4)}
                       className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 4 ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      4 Kolom (Lengkap + Teknisi)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateSigCount(2)}
-                      className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 2 ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-                    >
-                      2 Kolom (Simpel)
+                      4 Kolom (Lengkap)
                     </button>
                   </div>
                 </div>
 
-                <div className={`grid grid-cols-1 ${sigCount === 4 ? 'sm:grid-cols-4' : sigCount === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
-                  {/* Slot 1: Teknisi (If 4 columns) */}
-                  {sigCount === 4 && (
+                {sigCount === 0 ? (
+                  <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/70 text-center text-slate-300 text-xs">
+                    💡 <strong>Mode Tanpa Tanda Tangan:</strong> Dokumen PDF akan dicetak bersih tanpa area tanda tangan atau persetujuan pihak mana pun. Cocok untuk rekapitulasi data cepat &amp; arsip pribadi.
+                  </div>
+                ) : (
+                  <div className={`grid grid-cols-1 ${sigCount === 4 ? 'sm:grid-cols-4' : sigCount === 3 ? 'sm:grid-cols-3' : sigCount === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1'} gap-2`}>
+                    {/* Slot 1: Teknisi (If 4 columns) */}
+                    {sigCount === 4 && (
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <input
+                            type="text"
+                            value={sig1Header}
+                            onChange={e => { setSig1Header(e.target.value); localStorage.setItem('sig1_header', e.target.value); }}
+                            className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
+                          />
+                          {sig1Img && (
+                            <button onClick={() => handleSignatureClear(1)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
+                          )}
+                        </div>
+                        {sig1Img ? (
+                          <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                            <img src={sig1Img} alt="TTD Teknisi" className="max-h-full max-w-full object-contain" />
+                          </div>
+                        ) : (
+                          <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
+                            + Drop TTD Teknisi
+                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(1, e.target.files[0])} />
+                          </label>
+                        )}
+                        <input
+                          type="text"
+                          value={sig1Nama}
+                          placeholder="Nama Teknisi/PIC"
+                          onChange={e => { setSig1Nama(e.target.value); localStorage.setItem('sig1_nama', e.target.value); }}
+                          className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {/* Slot 2: Leader Teknik */}
+                    {sigCount >= 3 && (
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <input
+                            type="text"
+                            value={sig2Header}
+                            onChange={e => { setSig2Header(e.target.value); localStorage.setItem('sig2_header', e.target.value); }}
+                            className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
+                          />
+                          {sig2Img && (
+                            <button onClick={() => handleSignatureClear(2)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
+                          )}
+                        </div>
+                        {sig2Img ? (
+                          <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                            <img src={sig2Img} alt="TTD Leader" className="max-h-full max-w-full object-contain" />
+                          </div>
+                        ) : (
+                          <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
+                            + Drop TTD Leader
+                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(2, e.target.files[0])} />
+                          </label>
+                        )}
+                        <input
+                          type="text"
+                          value={sig2Nama}
+                          placeholder="Nama Leader Teknik"
+                          onChange={e => { setSig2Nama(e.target.value); localStorage.setItem('sig2_nama', e.target.value); }}
+                          className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {/* Slot 3: Admin Keuangan / Dibuat Oleh (Finance) */}
                     <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
                       <div className="flex items-center justify-between">
                         <input
                           type="text"
-                          value={sig1Header}
-                          onChange={e => { setSig1Header(e.target.value); localStorage.setItem('sig1_header', e.target.value); }}
+                          value={sig3Header}
+                          onChange={e => { setSig3Header(e.target.value); localStorage.setItem('sig3_header', e.target.value); }}
                           className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
                         />
-                        {sig1Img && (
-                          <button onClick={() => handleSignatureClear(1)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
+                        {sig3Img && (
+                          <button onClick={() => handleSignatureClear(3)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
                         )}
                       </div>
-                      {sig1Img ? (
+                      {sig3Img ? (
                         <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
-                          <img src={sig1Img} alt="TTD Teknisi" className="max-h-full max-w-full object-contain" />
+                          <img src={sig3Img} alt="TTD Finance" className="max-h-full max-w-full object-contain" />
                         </div>
                       ) : (
                         <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
-                          + Drop TTD Teknisi
-                          <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(1, e.target.files[0])} />
+                          + Drop TTD Finance
+                          <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(3, e.target.files[0])} />
                         </label>
                       )}
                       <input
                         type="text"
-                        value={sig1Nama}
-                        placeholder="Nama Teknisi/PIC"
-                        onChange={e => { setSig1Nama(e.target.value); localStorage.setItem('sig1_nama', e.target.value); }}
+                        value={sig3Nama}
+                        placeholder="Nama Finance"
+                        onChange={e => { setSig3Nama(e.target.value); localStorage.setItem('sig3_nama', e.target.value); }}
                         className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
                       />
                     </div>
-                  )}
 
-                  {/* Slot 2: Leader Teknik */}
-                  {sigCount >= 3 && (
-                    <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
-                      <div className="flex items-center justify-between">
+                    {/* Slot 4: Direktur Utama */}
+                    {sigCount >= 2 && (
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <input
+                            type="text"
+                            value={sig4Header}
+                            onChange={e => { setSig4Header(e.target.value); localStorage.setItem('sig4_header', e.target.value); }}
+                            className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
+                          />
+                          {sig4Img && (
+                            <button onClick={() => handleSignatureClear(4)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
+                          )}
+                        </div>
+                        {sig4Img ? (
+                          <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
+                            <img src={sig4Img} alt="TTD Direktur" className="max-h-full max-w-full object-contain" />
+                          </div>
+                        ) : (
+                          <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
+                            + Drop TTD Direktur
+                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(4, e.target.files[0])} />
+                          </label>
+                        )}
                         <input
                           type="text"
-                          value={sig2Header}
-                          onChange={e => { setSig2Header(e.target.value); localStorage.setItem('sig2_header', e.target.value); }}
-                          className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
+                          value={sig4Nama}
+                          placeholder="Nama Direktur"
+                          onChange={e => { setSig4Nama(e.target.value); localStorage.setItem('sig4_nama', e.target.value); }}
+                          className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
                         />
-                        {sig2Img && (
-                          <button onClick={() => handleSignatureClear(2)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
-                        )}
                       </div>
-                      {sig2Img ? (
-                        <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
-                          <img src={sig2Img} alt="TTD Leader" className="max-h-full max-w-full object-contain" />
-                        </div>
-                      ) : (
-                        <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
-                          + Drop TTD Leader
-                          <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(2, e.target.files[0])} />
-                        </label>
-                      )}
-                      <input
-                        type="text"
-                        value={sig2Nama}
-                        placeholder="Nama Leader Teknik"
-                        onChange={e => { setSig2Nama(e.target.value); localStorage.setItem('sig2_nama', e.target.value); }}
-                        className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
-                      />
-                    </div>
-                  )}
-
-                  {/* Slot 3: Admin Keuangan */}
-                  <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <input
-                        type="text"
-                        value={sig3Header}
-                        onChange={e => { setSig3Header(e.target.value); localStorage.setItem('sig3_header', e.target.value); }}
-                        className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
-                      />
-                      {sig3Img && (
-                        <button onClick={() => handleSignatureClear(3)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
-                      )}
-                    </div>
-                    {sig3Img ? (
-                      <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
-                        <img src={sig3Img} alt="TTD Finance" className="max-h-full max-w-full object-contain" />
-                      </div>
-                    ) : (
-                      <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
-                        + Drop TTD Finance
-                        <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(3, e.target.files[0])} />
-                      </label>
                     )}
-                    <input
-                      type="text"
-                      value={sig3Nama}
-                      placeholder="Nama Finance"
-                      onChange={e => { setSig3Nama(e.target.value); localStorage.setItem('sig3_nama', e.target.value); }}
-                      className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
-                    />
                   </div>
-
-                  {/* Slot 4: Direktur Utama */}
-                  <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/70 flex flex-col justify-between space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <input
-                        type="text"
-                        value={sig4Header}
-                        onChange={e => { setSig4Header(e.target.value); localStorage.setItem('sig4_header', e.target.value); }}
-                        className="bg-transparent text-[10px] font-bold text-emerald-400 w-full focus:outline-none focus:border-b border-emerald-500"
-                      />
-                      {sig4Img && (
-                        <button onClick={() => handleSignatureClear(4)} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
-                      )}
-                    </div>
-                    {sig4Img ? (
-                      <div className="h-9 bg-white rounded-lg border border-slate-300 p-1 flex items-center justify-center">
-                        <img src={sig4Img} alt="TTD Direktur" className="max-h-full max-w-full object-contain" />
-                      </div>
-                    ) : (
-                      <label className="h-9 bg-slate-700/60 hover:bg-slate-700 rounded-lg border border-dashed border-slate-500 flex items-center justify-center text-[9.5px] text-slate-300 cursor-pointer transition-colors">
-                        + Drop TTD Direktur
-                        <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleSignatureUpload(4, e.target.files[0])} />
-                      </label>
-                    )}
-                    <input
-                      type="text"
-                      value={sig4Nama}
-                      placeholder="Nama Direktur"
-                      onChange={e => { setSig4Nama(e.target.value); localStorage.setItem('sig4_nama', e.target.value); }}
-                      className="bg-slate-900/90 text-slate-100 text-[10px] font-bold px-2 py-1 rounded border border-slate-700 w-full focus:outline-none"
-                    />
-                  </div>
+                )}
 
                   {/* Opsi Tambahan: Paraf Pembuat Draft (Dekat TTD Leader) */}
                   <div className="p-2 bg-slate-800/80 rounded-xl border border-amber-500/40 flex flex-col justify-between space-y-1.5 col-span-2 sm:col-span-1">
@@ -1405,7 +1428,6 @@ export function PdfReportModal({
                   </div>
                 </div>
               </div>
-            </div>
 
         {/* Printable Document Preview Area */}
         <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-inner scrollbar-thin font-sans">
@@ -1780,9 +1802,17 @@ export function PdfReportModal({
                     </table>
                   </div>
 
-                  {/* 5. FORMAL SIGNATURE BOX HANYA DI HALAMAN TERAKHIR */}
-                  {chunk.isLastPage && (
-                    <div className="signature-container my-8" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                  {/* 5. FORMAL SIGNATURE BOX HANYA DI HALAMAN TERAKHIR JIKA SIGCOUNT > 0 */}
+                  {chunk.isLastPage && sigCount > 0 && (
+                    <div
+                      className="signature-container my-8"
+                      style={{
+                        display: 'flex',
+                        justifyContent: sigCount === 1 ? 'flex-end' : 'space-between',
+                        width: '100%',
+                        gap: '8px'
+                      }}
+                    >
                       {/* Slot 1: Teknisi (If 4 columns) */}
                       {sigCount === 4 && (
                         <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
@@ -1840,8 +1870,15 @@ export function PdfReportModal({
                         </div>
                       )}
 
-                      {/* Slot 3: Admin Keuangan */}
-                      <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                      {/* Slot 3: Admin Keuangan / Dibuat Oleh (Finance) */}
+                      <div
+                        className="signature-box"
+                        style={{
+                          flex: sigCount === 1 ? '0 0 220px' : '1',
+                          textAlign: 'center',
+                          padding: '0 4px'
+                        }}
+                      >
                         <p className="text-xs text-slate-600 font-medium mb-1">{sig3Header}</p>
                         <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {sig3Img ? (
@@ -1855,18 +1892,20 @@ export function PdfReportModal({
                       </div>
 
                       {/* Slot 4: Direktur Utama */}
-                      <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
-                        <p className="text-xs text-slate-600 font-medium mb-1">{sig4Header}</p>
-                        <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {sig4Img ? (
-                            <img src={sig4Img} alt="TTD Slot 4" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
-                          ) : null}
+                      {sigCount >= 2 && (
+                        <div className="signature-box" style={{ flex: '1', textAlign: 'center', padding: '0 4px' }}>
+                          <p className="text-xs text-slate-600 font-medium mb-1">{sig4Header}</p>
+                          <div className="signature-space" style={{ height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {sig4Img ? (
+                              <img src={sig4Img} alt="TTD Slot 4" style={{ maxHeight: '52px', maxWidth: '120px', objectFit: 'contain', margin: '0 auto' }} />
+                            ) : null}
+                          </div>
+                          <div className="signature-line text-xs font-bold text-[#047857]">
+                            {sig4Nama}
+                          </div>
+                          <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig4Jabatan}</p>
                         </div>
-                        <div className="signature-line text-xs font-bold text-[#047857]">
-                          {sig4Nama}
-                        </div>
-                        <p className="text-[9.5px] text-slate-600 font-semibold mt-0.5">{sig4Jabatan}</p>
-                      </div>
+                      )}
                     </div>
                   )}
 
