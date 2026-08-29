@@ -83,8 +83,8 @@ export function splitTransactionsIntoAccountingPages(
 ): AccountingPageChunk[] {
   // If everything fits on a single page
   const singlePageLimit = hasProcurementItems
-    ? (isF4 ? 20 : 16)
-    : (isF4 ? 25 : 20);
+    ? (isF4 ? 14 : 10)
+    : (isF4 ? 18 : 14);
 
   if (rows.length <= singlePageLimit) {
     return [{
@@ -95,14 +95,14 @@ export function splitTransactionsIntoAccountingPages(
     }];
   }
 
-  // Multi-page layout limits:
-  // Page 1: Kop + Info + Summary + (Optional Procurement Matrix)
+  // Multi-page layout limits strictly calibrated to prevent accidental browser overflow:
+  // Page 1: Kop + Info + Summary + (Optional Procurement Matrix) + Table
   const firstPageLimit = hasProcurementItems
-    ? (isF4 ? 18 : 14)
-    : (isF4 ? 23 : 18);
+    ? (isF4 ? 12 : 9)
+    : (isF4 ? 18 : 14);
 
-  // Subsequent pages: Full height table
-  const subsequentPageLimit = isF4 ? 30 : 24;
+  // Subsequent pages: Top Pindahan Header + Table + Bottom Dipindahkan Footer
+  const subsequentPageLimit = isF4 ? 26 : 21;
 
   const chunks: AccountingPageChunk[] = [];
   let currentIndex = 0;
@@ -754,7 +754,7 @@ export function PdfReportModal({
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
             @page {
               size: ${paperSize === 'f4' ? '215mm 330mm' : 'A4 portrait'};
-              margin: 10mm 10mm 10mm 10mm;
+              margin: 8mm 10mm 8mm 10mm;
             }
             .page-break-divider {
               page-break-after: always !important;
@@ -765,7 +765,8 @@ export function PdfReportModal({
               display: block !important;
             }
             .accounting-page-container {
-              page-break-inside: auto;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             /* Anti-Orphan Heading & Section Rules */
             h1, h2, h3, h4, h5, h6, .doc-header, .section-title, .table-title {
@@ -784,8 +785,8 @@ export function PdfReportModal({
             body {
               font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
               color: #0F172A;
-              font-size: 10.5px;
-              line-height: 1.45;
+              font-size: 10px;
+              line-height: 1.4;
               margin: 0;
               padding: 0;
               background: #ffffff;
@@ -800,17 +801,17 @@ export function PdfReportModal({
             }
             .kop-container {
               text-align: center;
-              padding-bottom: 8px;
-              border-bottom: 2.5px solid #047857;
+              padding-bottom: 6px;
+              border-bottom: 2px solid #047857;
               margin-bottom: 2px;
             }
             .kop-line-secondary {
               border-bottom: 1px solid #A7F3D0;
-              margin-bottom: 16px;
+              margin-bottom: 10px;
             }
             .company-title {
               font-family: 'Inter', sans-serif;
-              font-size: 18px;
+              font-size: 17px;
               font-weight: 900;
               color: #047857;
               letter-spacing: 0.5px;
@@ -818,40 +819,40 @@ export function PdfReportModal({
               text-transform: uppercase;
             }
             .company-info {
-              font-size: 9.5px;
+              font-size: 9px;
               color: #334155;
-              margin-top: 4px;
-              line-height: 1.5;
+              margin-top: 3px;
+              line-height: 1.4;
             }
             .doc-header {
               text-align: center;
-              margin: 14px 0 16px 0;
+              margin: 8px 0 10px 0;
             }
             .doc-title {
-              font-size: 13.5px;
+              font-size: 12.5px;
               font-weight: 800;
               color: #047857;
               text-transform: uppercase;
-              letter-spacing: 0.5px;
+              letter-spacing: 0.4px;
               margin: 0;
             }
             .doc-subtitle {
-              font-size: 10px;
+              font-size: 9.5px;
               color: #475569;
-              margin-top: 4px;
+              margin-top: 3px;
             }
             .summary-box {
               display: flex !important;
               flex-direction: row !important;
               justify-content: space-between !important;
               align-items: stretch !important;
-              gap: 12px;
+              gap: 8px;
               width: 100%;
               border: 1px solid #CBD5E1;
               border-radius: 10px;
               background-color: #F8FAFC;
-              margin-bottom: 20px;
-              padding: 12px;
+              margin-bottom: 12px;
+              padding: 8px 10px;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
             }
@@ -861,7 +862,7 @@ export function PdfReportModal({
               flex-direction: column;
               justify-content: center;
               border-radius: 8px;
-              padding: 10px 8px;
+              padding: 6px 6px;
               text-align: center;
               border: 1px solid #E2E8F0;
               background-color: #FFFFFF;
@@ -888,15 +889,15 @@ export function PdfReportModal({
               color: #1E3A8A !important;
             }
             .summary-label {
-              font-size: 8.5px;
+              font-size: 8px;
               color: #475569;
               text-transform: uppercase;
               font-weight: 700;
-              letter-spacing: 0.3px;
-              margin-bottom: 4px;
+              letter-spacing: 0.2px;
+              margin-bottom: 2px;
             }
             .summary-val {
-              font-size: 13.5px;
+              font-size: 12.5px;
               font-weight: 800;
               margin: 0;
             }
@@ -904,8 +905,9 @@ export function PdfReportModal({
             table.journal-table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 12px;
-              page-break-inside: auto;
+              margin-bottom: 8px;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             table.journal-table thead {
               display: table-header-group !important;
@@ -923,20 +925,20 @@ export function PdfReportModal({
             table.journal-table th {
               background-color: #047857 !important;
               color: #FFFFFF !important;
-              font-size: 9px;
+              font-size: 8.5px;
               font-weight: 700;
               text-transform: uppercase;
-              letter-spacing: 0.4px;
-              padding: 7px 6px;
+              letter-spacing: 0.3px;
+              padding: 5.5px 5px;
               border: 1px solid #047857;
-              line-height: 1.25;
+              line-height: 1.2;
               vertical-align: middle;
             }
             table.journal-table td {
-              padding: 6.5px 6px;
+              padding: 5px 5px;
               border: 1px solid #E2E8F0;
-              font-size: 9.5px;
-              line-height: 1.35;
+              font-size: 9px;
+              line-height: 1.3;
               vertical-align: top;
               word-wrap: break-word;
               overflow-wrap: break-word;
@@ -955,20 +957,18 @@ export function PdfReportModal({
             .font-bold { font-weight: 700; }
             .font-extrabold { font-weight: 800; }
             .signature-container {
-              display: table;
+              display: flex;
               width: 100%;
-              margin-top: 35px;
-              page-break-inside: avoid;
-              break-inside: avoid;
+              margin-top: 20px;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
             .signature-box {
-              display: table-cell;
-              width: 50%;
               text-align: center;
               vertical-align: top;
             }
             .signature-space {
-              height: 55px;
+              height: 50px;
             }
             .signature-line {
               border-top: 1.5px solid #047857;
