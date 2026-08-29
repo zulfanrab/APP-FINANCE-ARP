@@ -45,14 +45,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isFetchingRef = useRef<boolean>(false);
 
   const refreshData = useCallback(async () => {
-    // 1. INSTANT 0ms CACHE HYDRATION (Prevents perpetual skeleton loading UI)
-    const localTxs = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
-    const localProjs = getItem<Project[]>(KEYS.PROJECTS, []);
+    // 1. INSTANT 0ms CACHE HYDRATION (Only on initial cold start to prevent skeleton UI)
+    if (loading) {
+      const localTxs = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
+      const localProjs = getItem<Project[]>(KEYS.PROJECTS, []);
 
-    if (localTxs.length > 0 || localProjs.length > 0) {
-      setTransactions(localTxs);
-      setProjects(localProjs);
-      setLoading(false); // Instantly unblocks screen in 0ms!
+      if (localTxs.length > 0 || localProjs.length > 0) {
+        setTransactions(localTxs);
+        setProjects(localProjs);
+        setLoading(false); // Instantly unblocks screen in 0ms!
+      }
     }
 
     // Prevent stacking/overlapping background network calls
@@ -70,7 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isFetchingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [loading]);
 
   const addToast = useCallback((type: ToastMessage['type'], message: string) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;

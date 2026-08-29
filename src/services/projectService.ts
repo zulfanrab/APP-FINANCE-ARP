@@ -234,9 +234,12 @@ export async function getProjects(includeDeleted: boolean = false): Promise<Proj
           }
         }
 
-        const merged = [...remoteProjects, ...unsyncedLocal].sort(
-          (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
-        );
+        const merged = [...remoteProjects, ...unsyncedLocal].sort((a, b) => {
+          const timeA = new Date(a.dibuatPada || a.tanggalMulai || 0).getTime();
+          const timeB = new Date(b.dibuatPada || b.tanggalMulai || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return (a.id || '').localeCompare(b.id || '');
+        });
 
         setItem(KEYS.PROJECTS, merged);
         return includeDeleted ? [...merged, ...trashProjects] : merged;
@@ -246,9 +249,12 @@ export async function getProjects(includeDeleted: boolean = false): Promise<Proj
     }
   }
 
-  const sorted = [...localData].filter(p => !trashIds.has(p.id)).sort(
-    (a, b) => new Date(b.dibuatPada).getTime() - new Date(a.dibuatPada).getTime()
-  );
+  const sorted = [...localData].filter(p => !trashIds.has(p.id)).sort((a, b) => {
+    const timeA = new Date(a.dibuatPada || a.tanggalMulai || 0).getTime();
+    const timeB = new Date(b.dibuatPada || b.tanggalMulai || 0).getTime();
+    if (timeB !== timeA) return timeB - timeA;
+    return (a.id || '').localeCompare(b.id || '');
+  });
   return includeDeleted ? [...sorted, ...trashProjects] : sorted;
 }
 

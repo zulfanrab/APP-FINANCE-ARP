@@ -45,22 +45,29 @@ export function Projects() {
   const { transactions: allTransactions, projects: rawProjects, loading: globalLoading, addToast, triggerRefresh } = useApp();
 
   const projects = React.useMemo(() => {
-    return rawProjects.map(p => {
-      const txns = allTransactions.filter(t => t.proyekId === p.id);
-      const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
-      const targetInvoice = p.anggaran || 0;
-      const profitDinamis = targetInvoice > 0 ? (targetInvoice - financials.totalPengeluaran) : financials.labaRugiProyek;
+    return rawProjects
+      .map(p => {
+        const txns = allTransactions.filter(t => t.proyekId === p.id);
+        const financials = getProjectFinancialSummary(txns, p.anggaran || 0);
+        const targetInvoice = p.anggaran || 0;
+        const profitDinamis = targetInvoice > 0 ? (targetInvoice - financials.totalPengeluaran) : financials.labaRugiProyek;
 
-      return { 
-        ...p, 
-        anggaran: targetInvoice,
-        modalDisuntikkan: financials.modalDisuntikkan,
-        totalPemasukan: financials.pemasukanKlien, 
-        totalPengeluaran: financials.totalPengeluaran, 
-        profit: profitDinamis,
-        sisaKas: financials.sisaDanaProyek
-      };
-    });
+        return { 
+          ...p, 
+          anggaran: targetInvoice,
+          modalDisuntikkan: financials.modalDisuntikkan,
+          totalPemasukan: financials.pemasukanKlien, 
+          totalPengeluaran: financials.totalPengeluaran, 
+          profit: profitDinamis,
+          sisaKas: financials.sisaDanaProyek
+        };
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.dibuatPada || a.tanggalMulai || 0).getTime();
+        const timeB = new Date(b.dibuatPada || b.tanggalMulai || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (a.id || '').localeCompare(b.id || '');
+      });
   }, [rawProjects, allTransactions]);
 
   // Modal state
