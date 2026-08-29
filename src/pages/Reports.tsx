@@ -42,7 +42,12 @@ export function Reports() {
   const { transactions: allTransactions, projects, loading: globalLoading, addToast } = useApp();
 
   // Period
-  const [period, setPeriod] = useState<PeriodType>('bulan_ini');
+  type ReportPeriod = 'bulan_ini' | 'bulan_lalu' | 'pilih_bulan' | '3_bulan' | 'custom';
+  const [period, setPeriod] = useState<ReportPeriod>('bulan_ini');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [omzetTab, setOmzetTab] = useState<'semua' | 'riil' | 'semu'>('semua');
@@ -60,6 +65,19 @@ export function Reports() {
         to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
       };
     }
+    if (period === 'bulan_lalu') {
+      return {
+        from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        to: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
+      };
+    }
+    if (period === 'pilih_bulan' && selectedMonth) {
+      const [y, m] = selectedMonth.split('-').map(Number);
+      return {
+        from: new Date(y, m - 1, 1),
+        to: new Date(y, m, 0, 23, 59, 59, 999),
+      };
+    }
     if (period === '3_bulan') {
       return {
         from: new Date(now.getFullYear(), now.getMonth() - 2, 1),
@@ -75,11 +93,11 @@ export function Reports() {
       from: new Date(now.getFullYear(), now.getMonth(), 1),
       to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
     };
-  }, [period, customFrom, customTo]);
+  }, [period, selectedMonth, customFrom, customTo]);
 
-  const { categoryData, cashflowData, summary, omzetRilTx, omzetSemuTx } = React.useMemo(() => {
+  const { categoryData, cashflowData, summary, omzetRilTx, omzetSemuTx, periodTransactions } = React.useMemo(() => {
     if (allTransactions.length === 0) {
-      return { categoryData: [], cashflowData: [], summary: null, omzetRilTx: [], omzetSemuTx: [] };
+      return { categoryData: [], cashflowData: [], summary: null, omzetRilTx: [], omzetSemuTx: [], periodTransactions: [] };
     }
 
     const { from, to } = getPeriodDates();
@@ -151,7 +169,8 @@ export function Reports() {
       cashflowData: cashflow,
       summary: summaryObj,
       omzetRilTx: rList,
-      omzetSemuTx: sList
+      omzetSemuTx: sList,
+      periodTransactions: periodTx,
     };
   }, [allTransactions, projects, getPeriodDates]);
 
@@ -229,7 +248,7 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
     exportAccountingJournalExcel({
       title: 'Laporan Keuangan & Jurnal Akuntansi Konsolidasi',
       periodText,
-      transactions: allTransactions,
+      transactions: periodTransactions,
       projects,
       isConsolidated: true,
     });
@@ -263,30 +282,85 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
         </div>
       </div>
 
-      {/* Period Selector */}
-      <Card className="!p-4">
+      {/* Period Selector Toolbar */}
+      <Card className="!p-4 bg-white border border-gray-100 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <CalendarRange size={16} className="text-primary" />
-            <span className="text-xs font-semibold text-gray-700">Periode:</span>
+            <span className="text-xs font-bold text-gray-700">Filter Periode:</span>
           </div>
-          {(['bulan_ini', '3_bulan', 'custom'] as PeriodType[]).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all
-                ${period === p ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-            >
-              {p === 'bulan_ini' ? 'Bulan Ini' : p === '3_bulan' ? '3 Bulan' : 'Custom'}
-            </button>
-          ))}
+
+          <button
+            onClick={() => setPeriod('bulan_ini')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              period === 'bulan_ini' ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            📅 Bulan Ini
+          </button>
+
+          <button
+            onClick={() => setPeriod('bulan_lalu')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              period === 'bulan_lalu' ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            ⏮️ Bulan Lalu
+          </button>
+
+          <button
+            onClick={() => setPeriod('pilih_bulan')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              period === 'pilih_bulan' ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            🗓️ Pilih Bulan
+          </button>
+
+          {period === 'pilih_bulan' && (
+            <div className="flex items-center gap-2 animate-fade-in">
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-1 text-xs font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
+              />
+            </div>
+          )}
+
+          <button
+            onClick={() => setPeriod('3_bulan')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              period === '3_bulan' ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            📊 3 Bulan
+          </button>
+
+          <button
+            onClick={() => setPeriod('custom')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              period === 'custom' ? 'bg-primary text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            🎯 Custom Rentang
+          </button>
+
           {period === 'custom' && (
-            <div className="flex items-center gap-2">
-              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary" />
-              <span className="text-gray-400">—</span>
-              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                className="border border-gray-200 rounded-xl px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary" />
+            <div className="flex items-center gap-2 animate-fade-in">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={e => setCustomFrom(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <span className="text-gray-400 font-bold">—</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={e => setCustomTo(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
           )}
         </div>
@@ -569,7 +643,7 @@ ${sum.net >= 0 ? 'Arus kas dan Laba Bersih P&L Sehat. Pertahankan rasio Omzet Ri
         onClose={() => setPdfModalOpen(false)}
         title="Laporan Keuangan & Jurnal Transaksi Kas Utama"
         periodText={periodTextStr}
-        transactions={allTransactions}
+        transactions={periodTransactions}
       />
     </div>
   );
