@@ -159,7 +159,7 @@ export function PdfReportModal({
   project,
 }: PdfReportModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
-  const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama'>('konsolidasi');
+  const [reportScope, setReportScope] = useState<'konsolidasi' | 'kas_utama' | 'kas_admin' | 'bri_utama' | 'bca_utama'>('konsolidasi');
   const [paperSize, setPaperSize] = useState<'f4' | 'a4'>('f4');
   const [customPelaksanaName, setCustomPelaksanaName] = useState<string>('');
   const [selectedPengajuanTxId, setSelectedPengajuanTxId] = useState<string>('semua');
@@ -405,7 +405,7 @@ export function PdfReportModal({
 
     sortedPtx.forEach((t) => {
       const isInjection = isCapitalInjectionTx(t);
-      const isMasuk = t.jenis === 'masuk' || isInjection; // CAPITAL INJECTION IS ALWAYS DEBET (MASUK)!
+      const isMasuk = t.jenis === 'masuk' || isInjection;
 
       const debet = isMasuk ? t.nominal : 0;
       const kredit = !isMasuk ? t.nominal : 0;
@@ -424,7 +424,7 @@ export function PdfReportModal({
         currentBalance -= t.nominal;
         totalKredit += t.nominal;
         if ((t.kategori || '').toLowerCase().includes('refund')) {
-           totalRefundMasuk += t.nominal;
+          totalRefundMasuk += t.nominal;
         }
         if (!isMutasiInternal(t)) {
           totalPengeluaranRiil += t.nominal;
@@ -445,13 +445,20 @@ export function PdfReportModal({
     sisaDana = currentBalance;
   } else {
     // ============================================================
-    // GENERAL REPORT MATH (MODE A: KONSOLIDASI 100% vs MODE B: KAS UTAMA ONLY)
+    // GENERAL REPORT MATH (KONSOLIDASI vs KAS ADMIN vs BANK BRI vs BANK BCA vs KAS UTAMA)
     // ============================================================
     const mainTx = reportScope === 'konsolidasi'
       ? approvedTx
-      : approvedTx.filter(
-          t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'
-        );
+      : reportScope === 'kas_utama'
+      ? approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama')
+      : approvedTx.filter(t => {
+          const acc = reportScope;
+          if (t.kategori === 'Mutasi Internal / Transfer Kas') {
+            return t.rekeningId === acc || t.rekeningTujuanId === acc;
+          }
+          const txAcc = t.rekeningId || (t.jenis === 'masuk' ? 'bri_utama' : (t.proyekId ? 'kas_admin' : 'bri_utama'));
+          return txAcc === acc;
+        });
 
     const sortedMain = groupAndSortTransactions(mainTx, 'asc');
 
@@ -464,7 +471,7 @@ export function PdfReportModal({
       if (reportScope === 'konsolidasi') {
         if (t.jenis === 'masuk') debet = t.nominal;
         else kredit = t.nominal;
-      } else {
+      } else if (reportScope === 'kas_utama') {
         const classification = classifyTransaction(t);
         if (!t.proyekId) {
           if (t.jenis === 'masuk') debet = t.nominal;
@@ -476,23 +483,21 @@ export function PdfReportModal({
             debet = t.nominal; // Money in to Kas Utama
           }
         }
+      } else {
+        // Specific Physical Pocket / Account (kas_admin, bri_utama, bca_utama)
+        const targetAcc = reportScope;
+        if (t.kategori === 'Mutasi Internal / Transfer Kas') {
+          if (t.rekeningTujuanId === targetAcc) debet = t.nominal;
+          if (t.rekeningId === targetAcc) kredit = t.nominal;
+        } else {
+          if (t.jenis === 'masuk') debet = t.nominal;
+          else kredit = t.nominal;
+        }
       }
 
       currentBalance += debet - kredit;
       totalDebet += debet;
       totalKredit += kredit;
-
-      if (debet > 0) {
-        if (isOmzetRil(t)) {
-          totalOmzetRil += debet;
-        } else {
-          totalOmzetSemu += debet;
-        }
-      }
-
-      if (!isMutasiInternal(t) && kredit > 0) {
-        totalPengeluaranRiil += kredit;
-      }
 
       tableRows.push({
         no: idx + 1,
@@ -1069,10 +1074,13 @@ export function PdfReportModal({
               {!project ? (
                 <select
                   value={reportScope}
-                  onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
+                  onChange={e => setReportScope(e.target.value as any)}
                   className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
+                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap Semua Rekening PT)</option>
+                  <option value="kas_admin">💵 Khusus Kas Admin (Petty Cash &amp; Operasional)</option>
+                  <option value="bri_utama">🏦 Khusus Rekening Bank BRI Utama</option>
+                  <option value="bca_utama">🏦 Khusus Rekening Bank BCA Utama</option>
                   <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
                 </select>
               ) : (
