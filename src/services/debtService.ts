@@ -6,6 +6,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { type DebtItem, type DebtPaymentHistory, type Attachment } from '../types';
 import { addTransaction } from './transactionService';
+import { addActivityLog } from './activityLogService';
 
 const DEBTS_KEY = 'arka_debts';
 
@@ -172,6 +173,15 @@ export async function addDebt(item: Omit<DebtItem, 'id' | 'dibuatPada' | 'diupda
     }
   }
 
+  // Audit log
+  addActivityLog({
+    aksi: newDebt.tipe === 'piutang' ? 'tambah_piutang' : 'tambah_hutang',
+    deskripsi: `Tambah data ${newDebt.tipe}: "${newDebt.judul}" (${newDebt.kontakNama})`,
+    nominal: newDebt.totalNominal,
+    targetId: newDebt.id,
+    targetNama: newDebt.judul,
+  });
+
   return newDebt;
 }
 
@@ -216,6 +226,7 @@ export async function updateDebt(item: DebtItem): Promise<DebtItem> {
 /** Delete debt item */
 export async function deleteDebt(id: string): Promise<boolean> {
   const local = getLocalDebts();
+  const deletedItem = local.find(d => d.id !== id);
   const updated = local.filter(d => d.id !== id);
   setLocalDebts(updated);
 
@@ -226,6 +237,13 @@ export async function deleteDebt(id: string): Promise<boolean> {
       console.warn('Supabase debt delete fallback:', err);
     }
   }
+
+  addActivityLog({
+    aksi: 'hapus_transaksi',
+    deskripsi: `Menghapus data ${deletedItem?.tipe || 'tagihan'}: "${deletedItem?.judul || id}"`,
+    nominal: deletedItem?.totalNominal,
+    targetId: id,
+  });
 
   return true;
 }
@@ -303,6 +321,15 @@ export async function recordDebtPayment(
     riwayatPembayaran: [paymentRecord, ...(debt.riwayatPembayaran || [])],
     diupdatePada: new Date().toISOString(),
   };
+
+  // Record audit log
+  addActivityLog({
+    aksi: debt.tipe === 'piutang' ? 'bayar_piutang' : 'bayar_hutang',
+    deskripsi: `Mencatat pembayaran/cicilan ${debt.tipe}: "${debt.judul}" (${debt.kontakNama})`,
+    nominal: payNominal,
+    targetId: debt.id,
+    targetNama: debt.judul,
+  });
 
   return updateDebt(updatedDebt);
 }

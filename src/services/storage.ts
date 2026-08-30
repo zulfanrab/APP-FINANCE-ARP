@@ -9,6 +9,7 @@ const KEYS = {
   PIN_HASH: 'arka_pin_hash',
   STAFF_PIN_HASH: 'arka_staff_pin_hash',
   SESSION: 'arka_session',
+  ACTIVITY_LOGS: 'arka_activity_logs',
   TRASH_TRANSACTIONS: 'arka_trash_transactions',
   TRASH_PROJECTS: 'arka_trash_projects',
 } as const;

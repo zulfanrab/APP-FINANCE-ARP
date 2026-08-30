@@ -40,6 +40,8 @@ export interface Transaction {
   parentTransactionId?: string; // FK ke transaksi utama (untuk entri biaya admin bank)
   divisi?: 'admin' | 'ahli' | 'it' | 'umum'; // Sub-Divisi pengaju (Divisi Admin, Divisi Ahli, Divisi IT, Umum)
   urutan?: number; // Custom drag-and-drop order index
+  dibuatOlehRole?: UserRole; // 'owner' | 'admin' | 'staff'
+  dibuatOlehLabel?: string; // 'Direksi' | 'Head of Finance' | 'Asisten Keuangan'
   isDeleted?: boolean; // Soft delete flag
   deletedAt?: string; // ISO datetime when deleted
   dibuatPada: string; // ISO datetime
@@ -171,4 +173,32 @@ export interface DebtItem {
   dibuatPada: string;
   diupdatePada: string;
 }
+
+export type ActivityAction =
+  | 'tambah_transaksi'
+  | 'edit_transaksi'
+  | 'hapus_transaksi'
+  | 'approval_transaksi'
+  | 'tolak_transaksi'
+  | 'tambah_piutang'
+  | 'bayar_piutang'
+  | 'tambah_hutang'
+  | 'bayar_hutang'
+  | 'tambah_proyek'
+  | 'edit_proyek'
+  | 'ubah_pin_asisten'
+  | 'login_asisten';
+
+export interface ActivityLog {
+  id: string;
+  waktu: string; // ISO datetime
+  pelakuRole: UserRole;
+  pelakuLabel: string;
+  aksi: ActivityAction;
+  deskripsi: string;
+  nominal?: number;
+  targetId?: string;
+  targetNama?: string;
+}
+
 

@@ -175,6 +175,7 @@ export { AttachmentViewer } from './AttachmentViewer';
 export { Skeleton, DashboardSkeleton, TransactionListSkeleton, ProjectsSkeleton, ReportsSkeleton } from './Skeleton';
 export { TransactionDetailModal } from './TransactionDetailModal';
 export { PdfReportModal } from './PdfReportModal';
+export { ActivityLogModal } from './ActivityLogModal';
 export { AutoUpdateBanner } from './AutoUpdateBanner';
 export { ErrorBoundary } from './ErrorBoundary';
 

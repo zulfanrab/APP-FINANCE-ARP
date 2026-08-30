@@ -10,6 +10,8 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { getProjects, addProject } from './projectService';
 import { calculateCompanyLedger, classifyTransaction, type UnifiedCompanyLedger } from './financialEngine';
 import { broadcastSyncEvent } from './realtimeSync';
+import { getSessionData } from './authService';
+import { addActivityLog } from './activityLogService';
 
 function generateId(): string {
   return `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -133,6 +135,8 @@ function mapRowToTransaction(row: any): Transaction {
     parentTransactionId: row.parent_transaction_id ?? undefined,
     divisi: row.divisi ?? undefined,
     urutan: row.urutan ? Number(row.urutan) : undefined,
+    dibuatOlehRole: row.dibuat_oleh_role ?? undefined,
+    dibuatOlehLabel: row.dibuat_oleh_label ?? undefined,
     isDeleted: Boolean(row.is_deleted),
     deletedAt: row.deleted_at ?? undefined,
     dibuatPada: row.dibuat_pada,
@@ -161,6 +165,8 @@ function mapTransactionToRow(t: Transaction): any {
     rekening_tujuan_id: t.rekeningTujuanId ?? null,
     parent_transaction_id: t.parentTransactionId ?? null,
     urutan: t.urutan ?? null,
+    dibuat_oleh_role: t.dibuatOlehRole ?? null,
+    dibuat_oleh_label: t.dibuatOlehLabel ?? null,
     is_deleted: t.isDeleted ?? false,
     deleted_at: t.deletedAt ?? null,
     dibuat_pada: t.dibuatPada,
@@ -338,14 +344,41 @@ export async function addTransaction(
     }
   }
 
+  const currentSession = getSessionData();
+  const resolvedRole = data.dibuatOlehRole || currentSession?.role || 'admin';
+  const resolvedLabel =
+    data.dibuatOlehLabel ||
+    (resolvedRole === 'staff'
+      ? 'Asisten Keuangan'
+      : resolvedRole === 'owner'
+      ? 'Direksi / Pimpinan'
+      : 'Head of Finance');
+
+  // Assistant transactions default to 'menunggu_approval' unless explicitly specified
+  const resolvedStatus =
+    data.status ?? (resolvedRole === 'staff' ? 'menunggu_approval' : 'disetujui');
+
   const newTransaction: Transaction = {
     ...data,
     proyekId: proyekIdFinal,
     id: generateId(),
-    status: data.status ?? 'menunggu_approval',
+    dibuatOlehRole: resolvedRole,
+    dibuatOlehLabel: resolvedLabel,
+    status: resolvedStatus,
     dibuatPada: now(),
     diupdatePada: now(),
   };
+
+  // Record Audit Trail Activity Log
+  addActivityLog({
+    aksi: 'tambah_transaksi',
+    pelakuRole: resolvedRole,
+    pelakuLabel: resolvedLabel,
+    deskripsi: `Input ${newTransaction.jenis === 'masuk' ? 'pemasukan' : 'pengeluaran'}: "${newTransaction.deskripsi}"`,
+    nominal: newTransaction.nominal,
+    targetId: newTransaction.id,
+    targetNama: newTransaction.deskripsi,
+  });
 
   const transactions = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
 
@@ -616,6 +649,15 @@ export async function updateTransaction(
     broadcastSyncEvent('transactions', 'update', id);
   }
 
+  // Record audit log for update
+  addActivityLog({
+    aksi: 'edit_transaksi',
+    deskripsi: `Memperbarui transaksi: "${updated.deskripsi}"`,
+    nominal: updated.nominal,
+    targetId: id,
+    targetNama: updated.deskripsi,
+  });
+
   return updated;
 }
 
@@ -628,6 +670,22 @@ export async function updateTransactionStatus(
   if (notes !== undefined) {
     if (status === 'ditolak') updates.catatanPenolakan = notes;
   }
+
+  // Record approval / rejection log
+  if (status === 'disetujui' || status === 'selesai') {
+    addActivityLog({
+      aksi: 'approval_transaksi',
+      deskripsi: `Menyetujui transaksi #${id.substring(0, 8)}`,
+      targetId: id,
+    });
+  } else if (status === 'ditolak') {
+    addActivityLog({
+      aksi: 'tolak_transaksi',
+      deskripsi: `Menolak transaksi #${id.substring(0, 8)}${notes ? `: "${notes}"` : ''}`,
+      targetId: id,
+    });
+  }
+
   return updateTransaction(id, updates);
 }
 
@@ -661,6 +719,8 @@ export async function deleteTransaction(id: string): Promise<void> {
   const toDelete = transactions.filter(t => t.id === id || t.parentTransactionId === id);
   const remaining = transactions.filter(t => t.id !== id && t.parentTransactionId !== id);
 
+  const deletedItem = toDelete.find(t => t.id === id);
+
   // 1. Move to Trash Storage
   const currentTrash = getItem<Transaction[]>(KEYS.TRASH_TRANSACTIONS, []);
   const newTrashItems = toDelete.map(t => ({
@@ -674,6 +734,14 @@ export async function deleteTransaction(id: string): Promise<void> {
 
   setItem(KEYS.TRASH_TRANSACTIONS, Array.from(trashMap.values()));
   setItem(KEYS.TRANSACTIONS, remaining);
+
+  // Record audit log
+  addActivityLog({
+    aksi: 'hapus_transaksi',
+    deskripsi: `Menghapus transaksi: "${deletedItem?.deskripsi || id}"`,
+    nominal: deletedItem?.nominal,
+    targetId: id,
+  });
 
   // 2. Actually DELETE from Supabase so it NEVER resurfaces on getTransactions
   if (isSupabaseConfigured && supabase) {

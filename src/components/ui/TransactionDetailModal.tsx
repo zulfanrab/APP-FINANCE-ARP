@@ -531,6 +531,25 @@ export function TransactionDetailModal({
                   )}
                 </div>
               )}
+
+              {/* Audit / Creator Trail */}
+              <div className="pt-2 border-t border-gray-200/80 flex items-center justify-between text-[11px] text-gray-500 flex-wrap gap-2">
+                <span className="flex items-center gap-1 font-medium">
+                  <span>Diinput oleh:</span>
+                  <strong className={`px-2 py-0.5 rounded-md font-bold ${
+                    displayTx.dibuatOlehRole === 'staff'
+                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                      : displayTx.dibuatOlehRole === 'owner'
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'bg-slate-100 text-slate-800 border border-slate-200'
+                  }`}>
+                    {displayTx.dibuatOlehLabel || (displayTx.dibuatOlehRole === 'staff' ? '🤝 Asisten Keuangan' : '💼 Head of Finance')}
+                  </strong>
+                </span>
+                <span className="text-gray-400">
+                  {formatDate(displayTx.dibuatPada)}
+                </span>
+              </div>
             </div>
 
             {/* Attachments Section */}

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Wallet, TrendingUp, TrendingDown, User, FolderOpen,
-  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight, KeyRound
+  ArrowUpDown, Download, Search, Filter, ChevronUp, ChevronDown, Trash2, FileText, ChevronRight, KeyRound, ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getTransactions, filterTransactions, deleteTransaction, groupAndSortTransactions } from '../services/transactionService';
@@ -19,7 +19,7 @@ import {
 } from '../types';
 import {
   Card, Button, StatusBadge, LoadingSpinner, EmptyState, DashboardSkeleton,
-  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal
+  formatRupiah, formatDate, AttachmentViewer, TransactionDetailModal, ActivityLogModal
 } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { useApp } from '../context/AppContext';
@@ -141,6 +141,7 @@ export function AdminDashboard() {
 
   // Staff PIN State
   const [isStaffPinModalOpen, setIsStaffPinModalOpen] = useState(false);
+  const [isActivityLogModalOpen, setIsActivityLogModalOpen] = useState(false);
   const [staffPinInput, setStaffPinInput] = useState('');
   const [staffPinSaving, setStaffPinSaving] = useState(false);
   const [hasExistingStaffPin, setHasExistingStaffPin] = useState(false);
@@ -179,7 +180,14 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold text-gray-800">Dashboard Admin Keuangan</h1>
           <p className="text-gray-500 text-sm mt-1">Kelola semua transaksi keuangan</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setIsActivityLogModalOpen(true)}
+            className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
+          >
+            <ClipboardList size={15} className="text-emerald-700" />
+            <span>📋 Log Aktivitas Tim</span>
+          </button>
           <button
             onClick={() => setIsStaffPinModalOpen(true)}
             className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
@@ -462,6 +470,12 @@ export function AdminDashboard() {
           </div>
         </form>
       </Modal>
+
+      {/* Activity Log Modal */}
+      <ActivityLogModal
+        isOpen={isActivityLogModalOpen}
+        onClose={() => setIsActivityLogModalOpen(false)}
+      />
     </div>
   );
 }
