@@ -64,8 +64,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // 2. BACKGROUND REMOTE SYNC WITH SUPABASE (LIGHTWEIGHT <120KB)
     try {
       const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
-      setTransactions(txs);
-      setProjects(projs);
+      setTransactions(prev => {
+        if (prev.length !== txs.length) return txs;
+        const prevJson = JSON.stringify(prev.map(t => [t.id, t.diupdatePada, t.status, t.nominal]));
+        const nextJson = JSON.stringify(txs.map(t => [t.id, t.diupdatePada, t.status, t.nominal]));
+        return prevJson === nextJson ? prev : txs;
+      });
+      setProjects(prev => {
+        if (prev.length !== projs.length) return projs;
+        const prevJson = JSON.stringify(prev.map(p => [p.id, p.diupdatePada, p.status, p.anggaran, p.nomorSurat]));
+        const nextJson = JSON.stringify(projs.map(p => [p.id, p.diupdatePada, p.status, p.anggaran, p.nomorSurat]));
+        return prevJson === nextJson ? prev : projs;
+      });
     } catch (err) {
       console.warn('Background sync with Supabase notice:', err);
     } finally {
@@ -88,18 +98,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addToast('error', '⚠️ Mode Lokal: Kunci Supabase (.env) belum terpasang di browser perangkat ini.');
       return;
     }
-
-    addToast('info', '🔄 Menghubungi Supabase Cloud...');
     try {
-      const [txs, projs] = await Promise.all([getTransactions(), getProjects()]);
-      setTransactions(txs);
-      setProjects(projs);
-      addToast('success', `✅ Sinkronisasi Berhasil! (${txs.length} transaksi & ${projs.length} proyek dimuat)`);
+      addToast('info', '🔄 Menghubungkan & menyinkronkan data...');
+      await refreshData();
+      addToast('success', '✅ Sinkronisasi cloud berhasil!');
     } catch (err: any) {
-      console.error('Manual force sync failed:', err);
       addToast('error', `❌ Gagal menarik data: ${err?.message || 'Koneksi terputus'}`);
     }
-  }, [addToast]);
+  }, [addToast, refreshData]);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -110,8 +116,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // 1. INSTANT 0ms OPTIMISTIC UI HYDRATION: Update React state immediately from local storage
     const localTxs = getItem<Transaction[]>(KEYS.TRANSACTIONS, []);
     const localProjs = getItem<Project[]>(KEYS.PROJECTS, []);
-    if (localTxs.length > 0) setTransactions(localTxs);
-    if (localProjs.length > 0) setProjects(localProjs);
+    if (localTxs.length > 0) {
+      setTransactions(prev => {
+        if (prev.length !== localTxs.length) return localTxs;
+        const prevJson = JSON.stringify(prev.map(t => [t.id, t.diupdatePada, t.status]));
+        const nextJson = JSON.stringify(localTxs.map(t => [t.id, t.diupdatePada, t.status]));
+        return prevJson === nextJson ? prev : localTxs;
+      });
+    }
+    if (localProjs.length > 0) {
+      setProjects(prev => {
+        if (prev.length !== localProjs.length) return localProjs;
+        const prevJson = JSON.stringify(prev.map(p => [p.id, p.diupdatePada, p.status, p.nomorSurat]));
+        const nextJson = JSON.stringify(localProjs.map(p => [p.id, p.diupdatePada, p.status, p.nomorSurat]));
+        return prevJson === nextJson ? prev : localProjs;
+      });
+    }
     setRefreshKey(k => k + 1);
 
     // 2. Schedule fast remote background sync
@@ -120,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     refreshTimerRef.current = setTimeout(() => {
       refreshData();
-    }, 100);
+    }, 200);
   }, [refreshData]);
 
   // Initial load
@@ -165,11 +185,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [triggerRefresh]);
 
-  // 2. AUTO-SYNC ON MOBILE APP RESUME / WINDOW FOCUS / BACK ONLINE
+  // 2. AUTO-SYNC ON MOBILE APP RESUME / WINDOW FOCUS / BACK ONLINE (Debounced)
   useEffect(() => {
+    let focusTimeout: NodeJS.Timeout | null = null;
     const handleResumeOrOnline = () => {
-      console.info('📱 App resumed or came online. Triggering background sync...');
-      triggerRefresh();
+      if (focusTimeout) clearTimeout(focusTimeout);
+      focusTimeout = setTimeout(() => {
+        console.info('📱 App resumed or came online. Triggering background sync...');
+        triggerRefresh();
+      }, 500);
     };
 
     window.addEventListener('focus', handleResumeOrOnline);
@@ -182,25 +206,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
+      if (focusTimeout) clearTimeout(focusTimeout);
       window.removeEventListener('focus', handleResumeOrOnline);
       window.removeEventListener('online', handleResumeOrOnline);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [triggerRefresh]);
 
-  // 3. CONTINUOUS BACKGROUND HEARTBEAT POLLING FOR ROCK-SOLID MULTI-DEVICE SYNC
+  // 3. CONTINUOUS BACKGROUND HEARTBEAT POLLING (Relaxed 30s interval for stability)
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      // Only poll when page is active/visible
       if (document.visibilityState === 'visible') {
         refreshData();
       }
-    }, 4500);
+    }, 30000);
 
     return () => clearInterval(pollInterval);
   }, [refreshData]);
-
-
 
   return (
     <AppContext.Provider
