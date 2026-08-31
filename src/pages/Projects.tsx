@@ -14,6 +14,7 @@ import { getProjects, addProject, updateProject, completeProject, deleteProject 
 import { getTransactionsByProject } from '../services/transactionService';
 import { getProjectFinancialSummary } from '../services/analyticsService';
 import { uploadAttachmentFile } from '../services/storageService';
+import { getItem, KEYS } from '../services/storage';
 import { type Project } from '../types';
 import { Card, Button, Badge, LoadingSpinner, EmptyState, formatRupiah, formatDate, ProjectsSkeleton } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
@@ -115,20 +116,22 @@ export function Projects() {
 
   const openEdit = (e: React.MouseEvent, p: Project) => {
     e.stopPropagation();
-    setEditingProject(p);
+    const localProjects = getItem<Project[]>(KEYS.PROJECTS, []);
+    const targetP = localProjects.find(item => item.id === p.id) || p;
+    setEditingProject(targetP);
     setForm({
-      nama: p.nama,
-      nomorSurat: p.nomorSurat ?? '',
-      klien: p.klien,
-      pemohonNama: p.pemohonNama ?? '',
-      pemohonJabatan: p.pemohonJabatan ?? '',
-      teknisiPic: p.teknisiPic ?? '',
-      tipe: p.tipe ?? 'proyek_klien',
-      anggaran: p.anggaran ? String(p.anggaran) : '',
+      nama: targetP.nama || '',
+      nomorSurat: targetP.nomorSurat ?? '',
+      klien: targetP.klien || '',
+      pemohonNama: targetP.pemohonNama ?? '',
+      pemohonJabatan: targetP.pemohonJabatan ?? '',
+      teknisiPic: targetP.teknisiPic ?? '',
+      tipe: targetP.tipe ?? 'proyek_klien',
+      anggaran: targetP.anggaran ? String(targetP.anggaran) : '',
       suratPengajuanPdfFile: null,
-      tanggalMulai: p.tanggalMulai,
-      deskripsi: p.deskripsi ?? '',
-      status: p.status ?? 'aktif',
+      tanggalMulai: targetP.tanggalMulai || new Date().toISOString().split('T')[0],
+      deskripsi: targetP.deskripsi ?? '',
+      status: targetP.status ?? 'aktif',
     });
     setModalOpen(true);
   };

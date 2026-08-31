@@ -54,24 +54,32 @@ async function safeSupabaseUpdate(table: string, payload: any, id: string) {
 function mapRowToProject(row: any): Project {
   return {
     id: row.id,
-    nama: row.nama,
-    klien: row.klien,
-    nomorSurat: row.nomor_surat ?? undefined,
-    pemohonNama: row.pemohon_nama ?? undefined,
-    pemohonJabatan: row.pemohon_jabatan ?? undefined,
-    teknisiPic: row.teknisi_pic ?? undefined,
-    tipe: row.tipe_proyek ?? 'proyek_klien',
+    nama: row.nama || '',
+    klien: row.klien || '',
+    nomorSurat: (row.nomor_surat && typeof row.nomor_surat === 'string' && row.nomor_surat.trim())
+      ? row.nomor_surat.trim()
+      : (row.nomorSurat && typeof row.nomorSurat === 'string' && row.nomorSurat.trim() ? row.nomorSurat.trim() : undefined),
+    pemohonNama: (row.pemohon_nama && typeof row.pemohon_nama === 'string' && row.pemohon_nama.trim())
+      ? row.pemohon_nama.trim()
+      : (row.pemohonNama && typeof row.pemohonNama === 'string' && row.pemohonNama.trim() ? row.pemohonNama.trim() : undefined),
+    pemohonJabatan: (row.pemohon_jabatan && typeof row.pemohon_jabatan === 'string' && row.pemohon_jabatan.trim())
+      ? row.pemohon_jabatan.trim()
+      : (row.pemohonJabatan && typeof row.pemohonJabatan === 'string' && row.pemohonJabatan.trim() ? row.pemohonJabatan.trim() : undefined),
+    teknisiPic: (row.teknisi_pic && typeof row.teknisi_pic === 'string' && row.teknisi_pic.trim())
+      ? row.teknisi_pic.trim()
+      : (row.teknisiPic && typeof row.teknisiPic === 'string' && row.teknisiPic.trim() ? row.teknisiPic.trim() : undefined),
+    tipe: (row.tipe_proyek === 'operasional_kantor' || row.tipe === 'operasional_kantor') ? 'operasional_kantor' : 'proyek_klien',
     anggaran: row.anggaran ? Number(row.anggaran) : 0,
-    tanggalMulai: row.tanggal_mulai,
-    tanggalSelesai: row.tanggal_selesai ?? undefined,
-    status: row.status,
-    deskripsi: row.deskripsi ?? undefined,
-    suratPengajuanPdf: row.surat_pengajuan_pdf ?? undefined,
-    procurementItems: row.procurement_items ? (typeof row.procurement_items === 'string' ? JSON.parse(row.procurement_items) : row.procurement_items) : [],
-    isDeleted: Boolean(row.is_deleted),
-    deletedAt: row.deleted_at ?? undefined,
-    dibuatPada: row.dibuat_pada,
-    diupdatePada: row.diupdate_pada,
+    tanggalMulai: row.tanggal_mulai || row.tanggalMulai || new Date().toISOString().split('T')[0],
+    tanggalSelesai: row.tanggal_selesai || row.tanggalSelesai || undefined,
+    status: row.status || 'aktif',
+    deskripsi: row.deskripsi || undefined,
+    suratPengajuanPdf: row.surat_pengajuan_pdf || row.suratPengajuanPdf || undefined,
+    procurementItems: row.procurement_items ? (typeof row.procurement_items === 'string' ? JSON.parse(row.procurement_items) : row.procurement_items) : (row.procurementItems || []),
+    isDeleted: Boolean(row.is_deleted || row.isDeleted),
+    deletedAt: row.deleted_at || row.deletedAt || undefined,
+    dibuatPada: row.dibuat_pada || row.dibuatPada || new Date().toISOString(),
+    diupdatePada: row.diupdate_pada || row.diupdatePada || new Date().toISOString(),
   };
 }
 
@@ -80,10 +88,10 @@ export function mapProjectToRow(p: Project): any {
     id: p.id,
     nama: p.nama,
     klien: p.klien,
-    nomor_surat: p.nomorSurat ?? null,
-    pemohon_nama: p.pemohonNama ?? null,
-    pemohon_jabatan: p.pemohonJabatan ?? null,
-    teknisi_pic: p.teknisiPic ?? null,
+    nomor_surat: (p.nomorSurat && typeof p.nomorSurat === 'string' && p.nomorSurat.trim()) ? p.nomorSurat.trim() : null,
+    pemohon_nama: (p.pemohonNama && typeof p.pemohonNama === 'string' && p.pemohonNama.trim()) ? p.pemohonNama.trim() : null,
+    pemohon_jabatan: (p.pemohonJabatan && typeof p.pemohonJabatan === 'string' && p.pemohonJabatan.trim()) ? p.pemohonJabatan.trim() : null,
+    teknisi_pic: (p.teknisiPic && typeof p.teknisiPic === 'string' && p.teknisiPic.trim()) ? p.teknisiPic.trim() : null,
     anggaran: p.anggaran ?? 0,
     tanggal_mulai: p.tanggalMulai,
     tanggal_selesai: p.tanggalSelesai ?? null,
@@ -346,6 +354,10 @@ export async function updateProject(
   const updated: Project = {
     ...projects[idx],
     ...updates,
+    nomorSurat: updates.nomorSurat !== undefined ? (typeof updates.nomorSurat === 'string' && updates.nomorSurat.trim() ? updates.nomorSurat.trim() : undefined) : projects[idx].nomorSurat,
+    pemohonNama: updates.pemohonNama !== undefined ? (typeof updates.pemohonNama === 'string' && updates.pemohonNama.trim() ? updates.pemohonNama.trim() : undefined) : projects[idx].pemohonNama,
+    pemohonJabatan: updates.pemohonJabatan !== undefined ? (typeof updates.pemohonJabatan === 'string' && updates.pemohonJabatan.trim() ? updates.pemohonJabatan.trim() : undefined) : projects[idx].pemohonJabatan,
+    teknisiPic: updates.teknisiPic !== undefined ? (typeof updates.teknisiPic === 'string' && updates.teknisiPic.trim() ? updates.teknisiPic.trim() : undefined) : projects[idx].teknisiPic,
     diupdatePada: now(),
   };
 
@@ -360,10 +372,10 @@ export async function updateProject(
       };
       if (updates.nama !== undefined) updateRow.nama = updates.nama;
       if (updates.klien !== undefined) updateRow.klien = updates.klien;
-      if (updates.nomorSurat !== undefined) updateRow.nomor_surat = updates.nomorSurat;
-      if (updates.pemohonNama !== undefined) updateRow.pemohon_nama = updates.pemohonNama;
-      if (updates.pemohonJabatan !== undefined) updateRow.pemohon_jabatan = updates.pemohonJabatan;
-      if (updates.teknisiPic !== undefined) updateRow.teknisi_pic = updates.teknisiPic;
+      if (updates.nomorSurat !== undefined) updateRow.nomor_surat = updates.nomorSurat ? updates.nomorSurat.trim() : null;
+      if (updates.pemohonNama !== undefined) updateRow.pemohon_nama = updates.pemohonNama ? updates.pemohonNama.trim() : null;
+      if (updates.pemohonJabatan !== undefined) updateRow.pemohon_jabatan = updates.pemohonJabatan ? updates.pemohonJabatan.trim() : null;
+      if (updates.teknisiPic !== undefined) updateRow.teknisi_pic = updates.teknisiPic ? updates.teknisiPic.trim() : null;
       if (updates.anggaran !== undefined) updateRow.anggaran = updates.anggaran;
       if (updates.status !== undefined) updateRow.status = updates.status;
       if (updates.deskripsi !== undefined) updateRow.deskripsi = updates.deskripsi;
