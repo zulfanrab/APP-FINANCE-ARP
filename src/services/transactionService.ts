@@ -288,12 +288,11 @@ export async function getTransactions(includeDeleted: boolean = false): Promise<
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // LIGHTWEIGHT HIGH-SPEED QUERY (<60KB):
-      // Excludes massive base64 image strings from bulk query for instant (<0.2s) load on mobile & fresh devices
+      // RESILIENT BULK QUERY: Selects all existing columns without breaking on new/missing columns
       const { data, error } = await withTimeout(
         supabase
           .from('transactions')
-          .select('id, tanggal, jenis, deskripsi, nominal, kategori, tag, proyek_id, status, dibuat_pada, diupdate_pada, penerima_detail, jalur_transfer, parent_transaction_id, admin_nominal_custom, divisi, rekening_id, rekening_tujuan_id, catatan_penolakan, surat_pengajuan_id, dibuat_oleh_role, dibuat_oleh_label')
+          .select('*')
           .order('tanggal', { ascending: false }),
         timeoutMs
       );

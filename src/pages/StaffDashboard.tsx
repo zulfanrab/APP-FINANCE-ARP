@@ -31,11 +31,11 @@ export function StaffDashboard() {
 
   const kasAdminSaldo = ledger.accountBalances.kas_admin || 0;
 
-  // Filter approved transactions for operational kas admin / projects
+  // Filter operational transactions, petty cash, projects, and staff inputs
   const recentOperationalTxs = useMemo(() => {
     return transactions
-      .filter(t => t.rekeningId === 'kas_admin' || Boolean(t.proyekId))
-      .slice(0, 8);
+      .filter(t => t.tag === 'operasional' || t.rekeningId === 'kas_admin' || Boolean(t.proyekId) || t.dibuatOlehRole === 'staff')
+      .slice(0, 10);
   }, [transactions]);
 
   // Operational metrics for Staff
@@ -44,10 +44,10 @@ export function StaffDashboard() {
     const currentMonth = today.toISOString().slice(0, 7);
 
     const monthlyExpenses = transactions
-      .filter(t => isApproved(t) && t.jenis === 'keluar' && t.tanggal.startsWith(currentMonth))
+      .filter(t => isApproved(t) && t.jenis === 'keluar' && t.tanggal.startsWith(currentMonth) && t.tag !== 'pribadi')
       .reduce((sum, t) => sum + t.nominal, 0);
 
-    const activeProjectsCount = projects.filter(p => p.status === 'aktif').length;
+    const activeProjectsCount = projects.filter(p => p.status === 'aktif' && !p.isDeleted).length;
 
     const pendingApprovalCount = transactions.filter(t => t.status === 'menunggu_approval').length;
 

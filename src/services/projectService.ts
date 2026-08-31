@@ -195,11 +195,11 @@ export async function getProjects(includeDeleted: boolean = false): Promise<Proj
 
   if (isSupabaseConfigured && supabase) {
     try {
-      // LIGHTWEIGHT QUERY: Excludes massive base64 PDF strings to achieve <30KB payload and <100ms response!
+      // SELECT ALL COLUMNS SAFELY: Resilient against schema variations
       const { data, error } = await withTimeout(
         supabase
           .from('projects')
-          .select('id, nama, klien, nomor_surat, pemohon_nama, pemohon_jabatan, teknisi_pic, tanggal_mulai, tanggal_selesai, status, deskripsi, dibuat_pada, diupdate_pada, anggaran, tipe_proyek, procurement_items')
+          .select('*')
           .order('dibuat_pada', { ascending: false }),
         timeoutMs
       );
