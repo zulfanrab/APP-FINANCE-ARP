@@ -11,7 +11,7 @@ function now(): string {
   return new Date().toISOString();
 }
 
-async function safeSupabaseInsert(table: string, payload: any) {
+export async function safeSupabaseInsert(table: string, payload: any) {
   if (!supabase) return { error: null };
   let retryRow = { ...payload };
   let { error } = await supabase.from(table).insert([retryRow]);
@@ -75,7 +75,7 @@ function mapRowToProject(row: any): Project {
   };
 }
 
-function mapProjectToRow(p: Project): any {
+export function mapProjectToRow(p: Project): any {
   const row: any = {
     id: p.id,
     nama: p.nama,
@@ -144,6 +144,11 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
 
   if (isSupabaseConfigured && supabase) {
     try {
+      // Ensure project exists in Supabase projects table first so FK constraint is never violated
+      try {
+        await supabase.from('projects').upsert([mapProjectToRow(project)]);
+      } catch { /* ignore */ }
+
       await supabase.from('transactions').upsert({
         id: newTx.id,
         tanggal: newTx.tanggal,
@@ -152,7 +157,7 @@ export async function syncProjectBudgetTransaction(project: Project): Promise<vo
         nominal: project.anggaran,
         kategori: newTx.kategori,
         tag: newTx.tag,
-        proyek_id: newTx.proyekId,
+        proyek_id: newTx.proyekId || null,
         lampiran: [],
         status: newTx.status,
         dibuat_pada: newTx.dibuatPada,

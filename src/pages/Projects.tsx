@@ -167,7 +167,7 @@ export function Projects() {
           status: form.status,
           tanggalSelesai: form.status === 'selesai' ? (editingProject?.tanggalSelesai || new Date().toISOString().split('T')[0]) : undefined,
         });
-        addToast('success', 'Proyek berhasil diperbarui!');
+        addToast('success', form.tipe === 'operasional_kantor' ? 'Pos Operasional berhasil diperbarui!' : 'Proyek berhasil diperbarui!');
       } else {
         await addProject({
           nama: form.nama.trim(),
@@ -182,11 +182,13 @@ export function Projects() {
           tanggalMulai: form.tanggalMulai,
           deskripsi: form.deskripsi.trim(),
         });
-        addToast('success', 'Proyek berhasil ditambahkan!');
+        addToast('success', form.tipe === 'operasional_kantor' ? 'Pos Operasional berhasil ditambahkan!' : 'Proyek berhasil ditambahkan!');
       }
       setModalOpen(false);
       triggerRefresh();
-    } catch {
+    } catch (err: any) {
+      console.error('Gagal menyimpan proyek / pos operasional:', err);
+      addToast('error', err?.message || 'Gagal menyimpan proyek / pos operasional');
     } finally {
       setSaving(false);
     }

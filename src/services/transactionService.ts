@@ -7,7 +7,7 @@
 import { type Transaction, type TransactionStatus, type FilterOptions, type Project, type Attachment } from '../types';
 import { getItem, setItem, KEYS } from './storage';
 import { supabase, isSupabaseConfigured } from './supabase';
-import { getProjects, addProject } from './projectService';
+import { getProjects, addProject, mapProjectToRow } from './projectService';
 import { calculateCompanyLedger, classifyTransaction, type UnifiedCompanyLedger } from './financialEngine';
 import { broadcastSyncEvent } from './realtimeSync';
 import { getSessionData } from './authService';
@@ -31,10 +31,52 @@ async function safeSupabaseInsert(table: string, payload: any[]) {
         copy.lampiran = JSON.stringify(copy.lampiran);
       } catch { /* ignore */ }
     }
+    // Strict sanitation for PostgreSQL foreign keys (empty strings MUST be null)
+    if (copy.proyek_id !== undefined) {
+      copy.proyek_id = (typeof copy.proyek_id === 'string' && copy.proyek_id.trim()) ? copy.proyek_id.trim() : null;
+    }
+    if (copy.surat_pengajuan_id !== undefined) {
+      copy.surat_pengajuan_id = (typeof copy.surat_pengajuan_id === 'string' && copy.surat_pengajuan_id.trim()) ? copy.surat_pengajuan_id.trim() : null;
+    }
+    if (copy.parent_transaction_id !== undefined) {
+      copy.parent_transaction_id = (typeof copy.parent_transaction_id === 'string' && copy.parent_transaction_id.trim()) ? copy.parent_transaction_id.trim() : null;
+    }
     return copy;
   });
+
   let { error } = await supabase.from(table).insert(retryRows);
-  
+
+  // AUTO-HEALING: If error is caused by foreign key constraint violation (proyek_id missing in Supabase)
+  if (error && (error.message?.includes('violates foreign key constraint') || error.message?.includes('transactions_proyek_id_fkey'))) {
+    console.warn('Foreign key violation for transactions. Attempting to heal missing referenced project(s)...');
+    try {
+      const localProjects = getItem<Project[]>(KEYS.PROJECTS, []);
+      for (const row of retryRows) {
+        if (row.proyek_id) {
+          const proj = localProjects.find(p => p.id === row.proyek_id);
+          if (proj) {
+            try {
+              await supabase.from('projects').upsert([mapProjectToRow(proj)]);
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      // Retry insert
+      const retryFkRes = await supabase.from(table).insert(retryRows);
+      error = retryFkRes.error;
+    } catch {
+      // Ignore healing error
+    }
+
+    // If STILL failing after upsert attempt (e.g. project deleted or schema mismatch on projects table):
+    if (error && (error.message?.includes('violates foreign key constraint') || error.message?.includes('transactions_proyek_id_fkey'))) {
+      console.warn('Still violating transactions_proyek_id_fkey. Falling back to proyek_id = null in Cloud payload...');
+      retryRows = retryRows.map(r => ({ ...r, proyek_id: null }));
+      const retryNullFkRes = await supabase.from(table).insert(retryRows);
+      error = retryNullFkRes.error;
+    }
+  }
+
   while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
     const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
     if (match && match[1]) {
@@ -65,8 +107,45 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
     } catch { /* fallback */ }
   }
 
+  // Strict sanitation for PostgreSQL foreign keys (empty strings MUST be null)
+  if (retryRow.proyek_id !== undefined) {
+    retryRow.proyek_id = (typeof retryRow.proyek_id === 'string' && retryRow.proyek_id.trim()) ? retryRow.proyek_id.trim() : null;
+  }
+  if (retryRow.surat_pengajuan_id !== undefined) {
+    retryRow.surat_pengajuan_id = (typeof retryRow.surat_pengajuan_id === 'string' && retryRow.surat_pengajuan_id.trim()) ? retryRow.surat_pengajuan_id.trim() : null;
+  }
+  if (retryRow.parent_transaction_id !== undefined) {
+    retryRow.parent_transaction_id = (typeof retryRow.parent_transaction_id === 'string' && retryRow.parent_transaction_id.trim()) ? retryRow.parent_transaction_id.trim() : null;
+  }
+
   const performUpdate = async (): Promise<{ error: any }> => {
     let { error } = await supabase!.from(table).update(retryRow).eq('id', id);
+
+    // AUTO-HEALING for foreign key violation
+    if (error && (error.message?.includes('violates foreign key constraint') || error.message?.includes('transactions_proyek_id_fkey'))) {
+      console.warn('Foreign key violation for transaction update. Attempting to heal missing referenced project...');
+      try {
+        if (retryRow.proyek_id) {
+          const localProjects = getItem<Project[]>(KEYS.PROJECTS, []);
+          const proj = localProjects.find(p => p.id === retryRow.proyek_id);
+          if (proj) {
+            try {
+              await supabase!.from('projects').upsert([mapProjectToRow(proj)]);
+            } catch { /* ignore */ }
+          }
+        }
+        const retryFkRes = await supabase!.from(table).update(retryRow).eq('id', id);
+        error = retryFkRes.error;
+      } catch {
+        // Ignore
+      }
+
+      if (error && (error.message?.includes('violates foreign key constraint') || error.message?.includes('transactions_proyek_id_fkey'))) {
+        retryRow.proyek_id = null;
+        const retryNullFkRes = await supabase!.from(table).update(retryRow).eq('id', id);
+        error = retryNullFkRes.error;
+      }
+    }
 
     while (error && (error.message?.includes('does not exist') || error.message?.includes('schema cache') || error.message?.includes('Could not find'))) {
       const match = error.message.match(/column "(.*?)"/) || error.message.match(/the '(.*?)' column/);
@@ -153,8 +232,8 @@ function mapTransactionToRow(t: Transaction): any {
     nominal: t.nominal,
     kategori: t.kategori,
     tag: t.tag ?? null,
-    proyek_id: t.proyekId ?? null,
-    surat_pengajuan_id: t.suratPengajuanId ?? null,
+    proyek_id: (typeof t.proyekId === 'string' && t.proyekId.trim()) ? t.proyekId.trim() : null,
+    surat_pengajuan_id: (typeof t.suratPengajuanId === 'string' && t.suratPengajuanId.trim()) ? t.suratPengajuanId.trim() : null,
     lampiran: t.lampiran ?? [],
     status: t.status,
     bukti_transfer: t.buktiTransfer ?? null,
@@ -163,7 +242,7 @@ function mapTransactionToRow(t: Transaction): any {
     jalur_transfer: t.jalurTransfer ?? null,
     rekening_id: t.rekeningId ?? (t.jenis === 'masuk' ? 'bca_utama' : (t.proyekId ? 'kas_admin' : 'bca_utama')),
     rekening_tujuan_id: t.rekeningTujuanId ?? null,
-    parent_transaction_id: t.parentTransactionId ?? null,
+    parent_transaction_id: (typeof t.parentTransactionId === 'string' && t.parentTransactionId.trim()) ? t.parentTransactionId.trim() : null,
     urutan: t.urutan ?? null,
     dibuat_oleh_role: t.dibuatOlehRole ?? null,
     dibuat_oleh_label: t.dibuatOlehLabel ?? null,
@@ -307,7 +386,7 @@ export async function ensurePosOperasionalForDivisi(
   divisi: 'admin' | 'ahli' | 'it' | 'umum',
   _nominal?: number,
   _tanggal?: string
-): Promise<string> {
+): Promise<string | undefined> {
   const labelMap: Record<string, string> = {
     it: 'Operasional Divisi IT',
     admin: 'Operasional Divisi Admin',
@@ -326,14 +405,14 @@ export async function ensurePosOperasionalForDivisi(
     return existing.id;
   }
 
-  // Do NOT auto-create zombie projects if user hasn't explicitly made one!
-  return '';
+  // Return undefined so transactions without an explicit project stay in Kas Utama without creating invalid FK
+  return undefined;
 }
 
 export async function addTransaction(
   data: Omit<Transaction, 'id' | 'status' | 'dibuatPada' | 'diupdatePada'> & { status?: TransactionStatus }
 ): Promise<Transaction> {
-  let proyekIdFinal = data.proyekId;
+  let proyekIdFinal = (data.proyekId && typeof data.proyekId === 'string' && data.proyekId.trim()) ? data.proyekId.trim() : undefined;
 
   // AUTO-ASSIGN / AUTO-CREATE POS OPERASIONAL IF DIVISI IS SELECTED WITHOUT PROYEK_ID
   if (!proyekIdFinal && data.divisi) {
@@ -360,7 +439,7 @@ export async function addTransaction(
 
   const newTransaction: Transaction = {
     ...data,
-    proyekId: proyekIdFinal,
+    proyekId: proyekIdFinal || undefined,
     id: generateId(),
     dibuatOlehRole: resolvedRole,
     dibuatOlehLabel: resolvedLabel,
