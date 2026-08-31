@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { formatRupiah, formatDate } from '../components/ui';
+import { formatRupiah, formatDate, DashboardSkeleton } from '../components/ui';
 import { calculateCompanyLedger, isApproved } from '../services/financialEngine';
 
 export function StaffDashboard() {
@@ -57,6 +57,8 @@ export function StaffDashboard() {
       pendingApprovalCount,
     };
   }, [transactions, projects]);
+
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6 pb-12">
