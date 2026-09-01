@@ -25,7 +25,7 @@ import {
 } from '../components/ui';
 import { Modal } from '../components/ui/Modal';
 import { ProcurementChecklistSection } from '../components/procurement/ProcurementChecklistSection';
-import { isCapitalInjectionTx } from '../components/ui/PdfReportModal';
+import { isCapitalInjectionTx, isMatchingProject } from '../components/ui/PdfReportModal';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
@@ -287,8 +287,8 @@ export function ProjectDetail() {
   }, [allProjects, id, detailedProject]);
 
   const transactions = React.useMemo(() => {
-    return allTransactions.filter(t => t.proyekId === id);
-  }, [allTransactions, id]);
+    return allTransactions.filter(t => isMatchingProject(t, id, project?.nama, project?.nomorSurat));
+  }, [allTransactions, id, project?.nama, project?.nomorSurat]);
 
   const injectionTxns = React.useMemo(() => {
     return transactions

@@ -18,18 +18,28 @@ import { groupAndSortTransactions } from '../../services/transactionService';
 import { isMutasiInternal, isOmzetRil } from '../../services/analyticsService';
 import { classifyTransaction } from '../../services/financialEngine';
 
-export const isMatchingProject = (t: Transaction, projId?: string, projectNama?: string): boolean => {
+export const isMatchingProject = (t: Transaction, projId?: string, projectNama?: string, projectNomorSurat?: string): boolean => {
   if (!t) return false;
-  if (projId) {
-    const tProjId = t.proyekId || (t as any).proyek_id;
-    if (tProjId && String(tProjId).trim().toLowerCase() === String(projId).trim().toLowerCase()) return true;
-    const tSuratId = t.suratPengajuanId || (t as any).surat_pengajuan_id;
-    if (tSuratId && String(tSuratId).trim().toLowerCase() === String(projId).trim().toLowerCase()) return true;
+  const pId = String(projId || '').trim().toLowerCase();
+  const pNama = String(projectNama || '').trim().toLowerCase();
+  const pSurat = String(projectNomorSurat || '').trim().toLowerCase();
+
+  const tProjId = String(t.proyekId || (t as any).proyek_id || '').trim().toLowerCase();
+  const tSuratId = String(t.suratPengajuanId || (t as any).surat_pengajuan_id || '').trim().toLowerCase();
+  const tDesc = String(t.deskripsi || '').toLowerCase();
+
+  if (pId) {
+    if (tProjId === pId || tSuratId === pId) return true;
   }
-  if (projectNama && projectNama.trim()) {
-    const tProjId = t.proyekId || (t as any).proyek_id;
-    if (tProjId && String(tProjId).trim().toLowerCase() === String(projectNama).trim().toLowerCase()) return true;
+  if (pNama && pNama.length >= 3) {
+    if (tProjId === pNama || tSuratId === pNama) return true;
+    if (tDesc.includes(pNama)) return true;
   }
+  if (pSurat && pSurat.length >= 3) {
+    if (tProjId === pSurat || tSuratId === pSurat) return true;
+    if (tDesc.includes(pSurat)) return true;
+  }
+
   return false;
 };
 
@@ -66,6 +76,7 @@ export const universalExtractAttachments = (t: Transaction): Array<{ nama: strin
     } else if (typeof item === 'object') {
       url = (
         item.dataUrl ||
+        item.localFallbackUrl ||
         item.url ||
         item.fileUrl ||
         item.link ||
@@ -76,8 +87,8 @@ export const universalExtractAttachments = (t: Transaction): Array<{ nama: strin
         (item.id ? `https://drive.google.com/file/d/${item.id}/view?usp=sharing` : '') ||
         ''
       ).trim();
-      name = item.nama || item.name || '';
-      type = item.tipe || item.type || '';
+      name = item.nama || item.name || item.fileName || '';
+      type = item.tipe || item.type || item.mimeType || '';
     }
 
     if (!url) return;
@@ -117,8 +128,13 @@ export const universalExtractAttachments = (t: Transaction): Array<{ nama: strin
     (t as any).foto,
     (t as any).gambar,
     (t as any).nota,
+    (t as any).struk,
+    (t as any).invoice,
     (t as any).files,
     (t as any).file,
+    (t as any).images,
+    (t as any).image,
+    (t as any).bukti_transaksi,
   ];
 
   for (const raw of rawFields) {
@@ -890,7 +906,7 @@ export function PdfReportModal({
               gridHtml += `
                 <div class="gallery-item" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
                   <div class="img-wrapper" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; min-height: 180px; max-height: 250px; overflow: hidden; position: relative;">
-                    <img src="${item.url}" alt="${item.nama}" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
+                    <img src="${item.url}" alt="${item.nama}" referrerpolicy="no-referrer" crossorigin="anonymous" loading="eager" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                   </div>
                   <div class="caption" style="margin-top: 8px; border-top: 1px solid #F1F5F9; padding-top: 6px;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
@@ -991,6 +1007,8 @@ export function PdfReportModal({
       <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="utf-8">
+          <meta name="referrer" content="no-referrer">
           <title>${dynamicDocTitle}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -2335,6 +2353,109 @@ export function PdfReportModal({
                 </div>
               ));
             })()}
+
+            {/* 7. LAMPIRAN DOKUMENTASI & STRUK BUKTI AUDIT (VISIBLE ON-SCREEN PREVIEW) */}
+            {diagnosticData.totalBerkas > 0 && (
+              <div
+                className="accounting-page-container bg-white rounded-xl p-4 sm:p-6 space-y-4 mt-6 border border-slate-200"
+                style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
+              >
+                {/* Official Kop Header on Attachment Page */}
+                <div className="kop-container text-center pb-2 border-b-[2px] border-[#047857] mb-3">
+                  <h1 className="company-title text-base font-black text-[#047857] tracking-tight uppercase">
+                    LAMPIRAN DOKUMENTASI &amp; STRUK BUKTI AUDIT
+                  </h1>
+                  <p className="company-info text-[9px] font-medium text-slate-700 mt-0.5 leading-relaxed">
+                    {displayTitle} &middot; Periode: ${periodText} &middot; Total {diagnosticData.totalBerkas} Berkas Lampiran Terverifikasi
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 border-l-4 border-[#047857] p-2.5 rounded-r-lg mb-3">
+                  <h2 className="text-[11px] font-black text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <span>📸</span>
+                    <span>BERKAS BUKTI TRANSAKSI &amp; STRUK RESI RESMI</span>
+                  </h2>
+                  <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">
+                    Klik pada foto untuk memperbesar pratinjau. Seluruh lampiran di bawah ini otomatis terangkut saat mencetak PDF.
+                  </p>
+                </div>
+
+                {/* Grid Gallery */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {diagnosticData.inspectedItems.map((item, tIdx) => {
+                    if (item.attachments.length === 0) return null;
+                    return item.attachments.map((att, aIdx) => {
+                      const isPdf = att.tipe?.includes('pdf') || att.dataUrl.toLowerCase().includes('.pdf');
+                      const driveId = getDriveId(att.dataUrl);
+                      const resolved = resolveImageUrl(att.dataUrl);
+                      const seqLabel = item.attachments.length > 1 ? ` (Lampiran ${aIdx + 1} dari ${item.attachments.length})` : '';
+
+                      return (
+                        <div
+                          key={`${tIdx}-${aIdx}`}
+                          className="bg-white border border-slate-300 rounded-xl p-3 shadow-2xs space-y-2 flex flex-col justify-between"
+                          style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+                        >
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-center min-h-[170px] max-h-[240px] overflow-hidden">
+                            {isPdf ? (
+                              <div className="flex flex-col items-center justify-center text-center p-3 space-y-2">
+                                <div className="text-4xl">📄</div>
+                                <span className="text-[11px] font-bold text-slate-800 break-all max-w-[200px]">
+                                  {att.nama}
+                                </span>
+                                <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded">
+                                  Dokumen PDF
+                                </span>
+                              </div>
+                            ) : (
+                              <img
+                                src={resolved.primary}
+                                alt={att.nama}
+                                referrerPolicy="no-referrer"
+                                crossOrigin="anonymous"
+                                loading="eager"
+                                className="max-h-[220px] max-w-full object-contain rounded-md cursor-pointer hover:scale-105 transition-transform"
+                                onClick={() => setPreviewModalImg({ nama: att.nama, url: att.dataUrl })}
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  if (!target.dataset.tried && driveId) {
+                                    target.dataset.tried = '1';
+                                    target.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+                                  } else if (target.dataset.tried === '1' && driveId) {
+                                    target.dataset.tried = '2';
+                                    target.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+                                  }
+                                }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Caption */}
+                          <div className="pt-2 border-t border-slate-100 flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[8.5px] text-slate-500 font-bold">[{formatDate(item.tx.tanggal)}]</div>
+                              <div className="text-[10.5px] font-bold text-slate-900 leading-snug line-clamp-2">
+                                {item.tx.deskripsi}{seqLabel}
+                              </div>
+                              <div className="text-[11.5px] font-black text-rose-600 mt-0.5">
+                                {formatSaldoRupiah(item.tx.nominal)}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewModalImg({ nama: att.nama, url: att.dataUrl })}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[10px] font-bold flex-shrink-0 cursor-pointer"
+                            >
+                              🔍 Zoom
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
