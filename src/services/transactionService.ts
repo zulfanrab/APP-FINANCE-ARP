@@ -176,40 +176,70 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
   return Promise.race([performUpdate(), timeoutPromise]);
 }
 
-function parseLampiranField(raw: any): Attachment[] {
+export function parseLampiranField(raw: any): Attachment[] {
+  if (!raw) return [];
   if (Array.isArray(raw)) {
-    return raw.map((item: any) => {
-      if (typeof item === 'string') {
-        const isPdf = item.toLowerCase().includes('.pdf') || item.startsWith('data:application/pdf');
-        return {
-          nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
-          tipe: isPdf ? 'application/pdf' : 'image/jpeg',
-          dataUrl: item,
-        };
-      }
-      return item;
-    });
+    return raw
+      .map((item: any) => {
+        if (!item) return null;
+        if (typeof item === 'string') {
+          const trimmed = item.trim();
+          if (!trimmed) return null;
+          const isPdf = trimmed.toLowerCase().includes('.pdf') || trimmed.startsWith('data:application/pdf');
+          return {
+            nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
+            tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+            dataUrl: trimmed,
+          };
+        }
+        if (typeof item === 'object') {
+          const url = (
+            item.dataUrl || item.url || item.fileUrl || item.link || item.path ||
+            item.webViewLink || item.webContentLink || item.directUrl ||
+            (item.id ? `https://drive.google.com/file/d/${item.id}/view?usp=sharing` : '') || ''
+          ).trim();
+          if (!url) return null;
+          const isPdf = (item.tipe || item.type || '').includes('pdf') ||
+                        (item.nama || item.name || '').toLowerCase().endsWith('.pdf') ||
+                        url.toLowerCase().includes('.pdf') ||
+                        url.startsWith('data:application/pdf');
+          return {
+            nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
+            tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+            dataUrl: url,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as Attachment[];
+  }
+  if (typeof raw === 'object') {
+    const url = (
+      raw.dataUrl || raw.url || raw.fileUrl || raw.link || raw.path ||
+      raw.webViewLink || raw.webContentLink || raw.directUrl ||
+      (raw.id ? `https://drive.google.com/file/d/${raw.id}/view?usp=sharing` : '') || ''
+    ).trim();
+    if (url) {
+      const isPdf = (raw.tipe || raw.type || '').includes('pdf') ||
+                    (raw.nama || raw.name || '').toLowerCase().endsWith('.pdf') ||
+                    url.toLowerCase().includes('.pdf') ||
+                    url.startsWith('data:application/pdf');
+      return [{
+        nama: raw.nama || raw.name || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
+        tipe: raw.tipe || raw.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+        dataUrl: url,
+      }];
+    }
   }
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
-    if (trimmed.startsWith('[')) {
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
       try {
         const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed.map((item: any) => {
-            if (typeof item === 'string') {
-              const isPdf = item.toLowerCase().includes('.pdf') || item.startsWith('data:application/pdf');
-              return {
-                nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
-                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
-                dataUrl: item,
-              };
-            }
-            return item;
-          });
-        }
+        return parseLampiranField(parsed);
       } catch { /* ignore */ }
-    } else if (trimmed) {
+    }
+    if (trimmed) {
       const isPdf = trimmed.toLowerCase().includes('.pdf') || trimmed.startsWith('data:application/pdf');
       return [{
         nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',

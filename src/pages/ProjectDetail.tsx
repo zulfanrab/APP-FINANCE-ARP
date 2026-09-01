@@ -1682,7 +1682,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
         title={`Laporan Realisasi & Pertanggungjawaban Dana Proyek`}
         subtitle={project.tipe === 'operasional_kantor' ? 'Dokumen Pertanggungjawaban Kas Operasional Internal' : 'Dokumen Realisasi Proyek Klien'}
         periodText={`Per ${formatDate(new Date().toISOString())}`}
-        transactions={transactions}
+        transactions={allTransactions}
         project={project}
       />
 

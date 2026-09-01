@@ -18,10 +18,145 @@ import { groupAndSortTransactions } from '../../services/transactionService';
 import { isMutasiInternal, isOmzetRil } from '../../services/analyticsService';
 import { classifyTransaction } from '../../services/financialEngine';
 
-export const isMatchingProject = (t: Transaction, projId?: string): boolean => {
-  if (!t || !projId) return false;
-  const tProjId = t.proyekId || (t as any).proyek_id;
-  return Boolean(tProjId && String(tProjId).trim() === String(projId).trim());
+export const isMatchingProject = (t: Transaction, projId?: string, projectNama?: string): boolean => {
+  if (!t) return false;
+  if (projId) {
+    const tProjId = t.proyekId || (t as any).proyek_id;
+    if (tProjId && String(tProjId).trim().toLowerCase() === String(projId).trim().toLowerCase()) return true;
+    const tSuratId = t.suratPengajuanId || (t as any).surat_pengajuan_id;
+    if (tSuratId && String(tSuratId).trim().toLowerCase() === String(projId).trim().toLowerCase()) return true;
+  }
+  if (projectNama && projectNama.trim()) {
+    const tProjId = t.proyekId || (t as any).proyek_id;
+    if (tProjId && String(tProjId).trim().toLowerCase() === String(projectNama).trim().toLowerCase()) return true;
+  }
+  return false;
+};
+
+export const getDriveId = (url: string): string | null => {
+  if (!url) return null;
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+};
+
+export const resolveImageUrl = (url: string): { primary: string; fallback: string } => {
+  if (!url) return { primary: '', fallback: '' };
+  const driveId = getDriveId(url);
+  if (driveId) {
+    return {
+      primary: `https://lh3.googleusercontent.com/d/${driveId}`,
+      fallback: `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`,
+    };
+  }
+  return { primary: url, fallback: url };
+};
+
+export const universalExtractAttachments = (t: Transaction): Array<{ nama: string; tipe: string; dataUrl: string }> => {
+  if (!t) return [];
+  const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
+
+  const addUnique = (item: any) => {
+    if (!item) return;
+    let url = '';
+    let name = '';
+    let type = '';
+
+    if (typeof item === 'string') {
+      url = item.trim();
+    } else if (typeof item === 'object') {
+      url = (
+        item.dataUrl ||
+        item.url ||
+        item.fileUrl ||
+        item.link ||
+        item.path ||
+        item.webViewLink ||
+        item.webContentLink ||
+        item.directUrl ||
+        (item.id ? `https://drive.google.com/file/d/${item.id}/view?usp=sharing` : '') ||
+        ''
+      ).trim();
+      name = item.nama || item.name || '';
+      type = item.tipe || item.type || '';
+    }
+
+    if (!url) return;
+    if (result.some(r => r.dataUrl === url)) return;
+
+    const isPdf = type.includes('pdf') ||
+                  name.toLowerCase().endsWith('.pdf') ||
+                  url.toLowerCase().includes('.pdf') ||
+                  url.startsWith('data:application/pdf');
+
+    const cleanName = name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto');
+    const cleanType = type || (isPdf ? 'application/pdf' : 'image/jpeg');
+
+    result.push({
+      nama: cleanName,
+      tipe: cleanType,
+      dataUrl: url,
+    });
+  };
+
+  // 1. Bank transfer proof
+  const bt = (t.buktiTransfer || (t as any).bukti_transfer || (t as any).bukti || (t as any).resi || '').trim();
+  if (bt) {
+    const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
+    addUnique({
+      nama: 'Bukti Transfer Bank',
+      tipe: isPdf ? 'application/pdf' : 'image/png',
+      dataUrl: bt,
+    });
+  }
+
+  // 2. Scan all possible attachment property names
+  const rawFields = [
+    t.lampiran,
+    (t as any).attachments,
+    (t as any).attachment,
+    (t as any).foto,
+    (t as any).gambar,
+    (t as any).nota,
+    (t as any).files,
+    (t as any).file,
+  ];
+
+  for (const raw of rawFields) {
+    if (!raw) continue;
+    if (Array.isArray(raw)) {
+      raw.forEach(elem => {
+        if (!elem) return;
+        if (typeof elem === 'string') {
+          addUnique(elem);
+        } else if (typeof elem === 'object') {
+          addUnique(elem);
+        }
+      });
+    } else if (typeof raw === 'object') {
+      addUnique(raw);
+    } else if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(elem => {
+              if (typeof elem === 'string') addUnique(elem);
+              else if (typeof elem === 'object') addUnique(elem);
+            });
+          } else if (typeof parsed === 'object') {
+            addUnique(parsed);
+          }
+        } catch {
+          addUnique(trimmed);
+        }
+      } else if (trimmed) {
+        addUnique(trimmed);
+      }
+    }
+  }
+
+  return result;
 };
 
 interface PdfReportModalProps {
@@ -278,7 +413,7 @@ export function PdfReportModal({
   // Resilient transaction extraction: Include all active project transactions
   const validProjectTransactions = useMemo(() => {
     return project
-      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id))
+      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id, project.nama))
       : [];
   }, [project, transactions]);
 
@@ -300,68 +435,16 @@ export function PdfReportModal({
     }> = [];
 
     targetList.forEach(t => {
-      const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
-      const bt = (t.buktiTransfer || (t as any).bukti_transfer || '').trim();
-      if (bt) {
-        const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
-        result.push({
-          nama: 'Bukti Transfer Bank',
-          tipe: isPdf ? 'application/pdf' : 'image/png',
-          dataUrl: bt,
-        });
-        totalTransfer++;
-      }
-
-      const rawList = [t.lampiran, (t as any).attachments, (t as any).attachment, (t as any).foto];
-      for (const raw of rawList) {
-        if (!raw) continue;
-        let list: any[] = [];
-        if (Array.isArray(raw)) list = raw;
-        else if (typeof raw === 'string') {
-          const trimmed = raw.trim();
-          if (trimmed.startsWith('[')) {
-            try {
-              const p = JSON.parse(trimmed);
-              if (Array.isArray(p)) list = p;
-            } catch { /* ignore */ }
-          } else if (trimmed) {
-            list = [trimmed];
-          }
-        }
-
-        list.forEach(item => {
-          if (!item) return;
-          if (typeof item === 'string') {
-            const url = item.trim();
-            if (!url) return;
-            if (!result.some(r => r.dataUrl === url)) {
-              const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
-              result.push({
-                nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
-                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
-                dataUrl: url,
-              });
-              if (isPdf) totalPdf++; else totalFoto++;
-            }
-          } else if (typeof item === 'object') {
-            const url = item.dataUrl || item.url || item.fileUrl || item.link || item.path || '';
-            if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
-              const cleanUrl = url.trim();
-              const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
-              result.push({
-                nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
-                tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
-                dataUrl: cleanUrl,
-              });
-              if (isPdf) totalPdf++; else totalFoto++;
-            }
-          }
-        });
-      }
+      const atts = universalExtractAttachments(t);
+      atts.forEach(a => {
+        if (a.nama === 'Bukti Transfer Bank') totalTransfer++;
+        else if (a.tipe.includes('pdf') || a.dataUrl.toLowerCase().includes('.pdf')) totalPdf++;
+        else totalFoto++;
+      });
 
       inspectedItems.push({
         tx: t,
-        attachments: result,
+        attachments: atts,
         statusBadge: t.status === 'disetujui' || t.status === 'selesai' ? 'Disetujui' : (t.status === 'menunggu_approval' ? 'Menunggu Approval' : t.status),
         statusColor: t.status === 'disetujui' || t.status === 'selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800',
       });
@@ -679,86 +762,6 @@ export function PdfReportModal({
         qrDataUrl?: string;
       }> = [];
 
-      const getDriveId = (url: string): string | null => {
-        if (!url) return null;
-        const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-        return match ? match[1] : null;
-      };
-
-      const resolveUrl = (url: string): string => {
-        if (!url) return '';
-        if (url.includes('drive.google.com')) {
-          const driveId = getDriveId(url);
-          if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
-        }
-        return url;
-      };
-
-      const extractAttachmentObjects = (t: Transaction): Array<{ nama: string; tipe: string; dataUrl: string }> => {
-        const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
-
-        // 1. Check buktiTransfer & bukti_transfer
-        const bt = (t.buktiTransfer || (t as any).bukti_transfer || '').trim();
-        if (bt) {
-          const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
-          result.push({
-            nama: 'Bukti Transfer Bank',
-            tipe: isPdf ? 'application/pdf' : 'image/png',
-            dataUrl: bt,
-          });
-        }
-
-        // 2. Check all possible attachment fields (lampiran, attachments, attachment, foto)
-        const rawList = [t.lampiran, (t as any).attachments, (t as any).attachment, (t as any).foto];
-        for (const raw of rawList) {
-          if (!raw) continue;
-          let list: any[] = [];
-          if (Array.isArray(raw)) {
-            list = raw;
-          } else if (typeof raw === 'string') {
-            const strVal: string = raw as string;
-            const trimmed = strVal.trim();
-            if (trimmed.startsWith('[')) {
-              try {
-                const parsed = JSON.parse(trimmed);
-                if (Array.isArray(parsed)) list = parsed;
-              } catch { /* ignore */ }
-            } else if (trimmed) {
-              list = [trimmed];
-            }
-          }
-
-          list.forEach(item => {
-            if (!item) return;
-            if (typeof item === 'string') {
-              const url = item.trim();
-              if (!url) return;
-              if (!result.some(r => r.dataUrl === url)) {
-                const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
-                result.push({
-                  nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
-                  tipe: isPdf ? 'application/pdf' : 'image/jpeg',
-                  dataUrl: url,
-                });
-              }
-            } else if (typeof item === 'object') {
-              const url = item.dataUrl || item.url || item.fileUrl || item.link || item.path || '';
-              if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
-                const cleanUrl = url.trim();
-                const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
-                result.push({
-                  nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
-                  tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
-                  dataUrl: cleanUrl,
-                });
-              }
-            }
-          });
-        }
-
-        return result;
-      };
-
       // 0. Include Project Main Surat Pengajuan / Kontrak PDF if attached to Project
       if (project?.suratPengajuanPdf && project.suratPengajuanPdf.trim()) {
         const pPdf = project.suratPengajuanPdf.trim();
@@ -796,7 +799,7 @@ export function PdfReportModal({
 
       // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
       for (const t of reportTxs) {
-        const txAtts = extractAttachmentObjects(t);
+        const txAtts = universalExtractAttachments(t);
         const totalAtts = txAtts.length;
 
         const isClientPayment = t.jenis === 'masuk' && isOmzetRil(t);
@@ -834,9 +837,11 @@ export function PdfReportModal({
             }
           }
 
+          const imgResolved = resolveImageUrl(cleanUrl);
+
           itemsToPrint.push({
             type: isPdf ? 'pdf' : 'image',
-            url: isPdf ? cleanUrl : resolveUrl(cleanUrl),
+            url: isPdf ? cleanUrl : imgResolved.primary,
             nama: att.nama || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
             seqLabel,
             tanggal: t.tanggal,
