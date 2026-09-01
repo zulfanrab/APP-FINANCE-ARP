@@ -906,7 +906,7 @@ export function PdfReportModal({
               gridHtml += `
                 <div class="gallery-item" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
                   <div class="img-wrapper" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; min-height: 180px; max-height: 250px; overflow: hidden; position: relative;">
-                    <img src="${item.url}" alt="${item.nama}" referrerpolicy="no-referrer" crossorigin="anonymous" loading="eager" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
+                    <img src="${item.url}" alt="${item.nama}" referrerpolicy="no-referrer" loading="eager" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                   </div>
                   <div class="caption" style="margin-top: 8px; border-top: 1px solid #F1F5F9; padding-top: 6px;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
@@ -1027,6 +1027,10 @@ export function PdfReportModal({
             .accounting-page-container {
               page-break-inside: avoid !important;
               break-inside: avoid !important;
+            }
+            /* Hide the on-screen preview gallery inside the print iframe so it does not duplicate or print when not requested */
+            .on-screen-gallery {
+              display: none !important;
             }
             /* Anti-Orphan Heading & Section Rules */
             h1, h2, h3, h4, h5, h6, .doc-header, .section-title, .table-title {
@@ -2357,7 +2361,7 @@ export function PdfReportModal({
             {/* 7. LAMPIRAN DOKUMENTASI & STRUK BUKTI AUDIT (VISIBLE ON-SCREEN PREVIEW) */}
             {diagnosticData.totalBerkas > 0 && (
               <div
-                className="accounting-page-container bg-white rounded-xl p-4 sm:p-6 space-y-4 mt-6 border border-slate-200"
+                className="accounting-page-container on-screen-gallery bg-white rounded-xl p-4 sm:p-6 space-y-4 mt-6 border border-slate-200"
                 style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
               >
                 {/* Official Kop Header on Attachment Page */}
@@ -2412,7 +2416,6 @@ export function PdfReportModal({
                                 src={resolved.primary}
                                 alt={att.nama}
                                 referrerPolicy="no-referrer"
-                                crossOrigin="anonymous"
                                 loading="eager"
                                 className="max-h-[220px] max-w-full object-contain rounded-md cursor-pointer hover:scale-105 transition-transform"
                                 onClick={() => setPreviewModalImg({ nama: att.nama, url: att.dataUrl })}
