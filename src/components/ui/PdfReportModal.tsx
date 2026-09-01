@@ -567,7 +567,7 @@ export function PdfReportModal({
         if (!url) return '';
         if (url.includes('drive.google.com')) {
           const driveId = getDriveId(url);
-          if (driveId) return `https://lh3.googleusercontent.com/d/${driveId}`;
+          if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
         }
         return url;
       };
@@ -761,27 +761,39 @@ export function PdfReportModal({
               const driveId = getDriveId(item.url);
               const fallbackSrc = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w800` : item.url;
               gridHtml += `
-                <div class="gallery-item">
-                  <div class="img-wrapper">
-                    <img src="${item.url}" alt="${item.nama}" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
+                <div class="gallery-item" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
+                  <div class="img-wrapper" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; min-height: 180px; max-height: 250px; overflow: hidden; position: relative;">
+                    <img src="${item.url}" alt="${item.nama}" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
                   </div>
-                  <div class="caption">
-                    <div class="caption-date">[${formatDate(item.tanggal)}]</div>
-                    <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
-                    <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
+                  <div class="caption" style="margin-top: 8px; border-top: 1px solid #F1F5F9; padding-top: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                      <div style="flex: 1;">
+                        <div class="caption-date" style="font-size: 8.5px; color: #64748B; font-weight: 600;">[${formatDate(item.tanggal)}]</div>
+                        <div class="caption-desc" style="font-size: 10px; color: #0F172A; font-weight: 700; line-height: 1.3;">${item.deskripsi}${item.seqLabel}</div>
+                        <div class="caption-nom" style="font-size: 11px; color: #DC2626; font-weight: 800; margin-top: 2px;">${formatSaldoRupiah(item.nominal)}</div>
+                      </div>
+                      ${
+                        item.qrDataUrl
+                          ? `<div style="text-align: center; flex-shrink: 0;">
+                              <img src="${item.qrDataUrl}" alt="Scan QR" style="width: 52px; height: 52px; border: 1px solid #CBD5E1; padding: 2px; border-radius: 4px; background: #FFFFFF;" />
+                              <div style="font-size: 7px; color: #475569; font-weight: 700; margin-top: 1px;">📱 Scan Foto</div>
+                            </div>`
+                          : ''
+                      }
+                    </div>
                   </div>
                 </div>
               `;
             } else {
               gridHtml += `
-                <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px;">
-                  <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 180px;">
+                <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
+                  <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 180px;">
                     ${
                       item.qrDataUrl
-                        ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 100px; height: 100px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
+                        ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 110px; height: 110px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
                         : `<div style="font-size: 36px; margin-bottom: 6px;">📄</div>`
                     }
-                    <div style="font-size: 10px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
+                    <div style="font-size: 10.5px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
                       📄 ${item.nama}
                     </div>
                     <div style="font-size: 8.5px; font-weight: 700; color: #047857; margin-top: 2px;">
@@ -791,10 +803,10 @@ export function PdfReportModal({
                       ${item.hasOnlineLink ? '📱 Scan QR Code untuk membuka dokumen PDF di HP' : '💾 Dokumen tersimpan aman di database arsip internal'}
                     </div>
                   </div>
-                  <div class="caption" style="margin-top: 6px;">
-                    <div class="caption-date">[${formatDate(item.tanggal)}]</div>
-                    <div class="caption-desc">${item.deskripsi}${item.seqLabel}</div>
-                    <div class="caption-nom">${formatSaldoRupiah(item.nominal)}</div>
+                  <div class="caption" style="margin-top: 8px; border-top: 1px solid #E2E8F0; padding-top: 6px;">
+                    <div class="caption-date" style="font-size: 8.5px; color: #64748B; font-weight: 600;">[${formatDate(item.tanggal)}]</div>
+                    <div class="caption-desc" style="font-size: 10px; color: #0F172A; font-weight: 700; line-height: 1.3;">${item.deskripsi}${item.seqLabel}</div>
+                    <div class="caption-nom" style="font-size: 11px; color: #DC2626; font-weight: 800; margin-top: 2px;">${formatSaldoRupiah(item.nominal)}</div>
                   </div>
                 </div>
               `;
