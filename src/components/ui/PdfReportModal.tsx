@@ -429,7 +429,7 @@ export function PdfReportModal({
   // Resilient transaction extraction: Include all active project transactions
   const validProjectTransactions = useMemo(() => {
     return project
-      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id, project.nama))
+      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id, project.nama, project.nomorSurat))
       : [];
   }, [project, transactions]);
 
