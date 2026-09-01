@@ -181,11 +181,16 @@ export async function uploadAttachmentFile(
     try {
       const drivePromise = uploadToGoogleDrive(file, context);
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Drive upload timeout')), 3500)
+        setTimeout(() => reject(new Error('Drive upload timeout')), 4500)
       );
       const driveResult = await Promise.race([drivePromise, timeoutPromise]);
       if (driveResult && driveResult.dataUrl) {
-        return driveResult;
+        return {
+          nama: file.name,
+          tipe: file.type || localProcessed.tipe,
+          dataUrl: driveResult.dataUrl,
+          ...(localProcessed.dataUrl ? { localFallbackUrl: localProcessed.dataUrl } : {}),
+        } as Attachment;
       }
     } catch (err) {
       console.warn('Google Drive upload warning (falling back to compressed DataURL):', err);
