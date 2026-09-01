@@ -5,8 +5,11 @@
 // Universal Hidden-Iframe Printing for 100% Mobile HP & Desktop Compatibility
 // ============================================================
 
-import React, { useRef, useState, useEffect } from 'react';
-import { Printer, FileText } from 'lucide-react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
+import {
+  Printer, FileText, Search, CheckCircle2, Clock, AlertTriangle,
+  ChevronDown, ChevronUp, Maximize2, Eye, Image as ImageIcon, Sparkles, Bug, Check, AlertCircle
+} from 'lucide-react';
 import QRCode from 'qrcode';
 import { Modal } from './Modal';
 import { type Transaction, type Project } from '../../types';
@@ -14,6 +17,12 @@ import { formatDate, formatRupiah } from './index';
 import { groupAndSortTransactions } from '../../services/transactionService';
 import { isMutasiInternal, isOmzetRil } from '../../services/analyticsService';
 import { classifyTransaction } from '../../services/financialEngine';
+
+export const isMatchingProject = (t: Transaction, projId?: string): boolean => {
+  if (!t || !projId) return false;
+  const tProjId = t.proyekId || (t as any).proyek_id;
+  return Boolean(tProjId && String(tProjId).trim() === String(projId).trim());
+};
 
 interface PdfReportModalProps {
   isOpen: boolean;
@@ -214,6 +223,10 @@ export function PdfReportModal({
   const [docPemohon, setDocPemohon] = useState<string>(() => project?.pemohonNama || 'Rama Regawa Sri Anggayana');
   const [docPic, setDocPic] = useState<string>(() => project?.teknisiPic || 'Fauzan');
 
+  // Live Bug Diagnostics & Inspector State
+  const [inspectorOpen, setInspectorOpen] = useState<boolean>(true);
+  const [previewModalImg, setPreviewModalImg] = useState<{ nama: string; url: string } | null>(null);
+
   useEffect(() => {
     if (project) {
       setDocPerihal(project.nama || '');
@@ -262,6 +275,112 @@ export function PdfReportModal({
     else if (slotNum === 4) { setSig4Img(''); localStorage.removeItem('signature_slot4'); localStorage.removeItem('signature_direktur'); }
   };
 
+  // Resilient transaction extraction: Include all active project transactions
+  const validProjectTransactions = useMemo(() => {
+    return project
+      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id))
+      : [];
+  }, [project, transactions]);
+
+  const approvedTx = useMemo(() => {
+    return transactions.filter(t => !t.isDeleted && (t.status === 'disetujui' || t.status === 'selesai'));
+  }, [transactions]);
+
+  // Real-time Attachment Inspector & Bug Diagnostics
+  const diagnosticData = useMemo(() => {
+    const targetList = project ? validProjectTransactions : transactions.filter(t => !t.isDeleted && t.status !== 'ditolak');
+    let totalFoto = 0;
+    let totalPdf = 0;
+    let totalTransfer = 0;
+    const inspectedItems: Array<{
+      tx: Transaction;
+      attachments: Array<{ nama: string; tipe: string; dataUrl: string }>;
+      statusBadge: string;
+      statusColor: string;
+    }> = [];
+
+    targetList.forEach(t => {
+      const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
+      const bt = (t.buktiTransfer || (t as any).bukti_transfer || '').trim();
+      if (bt) {
+        const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
+        result.push({
+          nama: 'Bukti Transfer Bank',
+          tipe: isPdf ? 'application/pdf' : 'image/png',
+          dataUrl: bt,
+        });
+        totalTransfer++;
+      }
+
+      const rawList = [t.lampiran, (t as any).attachments, (t as any).attachment, (t as any).foto];
+      for (const raw of rawList) {
+        if (!raw) continue;
+        let list: any[] = [];
+        if (Array.isArray(raw)) list = raw;
+        else if (typeof raw === 'string') {
+          const trimmed = raw.trim();
+          if (trimmed.startsWith('[')) {
+            try {
+              const p = JSON.parse(trimmed);
+              if (Array.isArray(p)) list = p;
+            } catch { /* ignore */ }
+          } else if (trimmed) {
+            list = [trimmed];
+          }
+        }
+
+        list.forEach(item => {
+          if (!item) return;
+          if (typeof item === 'string') {
+            const url = item.trim();
+            if (!url) return;
+            if (!result.some(r => r.dataUrl === url)) {
+              const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
+              result.push({
+                nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
+                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+                dataUrl: url,
+              });
+              if (isPdf) totalPdf++; else totalFoto++;
+            }
+          } else if (typeof item === 'object') {
+            const url = item.dataUrl || item.url || item.fileUrl || item.link || item.path || '';
+            if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
+              const cleanUrl = url.trim();
+              const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
+              result.push({
+                nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
+                tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+                dataUrl: cleanUrl,
+              });
+              if (isPdf) totalPdf++; else totalFoto++;
+            }
+          }
+        });
+      }
+
+      inspectedItems.push({
+        tx: t,
+        attachments: result,
+        statusBadge: t.status === 'disetujui' || t.status === 'selesai' ? 'Disetujui' : (t.status === 'menunggu_approval' ? 'Menunggu Approval' : t.status),
+        statusColor: t.status === 'disetujui' || t.status === 'selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800',
+      });
+    });
+
+    if (project?.suratPengajuanPdf) {
+      totalPdf++;
+    }
+
+    return {
+      totalTx: targetList.length,
+      totalFoto,
+      totalPdf,
+      totalTransfer,
+      totalBerkas: totalFoto + totalPdf + totalTransfer,
+      inspectedItems,
+    };
+  }, [project, validProjectTransactions, transactions]);
+
   if (!isOpen) return null;
 
   const companyName = 'PT. AKSARA RIKSA PERDANA';
@@ -295,9 +414,6 @@ export function PdfReportModal({
     displaySubtitle = 'Dokumen Keuangan Resmi Mutasi Induk Kas Utama (Non-Proyek)';
   }
 
-  // Filter approved transactions
-  const approvedTx = transactions.filter(t => t.status === 'disetujui' || t.status === 'selesai');
-
   let tableRows: {
     no: number | string;
     tanggal: string;
@@ -319,13 +435,16 @@ export function PdfReportModal({
   let totalRefundMasuk = 0;
   let totalPengeluaranRiil = 0;
 
+  let ptx: Transaction[] = [];
+
   if (project) {
     // ============================================================
     // PROJECT REALISASI MATH: Starts with Modal Disuntikkan (Anggaran)
     // ============================================================
     modalAwal = project.anggaran || 0;
 
-    let ptx = approvedTx.filter(t => t.proyekId === project.id);
+    // Resilient filter for project transactions (matches approved and active project entries)
+    ptx = [...validProjectTransactions];
 
     // Filter out internal capital refund/drain transactions so they don't corrupt the operational P&L report
     ptx = ptx.filter(t => {
@@ -534,10 +653,13 @@ export function PdfReportModal({
     if (withAttachments) {
       // Find all transactions with attachments or receipts based on report context
       const reportTxs = project 
-        ? groupAndSortTransactions(approvedTx.filter(t => t.proyekId === project?.id), 'asc') 
+        ? groupAndSortTransactions(
+            selectedPengajuanTxId !== 'semua' ? ptx : validProjectTransactions,
+            'asc'
+          ) 
         : (reportScope === 'konsolidasi'
-            ? groupAndSortTransactions(approvedTx, 'asc')
-            : groupAndSortTransactions(approvedTx.filter(t => !t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama'), 'asc')
+            ? groupAndSortTransactions(transactions.filter(t => !t.isDeleted && t.status !== 'ditolak'), 'asc')
+            : groupAndSortTransactions(transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && (!t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama')), 'asc')
           );
 
       const itemsToPrint: Array<{
@@ -1235,8 +1357,8 @@ export function PdfReportModal({
                 </select>
               ) : (
                 (() => {
-                  const ptx = approvedTx.filter(t => t.proyekId === project.id);
-                  const injections = ptx
+                  const projectEntries = validProjectTransactions;
+                  const injections = projectEntries
                     .filter(t => isCapitalInjectionTx(t) || (t.jenis === 'masuk' && (t.kategori || '').toLowerCase().includes('mutasi')))
                     .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
                   if (injections.length > 1) {
@@ -1586,6 +1708,140 @@ export function PdfReportModal({
                   </div>
                 </div>
               </div>
+
+        {/* Live Bug Diagnostics & Attachment Inspector Widget */}
+        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl overflow-hidden shadow-xs transition-all">
+          <div
+            onClick={() => setInspectorOpen(prev => !prev)}
+            className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-emerald-100/50 transition-colors select-none"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                <Bug size={16} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                    🔍 Detektor Bukti &amp; Lampiran Transaksi (Live Inspector)
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full text-[10px] font-extrabold">
+                    {diagnosticData.totalBerkas} Berkas Terdeteksi
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium">
+                  {project ? `Terhubung ke Pos/Proyek: ${project.nama}` : 'Laporan Keuangan Konsolidasi'} &middot; {diagnosticData.totalTx} Transaksi
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold text-slate-700 mr-2">
+                <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-emerald-700">
+                  📸 {diagnosticData.totalFoto} Foto Struk
+                </span>
+                <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-amber-700">
+                  📄 {diagnosticData.totalPdf} PDF
+                </span>
+                <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-blue-700">
+                  🏦 {diagnosticData.totalTransfer} Bukti Transfer
+                </span>
+              </div>
+              <button
+                type="button"
+                className="p-1 text-slate-500 hover:text-slate-800 rounded-lg transition-transform"
+              >
+                {inspectorOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {inspectorOpen && (
+            <div className="p-3.5 bg-white border-t border-emerald-200/80 space-y-3 animate-fade-in">
+              {diagnosticData.inspectedItems.length === 0 ? (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                  Belum ada transaksi yang terdaftar di dalam pos/proyek ini.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {project?.suratPengajuanPdf && (
+                    <div className="p-2.5 bg-amber-50/60 border border-amber-200 rounded-xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-amber-600" />
+                        <div>
+                          <span className="text-xs font-bold text-slate-900">
+                            📄 Surat Pengajuan / Kontrak Induk Pos
+                          </span>
+                          <span className="block text-[10px] text-amber-700 font-medium">
+                            File PDF tersimpan di data proyek &middot; Status: Siap Dicetak &amp; QR Code Terpasang
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-bold">
+                        PDF Induk
+                      </span>
+                    </div>
+                  )}
+
+                  {diagnosticData.inspectedItems.map((item, idx) => (
+                    <div
+                      key={item.tx.id || idx}
+                      className="p-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-extrabold text-slate-900 truncate">
+                            {item.tx.deskripsi}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded-md text-[9.5px] font-bold ${item.statusColor}`}>
+                            {item.statusBadge}
+                          </span>
+                        </div>
+                        <div className="text-[10.5px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
+                          <span>📅 {formatDate(item.tx.tanggal)}</span>
+                          <span>&middot;</span>
+                          <span className="font-bold text-rose-600">{formatSaldoRupiah(item.tx.nominal)}</span>
+                          <span>&middot;</span>
+                          <span>Kategori: {item.tx.kategori}</span>
+                        </div>
+                      </div>
+
+                      {/* Attachments status list */}
+                      <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
+                        {item.attachments.length === 0 ? (
+                          <span className="px-2 py-1 bg-slate-200/60 text-slate-500 rounded-lg text-[10.5px] font-medium">
+                            Tanpa Lampiran
+                          </span>
+                        ) : (
+                          item.attachments.map((att, aIdx) => {
+                            const isPdf = att.tipe?.includes('pdf') || att.dataUrl.toLowerCase().includes('.pdf');
+                            const isDrive = att.dataUrl.includes('drive.google.com');
+                            const isBase64 = att.dataUrl.startsWith('data:');
+
+                            return (
+                              <button
+                                key={aIdx}
+                                type="button"
+                                onClick={() => setPreviewModalImg({ nama: att.nama, url: att.dataUrl })}
+                                className="px-2 py-1 bg-white border border-emerald-300 hover:border-emerald-500 text-slate-800 rounded-lg text-[10.5px] font-bold flex items-center gap-1 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                title="Klik untuk test preview foto/dokumen"
+                              >
+                                {isPdf ? <FileText size={12} className="text-amber-600" /> : <ImageIcon size={12} className="text-emerald-600" />}
+                                <span className="truncate max-w-[120px]">{att.nama || 'Foto Struk'}</span>
+                                <span className="text-[9px] px-1 py-0.2 bg-emerald-100 text-emerald-800 rounded">
+                                  {isBase64 ? 'Base64' : (isDrive ? 'Drive' : 'Cloud')}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Printable Document Preview Area */}
         <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-6 bg-white border border-gray-200 rounded-2xl shadow-inner scrollbar-thin font-sans">
@@ -2077,6 +2333,57 @@ export function PdfReportModal({
           </div>
         </div>
       </div>
+
+      {/* Mini Inspector Image Lightbox Preview Modal */}
+      {previewModalImg && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewModalImg(null)}
+        >
+          <div
+            className="relative max-w-2xl w-full bg-slate-900 border border-white/10 rounded-2xl p-4 text-white space-y-3"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-bold truncate">{previewModalImg.nama}</span>
+              <button
+                onClick={() => setPreviewModalImg(null)}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                ✕ Tutup
+              </button>
+            </div>
+            <div className="max-h-[70vh] flex items-center justify-center bg-slate-950 rounded-xl overflow-hidden p-2">
+              {previewModalImg.url.startsWith('data:application/pdf') || previewModalImg.url.toLowerCase().includes('.pdf') ? (
+                <div className="p-8 text-center space-y-2">
+                  <FileText size={48} className="text-amber-400 mx-auto" />
+                  <p className="text-xs font-bold text-slate-200">Dokumen PDF Terverifikasi</p>
+                  <a
+                    href={previewModalImg.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-xs font-bold text-white mt-2"
+                  >
+                    Buka Dokumen PDF
+                  </a>
+                </div>
+              ) : (
+                <img
+                  src={previewModalImg.url}
+                  alt={previewModalImg.nama}
+                  className="max-h-[65vh] max-w-full object-contain rounded-lg"
+                  onError={(e) => {
+                    const match = previewModalImg.url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || previewModalImg.url.match(/id=([a-zA-Z0-9_-]+)/);
+                    if (match && match[1]) {
+                      e.currentTarget.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                    }
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
