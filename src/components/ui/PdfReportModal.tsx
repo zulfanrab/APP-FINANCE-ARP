@@ -575,9 +575,9 @@ export function PdfReportModal({
       const extractAttachmentObjects = (t: Transaction): Array<{ nama: string; tipe: string; dataUrl: string }> => {
         const result: Array<{ nama: string; tipe: string; dataUrl: string }> = [];
 
-        // 1. Check buktiTransfer
-        if (t.buktiTransfer && typeof t.buktiTransfer === 'string' && t.buktiTransfer.trim()) {
-          const bt = t.buktiTransfer.trim();
+        // 1. Check buktiTransfer & bukti_transfer
+        const bt = (t.buktiTransfer || (t as any).bukti_transfer || '').trim();
+        if (bt) {
           const isPdf = bt.toLowerCase().includes('.pdf') || bt.startsWith('data:application/pdf');
           result.push({
             nama: 'Bukti Transfer Bank',
@@ -586,53 +586,91 @@ export function PdfReportModal({
           });
         }
 
-        // 2. Check lampiran field
-        const raw = t.lampiran;
-        let list: any[] = [];
-        if (Array.isArray(raw)) {
-          list = raw;
-        } else if (typeof raw === 'string') {
-          const strVal: string = raw as string;
-          const trimmed = strVal.trim();
-          if (trimmed.startsWith('[')) {
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (Array.isArray(parsed)) list = parsed;
-            } catch { /* ignore */ }
-          } else if (trimmed) {
-            list = [trimmed];
+        // 2. Check all possible attachment fields (lampiran, attachments, attachment, foto)
+        const rawList = [t.lampiran, (t as any).attachments, (t as any).attachment, (t as any).foto];
+        for (const raw of rawList) {
+          if (!raw) continue;
+          let list: any[] = [];
+          if (Array.isArray(raw)) {
+            list = raw;
+          } else if (typeof raw === 'string') {
+            const strVal: string = raw as string;
+            const trimmed = strVal.trim();
+            if (trimmed.startsWith('[')) {
+              try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) list = parsed;
+              } catch { /* ignore */ }
+            } else if (trimmed) {
+              list = [trimmed];
+            }
           }
-        }
 
-        list.forEach(item => {
-          if (!item) return;
-          if (typeof item === 'string') {
-            const url = item.trim();
-            if (!url) return;
-            if (!result.some(r => r.dataUrl === url)) {
-              const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
-              result.push({
-                nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
-                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
-                dataUrl: url,
-              });
+          list.forEach(item => {
+            if (!item) return;
+            if (typeof item === 'string') {
+              const url = item.trim();
+              if (!url) return;
+              if (!result.some(r => r.dataUrl === url)) {
+                const isPdf = url.toLowerCase().includes('.pdf') || url.startsWith('data:application/pdf');
+                result.push({
+                  nama: isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto',
+                  tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+                  dataUrl: url,
+                });
+              }
+            } else if (typeof item === 'object') {
+              const url = item.dataUrl || item.url || item.fileUrl || item.link || item.path || '';
+              if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
+                const cleanUrl = url.trim();
+                const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
+                result.push({
+                  nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
+                  tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+                  dataUrl: cleanUrl,
+                });
+              }
             }
-          } else if (typeof item === 'object') {
-            const url = item.dataUrl || item.url || item.fileUrl || item.link || '';
-            if (typeof url === 'string' && url.trim() && !result.some(r => r.dataUrl === url.trim())) {
-              const cleanUrl = url.trim();
-              const isPdf = (item.tipe || item.type || '').includes('pdf') || (item.nama || item.name || '').toLowerCase().endsWith('.pdf') || cleanUrl.toLowerCase().includes('.pdf') || cleanUrl.startsWith('data:application/pdf');
-              result.push({
-                nama: item.nama || item.name || (isPdf ? 'Dokumen PDF' : 'Struk / Lampiran Foto'),
-                tipe: item.tipe || item.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
-                dataUrl: cleanUrl,
-              });
-            }
-          }
-        });
+          });
+        }
 
         return result;
       };
+
+      // 0. Include Project Main Surat Pengajuan / Kontrak PDF if attached to Project
+      if (project?.suratPengajuanPdf && project.suratPengajuanPdf.trim()) {
+        const pPdf = project.suratPengajuanPdf.trim();
+        const hasOnlineLink = pPdf.startsWith('http://') || pPdf.startsWith('https://');
+        const driveId = getDriveId(pPdf);
+        const qrTarget = driveId
+          ? `https://drive.google.com/file/d/${driveId}/view?usp=drivesdk`
+          : (hasOnlineLink ? pPdf : `PT AKSARA RIKSA PERDANA - SURAT PENGAJUAN: ${project.nama} (${project.nomorSurat || 'Resmi'})`);
+
+        let qrDataUrl = '';
+        try {
+          qrDataUrl = await QRCode.toDataURL(qrTarget, {
+            width: 350,
+            margin: 3,
+            errorCorrectionLevel: 'M',
+            color: { dark: '#000000', light: '#FFFFFF' },
+          });
+        } catch (qrErr) {
+          console.warn('Gagal QR Code Surat Pengajuan:', qrErr);
+        }
+
+        itemsToPrint.push({
+          type: 'pdf',
+          url: pPdf,
+          nama: `Dokumen Resmi Surat Pengajuan / Kontrak: ${project.nama}`,
+          seqLabel: ' (Surat Pengajuan Utama)',
+          tanggal: project.tanggalMulai,
+          deskripsi: `Surat Pengajuan & Otorisasi Resmi Alokasi (${project.nomorSurat || 'Dokumen Resmi'})`,
+          nominal: project.anggaran || 0,
+          isDropDana: true,
+          hasOnlineLink,
+          qrDataUrl,
+        });
+      }
 
       // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
       for (const t of reportTxs) {
@@ -645,23 +683,29 @@ export function PdfReportModal({
 
         for (let i = 0; i < totalAtts; i++) {
           const att = txAtts[i];
+          const cleanUrl = att.dataUrl.trim();
           const isPdf =
             att.tipe?.includes('pdf') ||
             att.nama?.toLowerCase().endsWith('.pdf') ||
-            att.dataUrl.toLowerCase().includes('.pdf') ||
-            att.dataUrl.startsWith('data:application/pdf');
+            cleanUrl.toLowerCase().includes('.pdf') ||
+            cleanUrl.startsWith('data:application/pdf');
 
           const seqLabel = totalAtts > 1 ? ` (Lampiran ${i + 1} dari ${totalAtts})` : '';
 
           let qrDataUrl = '';
-          const hasOnlineLink = att.dataUrl.startsWith('http://') || att.dataUrl.startsWith('https://');
+          const hasOnlineLink = cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://');
+          const driveId = getDriveId(cleanUrl);
+          const qrTarget = driveId
+            ? `https://drive.google.com/file/d/${driveId}/view?usp=drivesdk`
+            : (hasOnlineLink ? cleanUrl : `PT. AKSARA RIKSA PERDANA - Ref: ${t.id} - ${formatDate(t.tanggal)} - Rp ${t.nominal.toLocaleString('id-ID')}`);
 
-          if (isPdf && hasOnlineLink) {
+          if (isPdf || hasOnlineLink) {
             try {
-              qrDataUrl = await QRCode.toDataURL(att.dataUrl, {
-                width: 300,
-                margin: 1,
-                color: { dark: '#0F172A', light: '#FFFFFF' },
+              qrDataUrl = await QRCode.toDataURL(qrTarget, {
+                width: 350,
+                margin: 3, // High readability margin for mobile camera scanners
+                errorCorrectionLevel: 'M',
+                color: { dark: '#000000', light: '#FFFFFF' },
               });
             } catch (qrErr) {
               console.warn('Gagal meng-generate QR code PDF:', qrErr);
@@ -670,7 +714,7 @@ export function PdfReportModal({
 
           itemsToPrint.push({
             type: isPdf ? 'pdf' : 'image',
-            url: isPdf ? att.dataUrl : resolveUrl(att.dataUrl),
+            url: isPdf ? cleanUrl : resolveUrl(cleanUrl),
             nama: att.nama || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
             seqLabel,
             tanggal: t.tanggal,
@@ -1102,16 +1146,59 @@ export function PdfReportModal({
 
     frameDoc.close();
 
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-
+    // Robust Image & QR Code Preloader: Wait until all images are fully decoded in DOM before printing!
+    const triggerPrintWhenImagesReady = () => {
+      const images = Array.from(frameDoc.images || []);
       const restoreDocTitle = () => {
         document.title = prevDocTitle;
       };
       window.addEventListener('afterprint', restoreDocTitle, { once: true });
-      setTimeout(restoreDocTitle, 4000);
-    }, 350);
+      setTimeout(restoreDocTitle, 5000);
+
+      if (images.length === 0) {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }, 300);
+        return;
+      }
+
+      let loadedCount = 0;
+      const totalImages = images.length;
+      let hasPrinted = false;
+
+      const checkAndPrint = () => {
+        if (hasPrinted) return;
+        loadedCount++;
+        if (loadedCount >= totalImages) {
+          hasPrinted = true;
+          setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          }, 350);
+        }
+      };
+
+      images.forEach(img => {
+        if (img.complete && img.naturalHeight !== 0) {
+          checkAndPrint();
+        } else {
+          img.onload = checkAndPrint;
+          img.onerror = checkAndPrint;
+        }
+      });
+
+      // Safety timeout: Always trigger print after 2.5 seconds maximum
+      setTimeout(() => {
+        if (!hasPrinted) {
+          hasPrinted = true;
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }
+      }, 2500);
+    };
+
+    triggerPrintWhenImagesReady();
   };
 
   return (

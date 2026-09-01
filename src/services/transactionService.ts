@@ -177,12 +177,46 @@ async function safeSupabaseUpdate(table: string, row: any, id: string): Promise<
 }
 
 function parseLampiranField(raw: any): Attachment[] {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch { /* ignore */ }
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => {
+      if (typeof item === 'string') {
+        const isPdf = item.toLowerCase().includes('.pdf') || item.startsWith('data:application/pdf');
+        return {
+          nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
+          tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+          dataUrl: item,
+        };
+      }
+      return item;
+    });
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => {
+            if (typeof item === 'string') {
+              const isPdf = item.toLowerCase().includes('.pdf') || item.startsWith('data:application/pdf');
+              return {
+                nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
+                tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+                dataUrl: item,
+              };
+            }
+            return item;
+          });
+        }
+      } catch { /* ignore */ }
+    } else if (trimmed) {
+      const isPdf = trimmed.toLowerCase().includes('.pdf') || trimmed.startsWith('data:application/pdf');
+      return [{
+        nama: isPdf ? 'Dokumen PDF' : 'Lampiran Foto',
+        tipe: isPdf ? 'application/pdf' : 'image/jpeg',
+        dataUrl: trimmed,
+      }];
+    }
   }
   return [];
 }
