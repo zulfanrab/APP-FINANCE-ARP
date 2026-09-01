@@ -747,249 +747,9 @@ export function PdfReportModal({
     const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
     if (!frameDoc) return;
 
-    let attachmentsHtml = '';
-    
-    if (withAttachments) {
-      // Find all transactions with attachments or receipts based on report context
-      const reportTxs = project 
-        ? groupAndSortTransactions(
-            selectedPengajuanTxId !== 'semua' ? ptx : validProjectTransactions,
-            'asc'
-          ) 
-        : (reportScope === 'konsolidasi'
-            ? groupAndSortTransactions(transactions.filter(t => !t.isDeleted && t.status !== 'ditolak'), 'asc')
-            : groupAndSortTransactions(transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && (!t.proyekId || isCapitalInjectionTx(t) || t.kategori === 'Mutasi Internal / Transfer Kas' || t.kategori === 'Refund Dana Proyek ke Kas Utama')), 'asc')
-          );
+    // Use the already-rendered on-screen gallery to guarantee 100% consistency
+    // No more duplicate attachmentsHtml generation that might miss items!
 
-      const itemsToPrint: Array<{
-        type: 'image' | 'pdf';
-        url: string;
-        nama: string;
-        seqLabel: string;
-        tanggal: string;
-        deskripsi: string;
-        nominal: number;
-        jenis?: string;
-        kategori?: string;
-        isClientPayment?: boolean;
-        isDropDana?: boolean;
-        isFieldExpense?: boolean;
-        hasOnlineLink?: boolean;
-        qrDataUrl?: string;
-      }> = [];
-
-      // 0. Include Project Main Surat Pengajuan / Kontrak PDF if attached to Project
-      if (project?.suratPengajuanPdf && project.suratPengajuanPdf.trim()) {
-        const pPdf = project.suratPengajuanPdf.trim();
-        const hasOnlineLink = pPdf.startsWith('http://') || pPdf.startsWith('https://');
-        const driveId = getDriveId(pPdf);
-        const qrTarget = driveId
-          ? `https://drive.google.com/file/d/${driveId}/view?usp=drivesdk`
-          : (hasOnlineLink ? pPdf : `PT AKSARA RIKSA PERDANA - SURAT PENGAJUAN: ${project.nama} (${project.nomorSurat || 'Resmi'})`);
-
-        let qrDataUrl = '';
-        try {
-          qrDataUrl = await QRCode.toDataURL(qrTarget, {
-            width: 350,
-            margin: 3,
-            errorCorrectionLevel: 'M',
-            color: { dark: '#000000', light: '#FFFFFF' },
-          });
-        } catch (qrErr) {
-          console.warn('Gagal QR Code Surat Pengajuan:', qrErr);
-        }
-
-        itemsToPrint.push({
-          type: 'pdf',
-          url: pPdf,
-          nama: `Dokumen Resmi Surat Pengajuan / Kontrak: ${project.nama}`,
-          seqLabel: ' (Surat Pengajuan Utama)',
-          tanggal: project.tanggalMulai,
-          deskripsi: `Surat Pengajuan & Otorisasi Resmi Alokasi (${project.nomorSurat || 'Dokumen Resmi'})`,
-          nominal: project.anggaran || 0,
-          isDropDana: true,
-          hasOnlineLink,
-          qrDataUrl,
-        });
-      }
-
-      // Unfold & Flatten All Attachments per Transaction with Sequence Labeling
-      for (const t of reportTxs) {
-        const txAtts = universalExtractAttachments(t);
-        const totalAtts = txAtts.length;
-
-        const isClientPayment = t.jenis === 'masuk' && isOmzetRil(t);
-        const isDropDana = (t.jenis === 'masuk' && !isOmzetRil(t)) || isMutasiInternal(t) || (t.kategori || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('mutasi') || (t.deskripsi || '').toLowerCase().includes('drop dana');
-        const isFieldExpense = t.jenis === 'keluar' && !isDropDana;
-
-        for (let i = 0; i < totalAtts; i++) {
-          const att = txAtts[i];
-          const cleanUrl = att.dataUrl.trim();
-          const isPdf =
-            att.tipe?.includes('pdf') ||
-            att.nama?.toLowerCase().endsWith('.pdf') ||
-            cleanUrl.toLowerCase().includes('.pdf') ||
-            cleanUrl.startsWith('data:application/pdf');
-
-          const seqLabel = totalAtts > 1 ? ` (Lampiran ${i + 1} dari ${totalAtts})` : '';
-
-          let qrDataUrl = '';
-          const hasOnlineLink = cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://');
-          const driveId = getDriveId(cleanUrl);
-          const qrTarget = driveId
-            ? `https://drive.google.com/file/d/${driveId}/view?usp=drivesdk`
-            : (hasOnlineLink ? cleanUrl : `PT. AKSARA RIKSA PERDANA - Ref: ${t.id} - ${formatDate(t.tanggal)} - Rp ${t.nominal.toLocaleString('id-ID')}`);
-
-          if (isPdf || hasOnlineLink) {
-            try {
-              qrDataUrl = await QRCode.toDataURL(qrTarget, {
-                width: 350,
-                margin: 3, // High readability margin for mobile camera scanners
-                errorCorrectionLevel: 'M',
-                color: { dark: '#000000', light: '#FFFFFF' },
-              });
-            } catch (qrErr) {
-              console.warn('Gagal meng-generate QR code PDF:', qrErr);
-            }
-          }
-
-          const imgResolved = resolveImageUrl(cleanUrl);
-
-          itemsToPrint.push({
-            type: isPdf ? 'pdf' : 'image',
-            url: isPdf ? cleanUrl : imgResolved.primary,
-            nama: att.nama || (isPdf ? 'Dokumen PDF' : 'Lampiran Foto'),
-            seqLabel,
-            tanggal: t.tanggal,
-            deskripsi: t.deskripsi,
-            nominal: t.nominal,
-            jenis: t.jenis,
-            kategori: t.kategori,
-            isClientPayment,
-            isDropDana,
-            isFieldExpense,
-            hasOnlineLink,
-            qrDataUrl,
-          });
-        }
-      }
-
-      if (itemsToPrint.length > 0) {
-        const clientPaymentItems = itemsToPrint.filter(i => i.isClientPayment);
-        const dropDanaItems = itemsToPrint.filter(i => i.isDropDana);
-        const fieldExpenseItems = itemsToPrint.filter(i => i.isFieldExpense);
-
-        attachmentsHtml += `
-          <div style="page-break-before: always; padding-top: 10px;">
-            <div class="kop-container" style="text-align: center; padding-bottom: 8px; border-bottom: 2.5px solid #047857; margin-bottom: 2px;">
-              <h1 class="company-title" style="font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 900; color: #047857; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">LAMPIRAN DOKUMENTASI &amp; STRUK BUKTI AUDIT</h1>
-              <p class="company-info" style="font-size: 9.5px; color: #334155; margin-top: 4px; line-height: 1.5;">
-                ${displayTitle} &middot; Periode: ${periodText}
-              </p>
-            </div>
-        `;
-
-        const renderItemGrid = (items: typeof itemsToPrint, sectionTitle: string) => {
-          if (items.length === 0) return '';
-          let gridHtml = `
-            <div style="margin-top: 16px; page-break-inside: avoid;">
-              <div style="background: #F1F5F9; border-left: 4px solid #047857; padding: 6px 10px; margin-bottom: 12px;">
-                <h3 style="margin: 0; font-size: 11px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.3px;">${sectionTitle}</h3>
-              </div>
-              <div class="gallery-grid">
-          `;
-
-          items.forEach(item => {
-            if (item.type === 'image') {
-              const driveId = getDriveId(item.url);
-              const fallbackSrc = driveId ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w800` : item.url;
-              gridHtml += `
-                <div class="gallery-item" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
-                  <div class="img-wrapper" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px; display: flex; align-items: center; justify-content: center; min-height: 180px; max-height: 250px; overflow: hidden; position: relative;">
-                    <img src="${item.url}" alt="${item.nama}" referrerpolicy="no-referrer" loading="eager" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px;" onerror="this.onerror=null;this.src='${fallbackSrc}';" />
-                  </div>
-                  <div class="caption" style="margin-top: 8px; border-top: 1px solid #F1F5F9; padding-top: 6px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                      <div style="flex: 1;">
-                        <div class="caption-date" style="font-size: 8.5px; color: #64748B; font-weight: 600;">[${formatDate(item.tanggal)}]</div>
-                        <div class="caption-desc" style="font-size: 10px; color: #0F172A; font-weight: 700; line-height: 1.3;">${item.deskripsi}${item.seqLabel}</div>
-                        <div class="caption-nom" style="font-size: 11px; color: #DC2626; font-weight: 800; margin-top: 2px;">${formatSaldoRupiah(item.nominal)}</div>
-                      </div>
-                      ${
-                        item.qrDataUrl
-                          ? `<div style="text-align: center; flex-shrink: 0;">
-                              <img src="${item.qrDataUrl}" alt="Scan QR" style="width: 52px; height: 52px; border: 1px solid #CBD5E1; padding: 2px; border-radius: 4px; background: #FFFFFF;" />
-                              <div style="font-size: 7px; color: #475569; font-weight: 700; margin-top: 1px;">📱 Scan Foto</div>
-                            </div>`
-                          : ''
-                      }
-                    </div>
-                  </div>
-                </div>
-              `;
-            } else {
-              gridHtml += `
-                <div class="gallery-item" style="background: #F8FAFC; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 10px; page-break-inside: avoid;">
-                  <div class="img-wrapper" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: auto; min-height: 180px;">
-                    ${
-                      item.qrDataUrl
-                        ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 110px; height: 110px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
-                        : `<div style="font-size: 36px; margin-bottom: 6px;">📄</div>`
-                    }
-                    <div style="font-size: 10.5px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
-                      📄 ${item.nama}
-                    </div>
-                    <div style="font-size: 8.5px; font-weight: 700; color: #047857; margin-top: 2px;">
-                      ${item.hasOnlineLink ? 'DOKUMEN PDF CLOUD ONLINE' : 'DOKUMEN PDF ARSIP SISTEM'}
-                    </div>
-                    <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
-                      ${item.hasOnlineLink ? '📱 Scan QR Code untuk membuka dokumen PDF di HP' : '💾 Dokumen tersimpan aman di database arsip internal'}
-                    </div>
-                  </div>
-                  <div class="caption" style="margin-top: 8px; border-top: 1px solid #E2E8F0; padding-top: 6px;">
-                    <div class="caption-date" style="font-size: 8.5px; color: #64748B; font-weight: 600;">[${formatDate(item.tanggal)}]</div>
-                    <div class="caption-desc" style="font-size: 10px; color: #0F172A; font-weight: 700; line-height: 1.3;">${item.deskripsi}${item.seqLabel}</div>
-                    <div class="caption-nom" style="font-size: 11px; color: #DC2626; font-weight: 800; margin-top: 2px;">${formatSaldoRupiah(item.nominal)}</div>
-                  </div>
-                </div>
-              `;
-            }
-          });
-
-          gridHtml += `
-              </div>
-            </div>
-          `;
-          return gridHtml;
-        };
-
-        if (clientPaymentItems.length > 0) {
-          attachmentsHtml += renderItemGrid(
-            clientPaymentItems,
-            '📌 BAGIAN A: BUKTI PEMBAYARAN & INVOICE PELUNASAN KLIEN (Penerimaan Omzet Usaha)'
-          );
-        }
-        if (dropDanaItems.length > 0) {
-          attachmentsHtml += renderItemGrid(
-            dropDanaItems,
-            '📌 BAGIAN B: OTORISASI DROP DANA & PERPUTARAN KAS MODAL (Transfer Kas Internal & Panjar)'
-          );
-        }
-        if (fieldExpenseItems.length > 0) {
-          attachmentsHtml += renderItemGrid(
-            fieldExpenseItems,
-            '📌 BAGIAN C: STRUK, NOTA & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana / Operasional)'
-          );
-        }
-        if (clientPaymentItems.length === 0 && dropDanaItems.length === 0 && fieldExpenseItems.length === 0) {
-          attachmentsHtml += renderItemGrid(itemsToPrint, '📌 LAMPIRAN BUKTI TRANSAKSI & STRUK');
-        }
-
-        attachmentsHtml += `
-          </div>
-        `;
-      }
-    }
 
     const sanitizeName = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
     const dateFormatted = new Date().toISOString().split('T')[0];
@@ -1028,10 +788,18 @@ export function PdfReportModal({
               page-break-inside: avoid !important;
               break-inside: avoid !important;
             }
+            ${!withAttachments ? `
             /* Hide the on-screen preview gallery inside the print iframe so it does not duplicate or print when not requested */
             .on-screen-gallery {
               display: none !important;
             }
+            ` : `
+            /* Make the on-screen gallery start on a new page */
+            .on-screen-gallery {
+              page-break-before: always;
+              margin-top: 20px;
+            }
+            `}
             /* Anti-Orphan Heading & Section Rules */
             h1, h2, h3, h4, h5, h6, .doc-header, .section-title, .table-title {
               page-break-after: avoid !important;
@@ -1300,7 +1068,6 @@ export function PdfReportModal({
         </head>
         <body>
           ${content.innerHTML}
-          ${attachmentsHtml}
         </body>
       </html>
     `);
@@ -1341,11 +1108,35 @@ export function PdfReportModal({
       };
 
       images.forEach(img => {
-        if (img.complete && img.naturalHeight !== 0) {
-          checkAndPrint();
-        } else {
+        const attachListeners = () => {
           img.onload = checkAndPrint;
-          img.onerror = checkAndPrint;
+          img.onerror = () => {
+            const fallback = img.getAttribute('data-fallback');
+            const driveId = img.getAttribute('data-driveid');
+            const tried = img.getAttribute('data-tried');
+            
+            if (!tried && fallback) {
+              img.setAttribute('data-tried', '1');
+              img.src = fallback;
+            } else if (tried === '1' && driveId) {
+              img.setAttribute('data-tried', '2');
+              img.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+            } else {
+              checkAndPrint();
+            }
+          };
+        };
+
+        if (img.complete) {
+          if (img.naturalHeight !== 0) {
+            checkAndPrint();
+          } else {
+            // Already failed or blank, trigger error logic manually
+            attachListeners();
+            img.dispatchEvent(new Event('error'));
+          }
+        } else {
+          attachListeners();
         }
       });
 
@@ -2415,6 +2206,8 @@ export function PdfReportModal({
                               <img
                                 src={resolved.primary}
                                 alt={att.nama}
+                                data-fallback={resolved.fallback}
+                                data-driveid={driveId || ''}
                                 referrerPolicy="no-referrer"
                                 loading="eager"
                                 className="max-h-[220px] max-w-full object-contain rounded-md cursor-pointer hover:scale-105 transition-transform"
