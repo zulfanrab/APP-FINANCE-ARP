@@ -1349,14 +1349,14 @@ export function PdfReportModal({
         }
       });
 
-      // Safety timeout: Always trigger print after 2.5 seconds maximum
+      // Safety timeout: Always trigger print after 8 seconds maximum (accommodates slow Google Apps Script redirects)
       setTimeout(() => {
         if (!hasPrinted) {
           hasPrinted = true;
           iframe.contentWindow?.focus();
           iframe.contentWindow?.print();
         }
-      }, 2500);
+      }, 8000);
     };
 
     triggerPrintWhenImagesReady();
