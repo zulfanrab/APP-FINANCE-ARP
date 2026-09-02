@@ -752,8 +752,6 @@ export function PdfReportModal({
 
 
     let attachmentsHtml = '';
-
-    let attachmentsHtml = '';
     if (withAttachments) {
       // Find all transactions with attachments or receipts based on report context
       const reportTxs = project 
