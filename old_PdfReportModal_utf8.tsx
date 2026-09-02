@@ -1,5 +1,5 @@
-// ============================================================
-// ARKA Finance — Official Printable PDF & KOP Document Engine
+﻿// ============================================================
+// ARKA Finance ΓÇö Official Printable PDF & KOP Document Engine
 // Matches Official Letterhead Details (Jl. Cibodas Raya No. 02, Antapani Kidul,
 // +62 821-2984-9515, aksara.riksa.perdana@gmail.com, aksarariksapjk3.com)
 // Universal Hidden-Iframe Printing for 100% Mobile HP & Desktop Compatibility
@@ -429,7 +429,7 @@ export function PdfReportModal({
   // Resilient transaction extraction: Include all active project transactions
   const validProjectTransactions = useMemo(() => {
     return project
-      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id, project.nama, project.nomorSurat))
+      ? transactions.filter(t => !t.isDeleted && t.status !== 'ditolak' && isMatchingProject(t, project.id, project.nama))
       : [];
   }, [project, transactions]);
 
@@ -747,13 +747,8 @@ export function PdfReportModal({
     const frameDoc = iframe.contentWindow?.document || iframe.contentDocument;
     if (!frameDoc) return;
 
-    // Use the already-rendered on-screen gallery to guarantee 100% consistency
-    // No more duplicate attachmentsHtml generation that might miss items!
-
-
     let attachmentsHtml = '';
-
-    let attachmentsHtml = '';
+    
     if (withAttachments) {
       // Find all transactions with attachments or receipts based on report context
       const reportTxs = project 
@@ -986,9 +981,8 @@ export function PdfReportModal({
             '≡ƒôî BAGIAN C: STRUK, NOTA & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana / Operasional)'
           );
         }
-        const uncategorizedItems = itemsToPrint.filter(i => !i.isClientPayment && !i.isDropDana && !i.isFieldExpense);
-        if (uncategorizedItems.length > 0) {
-          attachmentsHtml += renderItemGrid(uncategorizedItems, '📌 BAGIAN D: DOKUMENTASI TAMBAHAN & LAINNYA');
+        if (clientPaymentItems.length === 0 && dropDanaItems.length === 0 && fieldExpenseItems.length === 0) {
+          attachmentsHtml += renderItemGrid(itemsToPrint, '≡ƒôî LAMPIRAN BUKTI TRANSAKSI & STRUK');
         }
 
         attachmentsHtml += `
@@ -996,7 +990,6 @@ export function PdfReportModal({
         `;
       }
     }
-
 
     const sanitizeName = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
     const dateFormatted = new Date().toISOString().split('T')[0];
@@ -1035,7 +1028,7 @@ export function PdfReportModal({
               page-break-inside: avoid !important;
               break-inside: avoid !important;
             }
-            /* Hide the on-screen preview gallery inside the print iframe because we use attachmentsHtml for proper layout */
+            /* Hide the on-screen preview gallery inside the print iframe so it does not duplicate or print when not requested */
             .on-screen-gallery {
               display: none !important;
             }
@@ -1303,60 +1296,6 @@ export function PdfReportModal({
               color: #DC2626;
               font-weight: 800;
             }
-            .gallery-grid {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 15px;
-              margin-top: 20px;
-            }
-            .gallery-item {
-              width: calc(50% - 7.5px);
-              border: 1px solid #CBD5E1;
-              border-radius: 8px;
-              padding: 10px;
-              background: #F8FAFC;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-              box-sizing: border-box;
-              margin-bottom: 10px;
-            }
-            .img-wrapper {
-              width: 100%;
-              height: 200px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: #F1F5F9;
-              border-radius: 4px;
-              overflow: hidden;
-              margin-bottom: 10px;
-            }
-            .img-wrapper img {
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-            }
-            .caption {
-              text-align: left;
-            }
-            .caption-date {
-              font-size: 8.5px;
-              color: #64748B;
-              font-weight: 600;
-              margin-bottom: 2px;
-            }
-            .caption-desc {
-              font-size: 10px;
-              color: #0F172A;
-              font-weight: 700;
-              line-height: 1.3;
-              margin-bottom: 4px;
-            }
-            .caption-nom {
-              font-size: 11px;
-              color: #DC2626;
-              font-weight: 800;
-            }
           </style>
         </head>
         <body>
@@ -1402,35 +1341,11 @@ export function PdfReportModal({
       };
 
       images.forEach(img => {
-        const attachListeners = () => {
-          img.onload = checkAndPrint;
-          img.onerror = () => {
-            const fallback = img.getAttribute('data-fallback');
-            const driveId = img.getAttribute('data-driveid');
-            const tried = img.getAttribute('data-tried');
-            
-            if (!tried && fallback) {
-              img.setAttribute('data-tried', '1');
-              img.src = fallback;
-            } else if (tried === '1' && driveId) {
-              img.setAttribute('data-tried', '2');
-              img.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
-            } else {
-              checkAndPrint();
-            }
-          };
-        };
-
-        if (img.complete) {
-          if (img.naturalHeight !== 0) {
-            checkAndPrint();
-          } else {
-            // Already failed or blank, trigger error logic manually
-            attachListeners();
-            img.dispatchEvent(new Event('error'));
-          }
+        if (img.complete && img.naturalHeight !== 0) {
+          checkAndPrint();
         } else {
-          attachListeners();
+          img.onload = checkAndPrint;
+          img.onerror = checkAndPrint;
         }
       });
 
@@ -1464,8 +1379,8 @@ export function PdfReportModal({
                   onChange={e => setReportScope(e.target.value as 'konsolidasi' | 'kas_utama')}
                   className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="konsolidasi">🌐 Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
-                  <option value="kas_utama">🏢 Laporan Kas Utama (Induk / Non-Proyek)</option>
+                  <option value="konsolidasi">≡ƒîÉ Laporan Konsolidasi (Lengkap 100% Transaksi)</option>
+                  <option value="kas_utama">≡ƒÅó Laporan Kas Utama (Induk / Non-Proyek)</option>
                 </select>
               ) : (
                 (() => {
@@ -1480,10 +1395,10 @@ export function PdfReportModal({
                         onChange={e => setSelectedPengajuanTxId(e.target.value)}
                         className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
-                        <option value="semua">🌐 Akumulasi Total Proyek (Semua Pengajuan)</option>
+                        <option value="semua">≡ƒîÉ Akumulasi Total Proyek (Semua Pengajuan)</option>
                         {injections.map((inj, idx) => (
                           <option key={inj.id} value={inj.id}>
-                            📄 LPJ Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)} ({formatDate(inj.tanggal)})
+                            ≡ƒôä LPJ Pengajuan #{idx + 1}: {inj.deskripsi.slice(0, 30)} ({formatDate(inj.tanggal)})
                           </option>
                         ))}
                       </select>
@@ -1498,8 +1413,8 @@ export function PdfReportModal({
                 className="px-3 py-2 bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 title="Pilih Ukuran Kertas"
               >
-                <option value="f4">📄 Ukuran F4 / Folio (215 × 330 mm)</option>
-                <option value="a4">📄 Ukuran A4 (210 × 297 mm)</option>
+                <option value="f4">≡ƒôä Ukuran F4 / Folio (215 ├ù 330 mm)</option>
+                <option value="a4">≡ƒôä Ukuran A4 (210 ├ù 297 mm)</option>
               </select>
               <button
                 onClick={() => handlePrint(false)}
@@ -1521,7 +1436,7 @@ export function PdfReportModal({
             <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  📝 Sesuaikan Keterangan Kop &amp; Pengajuan Sebelum Cetak
+                  ≡ƒô¥ Sesuaikan Keterangan Kop &amp; Pengajuan Sebelum Cetak
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">Bisa diedit manual langsung di sini</span>
               </div>
@@ -1593,7 +1508,7 @@ export function PdfReportModal({
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-emerald-400">
-                      ✍️ Pengaturan Otorisasi &amp; Drop Tanda Tangan Digital (Fleksibel)
+                      Γ£ì∩╕Å Pengaturan Otorisasi &amp; Drop Tanda Tangan Digital (Fleksibel)
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1 bg-slate-800 p-1 rounded-xl text-[10.5px] font-bold">
@@ -1602,14 +1517,14 @@ export function PdfReportModal({
                       onClick={() => updateSigCount(0)}
                       className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 0 ? 'bg-rose-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      🚫 Tanpa TTD
+                      ≡ƒÜ½ Tanpa TTD
                     </button>
                     <button
                       type="button"
                       onClick={() => updateSigCount(1)}
                       className={`px-2.5 py-1 rounded-lg transition-all ${sigCount === 1 ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
                     >
-                      👤 1 Kolom (Dibuat Oleh: Finance Saja)
+                      ≡ƒæñ 1 Kolom (Dibuat Oleh: Finance Saja)
                     </button>
                     <button
                       type="button"
@@ -1637,7 +1552,7 @@ export function PdfReportModal({
 
                 {sigCount === 0 ? (
                   <div className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/70 text-center text-slate-300 text-xs">
-                    💡 <strong>Mode Tanpa Tanda Tangan:</strong> Dokumen PDF akan dicetak bersih tanpa area tanda tangan atau persetujuan pihak mana pun. Cocok untuk rekapitulasi data cepat &amp; arsip pribadi.
+                    ≡ƒÆí <strong>Mode Tanpa Tanda Tangan:</strong> Dokumen PDF akan dicetak bersih tanpa area tanda tangan atau persetujuan pihak mana pun. Cocok untuk rekapitulasi data cepat &amp; arsip pribadi.
                   </div>
                 ) : (
                   <div className={`grid grid-cols-1 ${sigCount === 4 ? 'sm:grid-cols-4' : sigCount === 3 ? 'sm:grid-cols-3' : sigCount === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1'} gap-2`}>
@@ -1790,7 +1705,7 @@ export function PdfReportModal({
                           }}
                           className="rounded text-amber-500 focus:ring-amber-400 w-3 h-3"
                         />
-                        <span className="text-[10px] font-bold text-amber-400">✍️ Paraf Draft</span>
+                        <span className="text-[10px] font-bold text-amber-400">Γ£ì∩╕Å Paraf Draft</span>
                       </label>
                       {parafImg && (
                         <button onClick={handleParafClear} className="text-[10px] text-rose-400 hover:underline flex-shrink-0 ml-1">Hapus</button>
@@ -1834,7 +1749,7 @@ export function PdfReportModal({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-900 uppercase tracking-wide">
-                    🔍 Detektor Bukti &amp; Lampiran Transaksi (Live Inspector)
+                    ≡ƒöì Detektor Bukti &amp; Lampiran Transaksi (Live Inspector)
                   </span>
                   <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded-full text-[10px] font-extrabold">
                     {diagnosticData.totalBerkas} Berkas Terdeteksi
@@ -1849,13 +1764,13 @@ export function PdfReportModal({
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-bold text-slate-700 mr-2">
                 <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-emerald-700">
-                  📸 {diagnosticData.totalFoto} Foto Struk
+                  ≡ƒô╕ {diagnosticData.totalFoto} Foto Struk
                 </span>
                 <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-amber-700">
-                  📄 {diagnosticData.totalPdf} PDF
+                  ≡ƒôä {diagnosticData.totalPdf} PDF
                 </span>
                 <span className="px-2 py-1 bg-white border border-emerald-200 rounded-lg text-blue-700">
-                  🏦 {diagnosticData.totalTransfer} Bukti Transfer
+                  ≡ƒÅª {diagnosticData.totalTransfer} Bukti Transfer
                 </span>
               </div>
               <button
@@ -1881,7 +1796,7 @@ export function PdfReportModal({
                         <FileText size={16} className="text-amber-600" />
                         <div>
                           <span className="text-xs font-bold text-slate-900">
-                            📄 Surat Pengajuan / Kontrak Induk Pos
+                            ≡ƒôä Surat Pengajuan / Kontrak Induk Pos
                           </span>
                           <span className="block text-[10px] text-amber-700 font-medium">
                             File PDF tersimpan di data proyek &middot; Status: Siap Dicetak &amp; QR Code Terpasang
@@ -1909,7 +1824,7 @@ export function PdfReportModal({
                           </span>
                         </div>
                         <div className="text-[10.5px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
-                          <span>📅 {formatDate(item.tx.tanggal)}</span>
+                          <span>≡ƒôà {formatDate(item.tx.tanggal)}</span>
                           <span>&middot;</span>
                           <span className="font-bold text-rose-600">{formatSaldoRupiah(item.tx.nominal)}</span>
                           <span>&middot;</span>
@@ -1990,7 +1905,7 @@ export function PdfReportModal({
                           </h1>
                           <p className="company-info text-[10.5px] font-medium text-slate-700 mt-1 leading-relaxed">
                             {companyAddress}<br />
-                            📞 {companyPhone} &nbsp;·&nbsp; ✉️ {companyEmail} &nbsp;·&nbsp; 🌐 {companyWebsite}
+                            ≡ƒô₧ {companyPhone} &nbsp;┬╖&nbsp; Γ£ë∩╕Å {companyEmail} &nbsp;┬╖&nbsp; ≡ƒîÉ {companyWebsite}
                           </p>
                         </div>
                         <div className="kop-line-secondary border-b border-emerald-200 mt-0.5 mb-4" />
@@ -2000,7 +1915,7 @@ export function PdfReportModal({
                       <div className="doc-header text-center my-3">
                         <h2 className="doc-title text-base font-extrabold text-[#047857] uppercase tracking-wide">{displayTitle}</h2>
                         <p className="doc-subtitle text-xs text-slate-600 mt-1">
-                          {displaySubtitle} · Periode: <strong className="text-slate-800">{periodText}</strong>
+                          {displaySubtitle} ┬╖ Periode: <strong className="text-slate-800">{periodText}</strong>
                         </p>
                         
                         {project && (
@@ -2113,19 +2028,19 @@ export function PdfReportModal({
                       ) : (
                         <div className="summary-box flex flex-row justify-between items-stretch gap-2.5 bg-[#F8FAFC] border border-slate-300 rounded-2xl p-3 my-4 shadow-sm w-full page-break-inside-avoid">
                           <div className="summary-card card-green flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">💰 Pendapatan Klien (P&L)</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">≡ƒÆ░ Pendapatan Klien (P&L)</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetRil)}</p>
                           </div>
                           <div className="summary-card card-navy flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📥 Drop Dana &amp; Modal</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">≡ƒôÑ Drop Dana &amp; Modal</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalOmzetSemu)}</p>
                           </div>
                           <div className="summary-card card-red flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center">
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">📉 Total Beban Pengeluaran</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">≡ƒôë Total Beban Pengeluaran</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">{formatRupiah(totalKredit)}</p>
                           </div>
                           <div className={`summary-card flex-1 flex flex-col justify-center p-2.5 rounded-xl border text-center ${sisaDana >= 0 ? 'card-green' : 'card-red'}`}>
-                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">🏦 Saldo Kas Akhir (Aset)</span>
+                            <span className="summary-label text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block mb-1">≡ƒÅª Saldo Kas Akhir (Aset)</span>
                             <p className="summary-val text-xs sm:text-sm font-black tabular-nums">
                               {formatSaldoRupiah(sisaDana)}
                             </p>
@@ -2138,7 +2053,7 @@ export function PdfReportModal({
                         <div className="my-5 page-break-inside-avoid">
                           <div className="border-b border-[#047857] pb-1 mb-2 flex items-center justify-between">
                             <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
-                              📋 Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
+                              ≡ƒôï Matriks Realisasi Item Pengadaan &amp; Varians RAB (Estimasi Rencana vs Realisasi Riil)
                             </h3>
                             <span className="text-[10px] text-slate-500 font-semibold">Checklist Cross-Check Item Belanja</span>
                           </div>
@@ -2173,18 +2088,18 @@ export function PdfReportModal({
                                       {budget > 0 ? formatRupiah(budget) : '-'}
                                     </td>
                                     <td className="p-2 border border-slate-200 text-right font-bold text-slate-900 tabular-nums">
-                                      {item.isCancelled ? '🚫 Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
+                                      {item.isCancelled ? '≡ƒÜ½ Dibatalkan' : actual > 0 ? formatRupiah(actual) : item.isPurchased ? 'Terbeli (Nota Ada)' : 'Belum Belanja'}
                                     </td>
                                     <td className={`p-2 border border-slate-200 text-right font-extrabold tabular-nums ${!item.isCancelled && selisih > 0 ? 'text-emerald-700' : !item.isCancelled && selisih < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
                                       {!item.isCancelled && selisih > 0 ? `+${formatRupiah(selisih)} (Hemat)` : !item.isCancelled && selisih < 0 ? `-${formatRupiah(Math.abs(selisih))} (Over)` : '-'}
                                     </td>
                                     <td className="p-2 border border-slate-200 text-center text-[9px] font-bold">
                                       {item.isCancelled ? (
-                                        <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">🚫 Dibatalkan</span>
+                                        <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">≡ƒÜ½ Dibatalkan</span>
                                       ) : item.isPurchased ? (
-                                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">✅ Terbeli</span>
+                                        <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Γ£à Terbeli</span>
                                       ) : (
-                                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⏳ Pending</span>
+                                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">ΓÅ│ Pending</span>
                                       )}
                                     </td>
                                   </tr>
@@ -2218,7 +2133,7 @@ export function PdfReportModal({
                     {chunk.isFirstPage && (
                       <div className="border-b border-[#047857] pb-1 mb-2">
                         <h3 className="text-xs font-bold text-[#047857] uppercase tracking-wider m-0">
-                          📑 Jurnal Mutasi Realisasi Kas Lapangan (Rincian Transaksi Transparan)
+                          ≡ƒôæ Jurnal Mutasi Realisasi Kas Lapangan (Rincian Transaksi Transparan)
                         </h3>
                       </div>
                     )}
@@ -2318,7 +2233,7 @@ export function PdfReportModal({
                               <div>{formatSaldoRupiah(sisaDana)}</div>
                               {isInternal && (
                                 <div className={`text-[8.5px] font-extrabold uppercase mt-0.5 tracking-wider ${sisaDana > 0 ? 'text-emerald-700' : sisaDana < 0 ? 'text-rose-700' : 'text-slate-500'}`}>
-                                  {sisaDana > 0 ? '📥 [REFUND]' : sisaDana < 0 ? '📤 [REIMBURSE]' : '[NIHIL]'}
+                                  {sisaDana > 0 ? '≡ƒôÑ [REFUND]' : sisaDana < 0 ? '≡ƒôñ [REIMBURSE]' : '[NIHIL]'}
                                 </div>
                               )}
                             </td>
@@ -2461,7 +2376,7 @@ export function PdfReportModal({
 
                 <div className="bg-slate-50 border-l-4 border-[#047857] p-2.5 rounded-r-lg mb-3">
                   <h2 className="text-[11px] font-black text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>📸</span>
+                    <span>≡ƒô╕</span>
                     <span>BERKAS BUKTI TRANSAKSI &amp; STRUK RESI RESMI</span>
                   </h2>
                   <p className="text-[9.5px] text-slate-500 font-medium mt-0.5">
@@ -2488,7 +2403,7 @@ export function PdfReportModal({
                           <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-center min-h-[170px] max-h-[240px] overflow-hidden">
                             {isPdf ? (
                               <div className="flex flex-col items-center justify-center text-center p-3 space-y-2">
-                                <div className="text-4xl">📄</div>
+                                <div className="text-4xl">≡ƒôä</div>
                                 <span className="text-[11px] font-bold text-slate-800 break-all max-w-[200px]">
                                   {att.nama}
                                 </span>
@@ -2500,8 +2415,6 @@ export function PdfReportModal({
                               <img
                                 src={resolved.primary}
                                 alt={att.nama}
-                                data-fallback={resolved.fallback}
-                                data-driveid={driveId || ''}
                                 referrerPolicy="no-referrer"
                                 loading="eager"
                                 className="max-h-[220px] max-w-full object-contain rounded-md cursor-pointer hover:scale-105 transition-transform"
@@ -2536,7 +2449,7 @@ export function PdfReportModal({
                               onClick={() => setPreviewModalImg({ nama: att.nama, url: att.dataUrl })}
                               className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded text-[10px] font-bold flex-shrink-0 cursor-pointer"
                             >
-                              🔍 Zoom
+                              ≡ƒöì Zoom
                             </button>
                           </div>
                         </div>
@@ -2566,7 +2479,7 @@ export function PdfReportModal({
                 onClick={() => setPreviewModalImg(null)}
                 className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold cursor-pointer"
               >
-                ✕ Tutup
+                Γ£ò Tutup
               </button>
             </div>
             <div className="max-h-[70vh] flex items-center justify-center bg-slate-950 rounded-xl overflow-hidden p-2">
