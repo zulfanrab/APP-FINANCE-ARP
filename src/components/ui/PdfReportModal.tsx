@@ -922,7 +922,7 @@ export function PdfReportModal({
                         item.qrDataUrl
                           ? `<div style="text-align: center; flex-shrink: 0;">
                               <img src="${item.qrDataUrl}" alt="Scan QR" style="width: 52px; height: 52px; border: 1px solid #CBD5E1; padding: 2px; border-radius: 4px; background: #FFFFFF;" />
-                              <div style="font-size: 7px; color: #475569; font-weight: 700; margin-top: 1px;">≡ƒô▒ Scan Foto</div>
+                              <div style="font-size: 7px; color: #475569; font-weight: 700; margin-top: 1px;">📱 Scan Foto</div>
                             </div>`
                           : ''
                       }
@@ -937,16 +937,16 @@ export function PdfReportModal({
                     ${
                       item.qrDataUrl
                         ? `<img src="${item.qrDataUrl}" alt="Scan QR Code PDF" style="width: 110px; height: 110px; border: 1px solid #CBD5E1; padding: 4px; border-radius: 6px; background: #FFFFFF; margin-bottom: 6px;" />`
-                        : `<div style="font-size: 36px; margin-bottom: 6px;">≡ƒôä</div>`
+                        : `<div style="font-size: 36px; margin-bottom: 6px;">📄</div>`
                     }
                     <div style="font-size: 10.5px; font-weight: 800; color: #1E293B; word-break: break-all; max-width: 95%; margin-top: 2px;">
-                      ≡ƒôä ${item.nama}
+                      📄 ${item.nama}
                     </div>
                     <div style="font-size: 8.5px; font-weight: 700; color: #047857; margin-top: 2px;">
                       ${item.hasOnlineLink ? 'DOKUMEN PDF CLOUD ONLINE' : 'DOKUMEN PDF ARSIP SISTEM'}
                     </div>
                     <div style="font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; padding: 3px 6px; background: #F1F5F9; border-radius: 4px; border: 1px dashed #CBD5E1;">
-                      ${item.hasOnlineLink ? '≡ƒô▒ Scan QR Code untuk membuka dokumen PDF di HP' : '≡ƒÆ╛ Dokumen tersimpan aman di database arsip internal'}
+                      ${item.hasOnlineLink ? '📱 Scan QR Code untuk membuka dokumen PDF di HP' : '💾 Dokumen tersimpan aman di database arsip internal'}
                     </div>
                   </div>
                   <div class="caption" style="margin-top: 8px; border-top: 1px solid #E2E8F0; padding-top: 6px;">
@@ -969,19 +969,19 @@ export function PdfReportModal({
         if (clientPaymentItems.length > 0) {
           attachmentsHtml += renderItemGrid(
             clientPaymentItems,
-            '≡ƒôî BAGIAN A: BUKTI PEMBAYARAN & INVOICE PELUNASAN KLIEN (Penerimaan Omzet Usaha)'
+            '📌 BAGIAN A: BUKTI PEMBAYARAN & INVOICE PELUNASAN KLIEN (Penerimaan Omzet Usaha)'
           );
         }
         if (dropDanaItems.length > 0) {
           attachmentsHtml += renderItemGrid(
             dropDanaItems,
-            '≡ƒôî BAGIAN B: OTORISASI DROP DANA & PERPUTARAN KAS MODAL (Transfer Kas Internal & Panjar)'
+            '📌 BAGIAN B: OTORISASI DROP DANA & PERPUTARAN KAS MODAL (Transfer Kas Internal & Panjar)'
           );
         }
         if (fieldExpenseItems.length > 0) {
           attachmentsHtml += renderItemGrid(
             fieldExpenseItems,
-            '≡ƒôî BAGIAN C: STRUK, NOTA & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana / Operasional)'
+            '📌 BAGIAN C: STRUK, NOTA & BUKTI FISIK BELANJA LAPANGAN (Teknisi / Pelaksana / Operasional)'
           );
         }
         const uncategorizedItems = itemsToPrint.filter(i => !i.isClientPayment && !i.isDropDana && !i.isFieldExpense);
