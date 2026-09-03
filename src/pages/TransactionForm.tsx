@@ -78,9 +78,6 @@ export function TransactionForm() {
     suratPengajuanId: '',
   });
 
-  // Approval Flow Switch
-  const [autoApprove, setAutoApprove] = useState<boolean>(!!urlProyekId);
-
   // Memoized historical recipients so it never lags during typing
   const historicalRecipients = React.useMemo(() => {
     return extractHistoricalRecipients(cachedTransactions);
@@ -95,17 +92,9 @@ export function TransactionForm() {
   useEffect(() => {
     if (urlProyekId) {
       setForm(f => ({ ...f, proyekId: urlProyekId }));
-      setAutoApprove(true);
     }
   }, [urlProyekId]);
-
-  useEffect(() => {
-    if (form.proyekId) {
-      setAutoApprove(true);
-    }
-  }, [form.proyekId]);
-
-  useEffect(() => {
+useEffect(() => {
     const defaults = form.jenis === 'masuk' ? DEFAULT_INCOME_CATEGORIES : DEFAULT_EXPENSE_CATEGORIES;
     setCategories(defaults);
     setForm(f => ({
@@ -374,7 +363,7 @@ export function TransactionForm() {
         tag: form.jenis === 'keluar' ? form.tag : undefined,
         proyekId: (form.proyekId || urlProyekId) || undefined,
         lampiran: uploadedAttachments,
-        status: autoApprove ? 'disetujui' : 'menunggu_approval',
+        status: 'disetujui',
         penerimaDetail: form.jenis === 'keluar' ? (form.penerimaDetail.trim() || undefined) : undefined,
         jalurTransfer: form.jenis === 'keluar' ? form.jalurTransfer : undefined,
         adminNominalCustom: form.jenis === 'keluar' && form.jalurTransfer === 'custom' ? adminNominalCustom : undefined,
@@ -1027,44 +1016,6 @@ export function TransactionForm() {
                 <p>Transaksi ini hanya mengurangi saldo dana proyek, <strong>TIDAK</strong> mengurangi kas utama perusahaan.</p>
               </div>
             )}
-
-            {/* Status Approval Selector */}
-            <div className="sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
-              <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">Status Approval Transaksi</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAutoApprove(true)}
-                  className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
-                    autoApprove
-                      ? 'border-emerald-500 bg-emerald-50/80 text-emerald-900 ring-2 ring-emerald-500/20 shadow-sm'
-                      : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap size={16} className={autoApprove ? 'text-emerald-600' : 'text-gray-400'} />
-                    <span className="font-extrabold text-xs">⚡ Auto-Approved</span>
-                  </div>
-                  <p className="text-[11px] opacity-80 leading-snug">Langsung disetujui &amp; aktif di kas/proyek tanpa antrean approval.</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setAutoApprove(false)}
-                  className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
-                    !autoApprove
-                      ? 'border-amber-500 bg-amber-50/80 text-amber-900 ring-2 ring-amber-500/20 shadow-sm'
-                      : 'border-gray-200 text-gray-600 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Clock size={16} className={!autoApprove ? 'text-amber-600' : 'text-gray-400'} />
-                    <span className="font-extrabold text-xs">⏰ Perlu Approval</span>
-                  </div>
-                  <p className="text-[11px] opacity-80 leading-snug">Masuk ke antrean approval manajemen terlebih dahulu.</p>
-                </button>
-              </div>
-            </div>
           </div>
         </Card>
 

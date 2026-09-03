@@ -497,9 +497,8 @@ export async function addTransaction(
       ? 'Direksi / Pimpinan'
       : 'Head of Finance');
 
-  // Assistant transactions default to 'menunggu_approval' unless explicitly specified
-  const resolvedStatus =
-    data.status ?? (resolvedRole === 'staff' ? 'menunggu_approval' : 'disetujui');
+  // All transactions default to 'disetujui' since approval flow is removed
+  const resolvedStatus = data.status ?? 'disetujui';
 
   const newTransaction: Transaction = {
     ...data,
