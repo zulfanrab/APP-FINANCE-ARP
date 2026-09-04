@@ -688,50 +688,6 @@ useEffect(() => {
               </div>
             )}
 
-            {/* Rekening Sumber */}
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                {form.jenis === 'masuk' ? 'Saku / Rekening Penerima *' : 'Saku / Rekening Sumber *'}
-              </label>
-              <select
-                value={form.rekeningId}
-                onChange={e => setField('rekeningId', e.target.value as AccountId)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
-                required
-              >
-                {role !== 'staff' && (
-                  <>
-                    <option value="bca_utama">BCA Utama (Holding/Bos)</option>
-                    <option value="bri_utama">BRI Utama (Holding/Bos)</option>
-                  </>
-                )}
-                <option value="kas_admin">Kas Operasional Admin</option>
-              </select>
-            </div>
-
-            {/* Rekening Tujuan (Khusus Mutasi Internal) */}
-            {form.kategori === 'Mutasi Internal / Transfer Kas' && (
-              <div className="sm:col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-xl animate-fade-in mb-4">
-                <label className="block text-xs font-semibold text-blue-900 mb-1">
-                  Saku / Rekening Tujuan *
-                </label>
-                <select
-                  value={form.rekeningTujuanId}
-                  onChange={e => setField('rekeningTujuanId', e.target.value as AccountId)}
-                  className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium text-blue-900"
-                  required
-                >
-                  {role !== 'staff' && (
-                    <>
-                      <option value="bca_utama">BCA Utama (Holding/Bos)</option>
-                      <option value="bri_utama">BRI Utama (Holding/Bos)</option>
-                    </>
-                  )}
-                  <option value="kas_admin">Kas Operasional Admin</option>
-                </select>
-              </div>
-            )}
-
             {/* Kategori Custom Select */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -898,40 +854,32 @@ useEffect(() => {
 
             {/* Saku / Rekening Conditional Selector */}
             {form.kategori === 'Mutasi Internal / Transfer Kas' ? (
-              <>
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl mb-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Asal (Dari)</label>
+                  <label className="block text-xs font-bold text-blue-900 mb-2 uppercase tracking-wider">Saku Asal (Dari)</label>
                   <select
                     value={form.rekeningId}
                     onChange={e => setField('rekeningId', e.target.value as AccountId)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                    className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-blue-900 shadow-sm"
                   >
-                    {role !== 'staff' && (
-                      <>
-                        <option value="bca_utama">🏦 BCA Utama</option>
-                        <option value="bri_utama">🏦 BRI Utama</option>
-                      </>
-                    )}
-                    <option value="kas_admin">💵 Kas Operasional Admin</option>
+                    <option value="bca_utama">💳 BCA Utama</option>
+                    <option value="bri_utama">💳 BRI Utama</option>
+                    <option value="kas_admin">💼 Kas Operasional Admin</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Tujuan (Ke)</label>
+                  <label className="block text-xs font-bold text-blue-900 mb-2 uppercase tracking-wider">Saku Tujuan (Ke)</label>
                   <select
                     value={form.rekeningTujuanId}
                     onChange={e => setField('rekeningTujuanId', e.target.value as AccountId)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white font-medium"
+                    className="w-full border border-blue-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-blue-900 shadow-sm"
                   >
-                    {role !== 'staff' && (
-                      <>
-                        <option value="bca_utama">🏦 BCA Utama</option>
-                        <option value="bri_utama">🏦 BRI Utama</option>
-                      </>
-                    )}
-                    <option value="kas_admin">💵 Kas Operasional Admin</option>
+                    <option value="bca_utama">💳 BCA Utama</option>
+                    <option value="bri_utama">💳 BRI Utama</option>
+                    <option value="kas_admin">💼 Kas Operasional Admin</option>
                   </select>
                 </div>
-              </>
+              </div>
             ) : (
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
