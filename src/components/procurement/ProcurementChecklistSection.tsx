@@ -76,36 +76,40 @@ const QuickAddForm = React.memo(({ onAdd, injectionTxns, defaultSuratPengajuanId
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-2">
-      <input
-        type="text"
-        value={nama}
-        onChange={e => setNama(e.target.value)}
-        className="flex-[2] border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm"
-        placeholder="Nama Barang / Kebutuhan (Cth: Semen Padang)"
-      />
-      <div className="flex gap-1.5 flex-1 flex-wrap sm:flex-nowrap">
-        <input
-          type="number"
-          min="1"
-          value={kuantitas}
-          onChange={e => setKuantitas(e.target.value)}
-          className="w-14 border border-gray-200 rounded-xl px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm font-semibold"
-          placeholder="Qty"
-          title="Kuantitas"
-        />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 p-3 sm:p-4 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-sm">
+      <div className="w-full">
         <input
           type="text"
-          value={satuan}
-          onChange={e => setSatuan(e.target.value)}
-          className="w-20 border border-gray-200 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm"
-          placeholder="Satuan"
-          title="Satuan (Pcs, Sak, Unit, Roll, Load, dll)"
+          value={nama}
+          onChange={e => setNama(e.target.value)}
+          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm font-medium"
+          placeholder="Nama Barang / Kebutuhan (Cth: Kertas A4 / Wifi Kantor)"
         />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 items-center">
+        <div className="flex gap-1.5 col-span-2 sm:col-span-2 lg:col-span-2">
+          <input
+            type="number"
+            min="1"
+            value={kuantitas}
+            onChange={e => setKuantitas(e.target.value)}
+            className="w-16 border border-gray-200 rounded-xl px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm font-bold text-gray-900"
+            placeholder="Qty"
+            title="Kuantitas"
+          />
+          <input
+            type="text"
+            value={satuan}
+            onChange={e => setSatuan(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm font-medium min-w-0"
+            placeholder="Satuan (Pcs, Box...)"
+            title="Satuan"
+          />
+        </div>
         <select
           value={kategori}
           onChange={e => setKategori(e.target.value)}
-          className="border border-gray-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-700 font-medium shadow-sm"
+          className="col-span-2 sm:col-span-2 lg:col-span-1 border border-gray-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-white text-gray-700 font-medium shadow-sm w-full truncate"
         >
           <option value="Operational Cost">📦 Operational Cost</option>
           <option value="Transportasi & Akomodasi">🚗 Transportasi & Akomodasi</option>
@@ -120,7 +124,7 @@ const QuickAddForm = React.memo(({ onAdd, injectionTxns, defaultSuratPengajuanId
           <select
             value={suratPengajuanId}
             onChange={e => setSuratPengajuanId(e.target.value)}
-            className="border border-blue-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50/70 text-blue-900 font-bold shadow-sm"
+            className="col-span-2 sm:col-span-2 lg:col-span-1 border border-blue-200 rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50/70 text-blue-900 font-bold shadow-sm w-full truncate"
             title="Tautkan item ini ke Surat Pengajuan tertentu"
           >
             <option value="">-- Tanpa Surat --</option>
@@ -136,20 +140,21 @@ const QuickAddForm = React.memo(({ onAdd, injectionTxns, defaultSuratPengajuanId
           type="text"
           value={hargaRencana}
           onChange={e => setHargaRencana(formatRupiahInput(e.target.value))}
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-w-[120px] bg-white shadow-sm font-medium"
-          placeholder="Harga Rencana (Rp)"
+          className={`border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white shadow-sm font-bold text-gray-900 ${injectionTxns.length > 0 ? 'col-span-2 sm:col-span-2 lg:col-span-1' : 'col-span-2 sm:col-span-2 lg:col-span-2'}`}
+          placeholder="Total Rencana (Rp)"
         />
+
+        <Button
+          type="submit"
+          variant="primary"
+          size="sm"
+          disabled={!nama.trim() || submitting}
+          icon={<PlusCircle size={16} />}
+          className="col-span-2 sm:col-span-2 lg:col-span-1 w-full justify-center shadow-sm py-2.5 font-bold"
+        >
+          {submitting ? 'Menambah...' : 'Tambah Item'}
+        </Button>
       </div>
-      <Button
-        type="submit"
-        variant="primary"
-        size="sm"
-        disabled={!nama.trim() || submitting}
-        icon={<PlusCircle size={16} />}
-        className="whitespace-nowrap shadow-sm"
-      >
-        {submitting ? 'Menambah...' : 'Tambah'}
-      </Button>
     </form>
   );
 });

@@ -595,9 +595,9 @@ export function Projects() {
             />
           </div>
 
-          <div className="flex gap-3 justify-end pt-2">
-            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Batal</Button>
-            <Button type="submit" loading={saving}>{editingProject ? 'Simpan Perubahan' : 'Tambah Alokasi'}</Button>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end pt-2">
+            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)} className="w-full sm:w-auto justify-center">Batal</Button>
+            <Button type="submit" loading={saving} className="w-full sm:w-auto justify-center">{editingProject ? 'Simpan Perubahan' : 'Tambah Alokasi'}</Button>
           </div>
         </form>
       </Modal>
@@ -609,9 +609,9 @@ export function Projects() {
             Apakah Anda yakin ingin menghapus alokasi <strong>"{deleteConfirm?.nama}"</strong>?
             Transaksi yang terkait tidak akan ikut terhapus.
           </p>
-          <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Batal</Button>
-            <Button variant="danger" icon={<Trash2 size={14} />} onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Hapus</Button>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end">
+            <Button variant="secondary" onClick={() => setDeleteConfirm(null)} className="w-full sm:w-auto justify-center">Batal</Button>
+            <Button variant="danger" icon={<Trash2 size={14} />} onClick={() => deleteConfirm && handleDelete(deleteConfirm)} className="w-full sm:w-auto justify-center">Hapus</Button>
           </div>
         </div>
       </Modal>

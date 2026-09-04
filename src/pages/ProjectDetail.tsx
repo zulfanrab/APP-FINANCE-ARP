@@ -1554,9 +1554,9 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             )}
           </div>
 
-          <div className="flex gap-2 justify-end pt-3">
-            <Button variant="secondary" size="sm" onClick={() => setEditModalOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" onClick={handleSaveEdit}>Simpan Perubahan</Button>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-3">
+            <Button variant="secondary" size="sm" onClick={() => setEditModalOpen(false)} className="w-full sm:w-auto justify-center">Batal</Button>
+            <Button variant="primary" size="sm" onClick={handleSaveEdit} className="w-full sm:w-auto justify-center">Simpan Perubahan</Button>
           </div>
         </div>
       </Modal>
@@ -1601,14 +1601,15 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
             </ul>
           </div>
 
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setRefundModalOpen(false)}>Batal</Button>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
+            <Button variant="secondary" size="sm" onClick={() => setRefundModalOpen(false)} className="w-full sm:w-auto justify-center">Batal</Button>
             <Button
               variant="primary"
               size="sm"
               icon={<ArrowUpRight size={15} />}
               loading={refundSaving}
               onClick={handleRefundToKasUtama}
+              className="w-full sm:w-auto justify-center"
             >
               Konfirmasi Tarik ke Kas Utama
             </Button>
@@ -1658,8 +1659,8 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               className="w-full border border-gray-200 rounded-xl p-3 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <Button variant="secondary" size="sm" onClick={() => setImportModalOpen(false)}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-gray-100">
+            <Button variant="secondary" size="sm" onClick={() => setImportModalOpen(false)} className="w-full sm:w-auto justify-center">
               Batal
             </Button>
             <Button
@@ -1668,6 +1669,7 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
               icon={importing ? <LoadingSpinner size={14} /> : <CheckSquare size={16} />}
               onClick={handleImportBulkText}
               disabled={importing || !importText.trim()}
+              className="w-full sm:w-auto justify-center"
             >
               {importing ? 'Memproses...' : 'Proses & Import Item'}
             </Button>

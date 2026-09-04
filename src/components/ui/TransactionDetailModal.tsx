@@ -574,30 +574,30 @@ export function TransactionDetailModal({
             </div>
 
             {/* Footer Action Buttons */}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between pt-3 border-t border-gray-100 gap-2.5">
               {role === 'admin' ? (
                 <button
                   type="button"
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="px-3.5 py-2 rounded-xl text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl text-red-600 hover:bg-red-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors border sm:border-0 border-red-200"
                 >
-                  <Trash2 size={15} /> Hapus
+                  <Trash2 size={15} /> Hapus Transaksi
                 </button>
               ) : <div />}
 
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={handleStartEditing}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-md"
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-md"
                 >
-                  <Edit3 size={15} /> Edit Transaksi
+                  <Edit3 size={15} /> Edit
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all"
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold text-center transition-all"
                 >
                   Tutup
                 </button>
@@ -770,7 +770,7 @@ export function TransactionDetailModal({
                     <button
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, jalurTransfer: 'custom' }))}
-                      className={`p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
+                      className={`col-span-2 sm:col-span-1 p-2 rounded-xl border text-center text-[11px] font-semibold transition-all ${
                         editForm.jalurTransfer === 'custom'
                           ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/20'
                           : 'border-gray-200 text-gray-700 bg-white'
@@ -862,32 +862,32 @@ export function TransactionDetailModal({
 
               {/* Saku / Rekening Conditional Selector */}
               {editForm.kategori === 'Mutasi Internal / Transfer Kas' ? (
-                <>
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-2xl mb-1">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Asal (Dari)</label>
+                    <label className="block text-xs font-bold text-blue-900 mb-1 uppercase tracking-wider">Saku Asal (Dari)</label>
                     <select
                       value={editForm.rekeningId}
                       onChange={e => setEditForm(f => ({ ...f, rekeningId: e.target.value as AccountId }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                      className="w-full border border-blue-200 rounded-xl px-3 py-2 text-xs font-semibold text-blue-900 bg-white"
                     >
-                      <option value="bca_utama">🏦 BCA Utama</option>
-                      <option value="bri_utama">🏦 BRI Utama</option>
-                      <option value="kas_admin">💵 Kas Operasional Admin</option>
+                      <option value="bca_utama">💳 BCA Utama</option>
+                      <option value="bri_utama">💳 BRI Utama</option>
+                      <option value="kas_admin">💼 Kas Operasional Admin</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Saku Tujuan (Ke)</label>
+                    <label className="block text-xs font-bold text-blue-900 mb-1 uppercase tracking-wider">Saku Tujuan (Ke)</label>
                     <select
                       value={editForm.rekeningTujuanId}
                       onChange={e => setEditForm(f => ({ ...f, rekeningTujuanId: e.target.value as AccountId }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium bg-white"
+                      className="w-full border border-blue-200 rounded-xl px-3 py-2 text-xs font-semibold text-blue-900 bg-white"
                     >
-                      <option value="bca_utama">🏦 BCA Utama</option>
-                      <option value="bri_utama">🏦 BRI Utama</option>
-                      <option value="kas_admin">💵 Kas Operasional Admin</option>
+                      <option value="bca_utama">💳 BCA Utama</option>
+                      <option value="bri_utama">💳 BRI Utama</option>
+                      <option value="kas_admin">💼 Kas Operasional Admin</option>
                     </select>
                   </div>
-                </>
+                </div>
               ) : (
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -955,7 +955,7 @@ export function TransactionDetailModal({
               {/* Sub-Divisi Selector in Edit Mode */}
               <div className="sm:col-span-2 border-t border-gray-100 pt-2.5 mt-1">
                 <label className="block text-xs font-bold text-gray-700 mb-1">Sub-Divisi Pengaju</label>
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
                     { id: undefined, label: '🌐 Umum' },
                     { id: 'admin', label: '💼 Admin' },
@@ -1084,11 +1084,11 @@ export function TransactionDetailModal({
             </div>
 
             {/* Edit Footer Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-gray-100">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold"
+                className="w-full sm:w-auto px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold text-center"
                 disabled={saving}
               >
                 Batal
@@ -1097,7 +1097,7 @@ export function TransactionDetailModal({
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-50"
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                 {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
