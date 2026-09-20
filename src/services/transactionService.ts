@@ -298,9 +298,15 @@ function mapTransactionToRow(t: Transaction): any {
     tag: t.tag ?? null,
     proyek_id: (typeof t.proyekId === 'string' && t.proyekId.trim()) ? t.proyekId.trim() : null,
     surat_pengajuan_id: (typeof t.suratPengajuanId === 'string' && t.suratPengajuanId.trim()) ? t.suratPengajuanId.trim() : null,
-    lampiran: t.lampiran ?? [],
+    lampiran: (t.lampiran || [])
+      .filter((att: any) => att && typeof att.dataUrl === 'string' && !att.dataUrl.startsWith('data:'))
+      .map((att: any) => ({
+        nama: att.nama || 'Lampiran',
+        tipe: att.tipe || 'application/octet-stream',
+        dataUrl: att.dataUrl,
+      })),
     status: t.status,
-    bukti_transfer: t.buktiTransfer ?? null,
+    bukti_transfer: (t.buktiTransfer && !t.buktiTransfer.startsWith('data:')) ? t.buktiTransfer : null,
     catatan_penolakan: t.catatanPenolakan ?? null,
     penerima_detail: t.penerimaDetail ?? null,
     jalur_transfer: t.jalurTransfer ?? null,

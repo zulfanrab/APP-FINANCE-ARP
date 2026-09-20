@@ -97,7 +97,8 @@ export function mapProjectToRow(p: Project): any {
     tanggal_selesai: p.tanggalSelesai ?? null,
     status: p.status,
     deskripsi: p.deskripsi ?? null,
-    surat_pengajuan_pdf: p.suratPengajuanPdf ?? null,
+    // BULLETPROOF SAFEGUARD: Never store Base64 in Supabase
+    surat_pengajuan_pdf: (p.suratPengajuanPdf && !p.suratPengajuanPdf.startsWith('data:')) ? p.suratPengajuanPdf : null,
     procurement_items: p.procurementItems ? JSON.stringify(p.procurementItems) : null,
     is_deleted: p.isDeleted ?? false,
     deleted_at: p.deletedAt ?? null,

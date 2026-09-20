@@ -166,36 +166,41 @@ function readAsDataUrlFallback(file: File, mimeType: string, resolve: (att: Atta
 }
 
 /**
- * Uploads attachment file safely with multi-tiered fallback.
- * First tries Google Drive (if configured).
- * If Google Drive is unconfigured or fails (due to CORS/Network/Webhook error on mobile),
- * it seamlessly falls back to compressed local DataURL.
+ * Uploads attachment file to Google Drive.
+ * Timeout is 25s to handle Google Apps Script cold starts.
+ * IMPORTANT: This function NEVER falls back to Base64 to prevent Supabase egress explosion.
+ * If Drive upload fails, it returns an Attachment with empty dataUrl.
+ * The caller (TransactionForm) is responsible for informing the user.
  */
 export async function uploadAttachmentFile(
   file: File,
   context: UploadContext
 ): Promise<Attachment> {
-  const localProcessed = await compressFileToAttachment(file);
-
-  if (isGoogleDriveConfigured) {
-    try {
-      const drivePromise = uploadToGoogleDrive(file, context);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Drive upload timeout')), 4500)
-      );
-      const driveResult = await Promise.race([drivePromise, timeoutPromise]);
-      if (driveResult && driveResult.dataUrl) {
-        return {
-          nama: file.name,
-          tipe: file.type || localProcessed.tipe,
-          dataUrl: driveResult.dataUrl,
-          ...(localProcessed.dataUrl ? { localFallbackUrl: localProcessed.dataUrl } : {}),
-        } as Attachment;
-      }
-    } catch (err) {
-      console.warn('Google Drive upload warning (falling back to compressed DataURL):', err);
-    }
+  if (!isGoogleDriveConfigured) {
+    // Drive not configured — return empty attachment (no Base64 stored in DB)
+    console.warn('Google Drive not configured. Attachment will not be saved.');
+    return { nama: file.name, tipe: file.type || 'application/octet-stream', dataUrl: '' };
   }
 
-  return localProcessed;
+  try {
+    const drivePromise = uploadToGoogleDrive(file, context);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Drive upload timeout after 25s')), 25000)
+    );
+    const driveResult = await Promise.race([drivePromise, timeoutPromise]);
+    if (driveResult && driveResult.dataUrl) {
+      return {
+        nama: file.name,
+        tipe: file.type || driveResult.tipe,
+        dataUrl: driveResult.dataUrl,
+      };
+    }
+    // Drive returned no URL — return empty (do not fall back to Base64)
+    console.warn('Google Drive returned no URL for file:', file.name);
+    return { nama: file.name, tipe: file.type || 'application/octet-stream', dataUrl: '' };
+  } catch (err) {
+    console.error('Google Drive upload failed:', err);
+    // NEVER fall back to Base64 — return empty attachment
+    return { nama: file.name, tipe: file.type || 'application/octet-stream', dataUrl: '' };
+  }
 }

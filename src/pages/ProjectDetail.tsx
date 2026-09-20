@@ -601,7 +601,11 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           tanggal: project.tanggalMulai,
           proyekNama: editNama.trim(),
         });
-        pdfUrl = result.dataUrl;
+        if (result.dataUrl) {
+          pdfUrl = result.dataUrl;
+        } else {
+          addToast('error', 'Gagal mengunggah surat pengajuan PDF ke Google Drive');
+        }
       }
       await updateProject(project.id, {
         nama: editNama.trim(),

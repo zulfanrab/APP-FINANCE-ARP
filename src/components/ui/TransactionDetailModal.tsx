@@ -15,7 +15,7 @@ import { type Transaction, type Project, type JalurTransfer, type AccountId, typ
 import { updateTransaction, deleteTransaction, getTransactions, getTransactionById } from '../../services/transactionService';
 import { getProjects } from '../../services/projectService';
 import { getCategories } from '../../services/categoryService';
-import { uploadAttachmentFile, compressFileToAttachment } from '../../services/storageService';
+import { uploadAttachmentFile } from '../../services/storageService';
 import { formatRupiah, formatDate, StatusBadge } from './index';
 import { isCapitalInjectionTx } from './PdfReportModal';
 import { isOmzetRil } from '../../services/analyticsService';
@@ -326,39 +326,40 @@ export function TransactionDetailModal({
     try {
       const currentProject = cachedProjects.find(p => p.id === editForm.proyekId);
 
-      // Process attachments with parallel execution and safety fallback
-      const finalAttachments: Attachment[] = await Promise.all(
-        stagedAttachments.map(async (att) => {
-          if (att.fileObj) {
-            try {
+      // Process attachments safely without any Base64 fallback
+      let driveFailCount = 0;
+      const finalAttachments: Attachment[] = (
+        await Promise.all(
+          stagedAttachments.map(async (att) => {
+            if (att.fileObj) {
               const uploaded = await uploadAttachmentFile(att.fileObj, {
                 tanggal: editForm.tanggal,
                 tag: editForm.tag,
                 proyekNama: currentProject?.nama,
               });
-              if (uploaded && uploaded.dataUrl) {
-                return uploaded;
+              if (!uploaded.dataUrl) {
+                driveFailCount++;
+                return null;
               }
-              return await compressFileToAttachment(att.fileObj);
-            } catch {
-              try {
-                return await compressFileToAttachment(att.fileObj);
-              } catch {
-                return {
-                  nama: att.nama,
-                  tipe: att.tipe,
-                  dataUrl: att.dataUrl || '',
-                };
-              }
+              return uploaded;
             }
-          }
-          return {
-            nama: att.nama,
-            tipe: att.tipe,
-            dataUrl: att.dataUrl || '',
-          };
-        })
-      );
+            // Existing URL - reject if it starts with data: (prevent persisting any existing base64)
+            if (att.dataUrl && att.dataUrl.startsWith('data:')) {
+              driveFailCount++;
+              return null;
+            }
+            return {
+              nama: att.nama,
+              tipe: att.tipe,
+              dataUrl: att.dataUrl || '',
+            };
+          })
+        )
+      ).filter((a): a is Attachment => a !== null && Boolean(a.dataUrl));
+
+      if (driveFailCount > 0) {
+        addToast('error', `${driveFailCount} foto gagal diunggah ke Google Drive dan tidak disimpan.`);
+      }
 
       const adminNominalCustom = parseRupiahInput(editForm.adminNominalCustomStr || '0');
 

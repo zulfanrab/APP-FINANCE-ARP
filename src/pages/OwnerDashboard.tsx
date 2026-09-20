@@ -214,8 +214,12 @@ export function OwnerDashboard() {
         tanggal: new Date().toISOString().split('T')[0],
         tag: 'Bukti_Transfer',
       });
-      setTransferFile(att.dataUrl);
-      addToast('success', 'Bukti transfer berhasil terlampir');
+      if (att.dataUrl) {
+        setTransferFile(att.dataUrl);
+        addToast('success', 'Bukti transfer berhasil terlampir');
+      } else {
+        addToast('error', 'Gagal mengunggah bukti transfer ke Google Drive');
+      }
     } catch {
       addToast('error', 'Gagal mengunggah bukti transfer');
     } finally {
@@ -248,8 +252,12 @@ export function OwnerDashboard() {
         tanggal: new Date().toISOString().split('T')[0],
         tag: quickForm.mode === 'prive' ? 'pribadi' : 'operasional',
       });
-      setQuickAttachments(prev => [...prev, att]);
-      addToast('success', 'Lampiran berhasil ditambahkan');
+      if (att.dataUrl) {
+        setQuickAttachments(prev => [...prev, att]);
+        addToast('success', 'Lampiran berhasil ditambahkan');
+      } else {
+        addToast('error', 'Gagal mengunggah lampiran ke Google Drive');
+      }
     } catch {
       addToast('error', 'Gagal mengunggah lampiran');
     } finally {

@@ -151,7 +151,11 @@ export function Projects() {
           tanggal: form.tanggalMulai,
           proyekNama: form.nama.trim(),
         });
-        pdfUrl = result.dataUrl;
+        if (result.dataUrl) {
+          pdfUrl = result.dataUrl;
+        } else {
+          addToast('error', 'Gagal mengunggah surat pengajuan PDF ke Google Drive');
+        }
       }
 
       if (editingProject) {

@@ -14,7 +14,7 @@ import Tesseract from 'tesseract.js';
 import { addTransaction, getTransactions } from '../services/transactionService';
 import { getProjects } from '../services/projectService';
 import { getCategories, addCategory, deleteCategory, DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from '../services/categoryService';
-import { uploadAttachmentFile, compressFileToAttachment } from '../services/storageService';
+import { uploadAttachmentFile } from '../services/storageService';
 import { type Project, type Attachment, type JalurTransfer, type AccountId } from '../types';
 import { Button, Card, formatRupiah } from '../components/ui';
 import { scanReceiptWithGemini } from '../services/aiOcrService';
@@ -319,38 +319,38 @@ useEffect(() => {
     try {
       const currentProject = cachedProjects.find(p => p.id === (form.proyekId || urlProyekId));
 
-      const uploadedAttachments: Attachment[] = await Promise.all(
-        stagedFiles.map(async (staged) => {
-          if (staged.fileObj) {
-            try {
+      let driveFailCount = 0;
+      const uploadedAttachments: Attachment[] = (
+        await Promise.all(
+          stagedFiles.map(async (staged) => {
+            if (staged.fileObj) {
               const uploaded = await uploadAttachmentFile(staged.fileObj, {
                 tanggal: form.tanggal,
                 tag: form.tag,
                 proyekNama: currentProject?.nama,
               });
-              if (uploaded && uploaded.dataUrl) {
-                return uploaded;
+              if (!uploaded.dataUrl) {
+                // Drive upload failed — skip this attachment (never store Base64)
+                driveFailCount++;
+                return null;
               }
-              return await compressFileToAttachment(staged.fileObj);
-            } catch {
-              try {
-                return await compressFileToAttachment(staged.fileObj);
-              } catch {
-                return {
-                  nama: staged.nama,
-                  tipe: staged.tipe,
-                  dataUrl: staged.dataUrl || '',
-                };
-              }
+              return uploaded;
             }
-          }
-          return {
-            nama: staged.nama,
-            tipe: staged.tipe,
-            dataUrl: staged.dataUrl,
-          };
-        })
-      );
+            // staged.dataUrl already a Drive URL (from edit/preview) — keep as-is
+            // but reject if it looks like Base64
+            if (staged.dataUrl && staged.dataUrl.startsWith('data:')) {
+              driveFailCount++;
+              return null;
+            }
+            return { nama: staged.nama, tipe: staged.tipe, dataUrl: staged.dataUrl };
+          })
+        )
+      ).filter((a): a is Attachment => a !== null && Boolean(a.dataUrl));
+
+      if (driveFailCount > 0) {
+        addToast('error', `${driveFailCount} foto gagal diupload ke Google Drive dan tidak disimpan. Coba tambahkan ulang setelah transaksi tersimpan.`);
+      }
+
 
       const adminNominalCustom = parseRupiahInput(form.adminNominalCustomStr || '0');
 
