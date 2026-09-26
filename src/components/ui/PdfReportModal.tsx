@@ -220,6 +220,7 @@ export interface AccountingPageChunk {
     debet: number;
     kredit: number;
     saldo: number;
+    isSubtotal?: boolean;
   }[];
   pindahanDebet?: number;
   pindahanKredit?: number;
@@ -236,7 +237,7 @@ export interface AccountingPageChunk {
  * - "PINDAHAN DARI HALAMAN SEBELUMNYA" at top of subsequent page
  */
 export function splitTransactionsIntoAccountingPages(
-  rows: { no: number | string; tanggal: string; deskripsi: string; kategori: string; debet: number; kredit: number; saldo: number }[],
+  rows: { no: number | string; tanggal: string; deskripsi: string; kategori: string; debet: number; kredit: number; saldo: number; isSubtotal?: boolean; }[],
   isF4: boolean = true,
   hasProcurementItems: boolean = false,
   hasKopAndSummary: boolean = true
@@ -521,6 +522,7 @@ export function PdfReportModal({
     debet: number;
     kredit: number;
     saldo: number;
+    isSubtotal?: boolean;
   }[] = [];
 
   let modalAwal = 0;
@@ -1968,8 +1970,50 @@ export function PdfReportModal({
               });
               const hasProcurementSection = displayProcurementItems.length > 0;
 
+              // Inject Daily Subtotals
+              const tableRowsWithSubtotals: typeof tableRows = [];
+              let currentDay = tableRows.length > 0 ? tableRows[0].tanggal : '';
+              let dailyDebet = 0;
+              let dailyKredit = 0;
+
+              for (let i = 0; i < tableRows.length; i++) {
+                const r = tableRows[i];
+                if (r.tanggal !== currentDay && r.tanggal) {
+                  // End of day, push subtotal
+                  tableRowsWithSubtotals.push({
+                    no: '',
+                    tanggal: currentDay,
+                    deskripsi: 'SUBTOTAL HARIAN (' + currentDay + ')',
+                    kategori: '',
+                    debet: dailyDebet,
+                    kredit: dailyKredit,
+                    saldo: tableRowsWithSubtotals[tableRowsWithSubtotals.length - 1]?.saldo || 0,
+                    isSubtotal: true
+                  });
+                  currentDay = r.tanggal;
+                  dailyDebet = 0;
+                  dailyKredit = 0;
+                }
+                dailyDebet += r.debet || 0;
+                dailyKredit += r.kredit || 0;
+                tableRowsWithSubtotals.push(r);
+              }
+              // Push last day subtotal
+              if (tableRows.length > 0) {
+                tableRowsWithSubtotals.push({
+                  no: '',
+                  tanggal: currentDay,
+                  deskripsi: 'SUBTOTAL HARIAN (' + currentDay + ')',
+                  kategori: '',
+                  debet: dailyDebet,
+                  kredit: dailyKredit,
+                  saldo: tableRowsWithSubtotals[tableRowsWithSubtotals.length - 1]?.saldo || 0,
+                  isSubtotal: true
+                });
+              }
+
               const accountingChunks = splitTransactionsIntoAccountingPages(
-                tableRows,
+                tableRowsWithSubtotals,
                 paperSize === 'f4',
                 hasProcurementSection,
                 Boolean(project)
@@ -2255,23 +2299,46 @@ export function PdfReportModal({
                         )}
 
                         {/* 2. Baris Transaksi di Halaman Ini */}
-                        {chunk.rows.map((row, idx) => (
-                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-emerald-50/20' : 'bg-[#F8FAFC] hover:bg-emerald-50/20'}>
-                            <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{row.no}</td>
-                            <td className="p-2.5 border border-slate-200 text-center font-medium whitespace-nowrap text-slate-700 tabular-nums">{row.tanggal}</td>
-                            <td className="p-2.5 border border-slate-200 text-left font-bold text-slate-900 break-words">{row.deskripsi}</td>
-                            <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">{row.kategori}</td>
-                            <td className="p-2.5 border border-slate-200 text-right font-semibold text-emerald-700 tabular-nums">
-                              {row.debet > 0 ? formatRupiah(row.debet) : '-'}
-                            </td>
-                            <td className="p-2.5 border border-slate-200 text-right font-semibold text-rose-700 tabular-nums">
-                              {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
-                            </td>
-                            <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${row.saldo >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
-                              {formatSaldoRupiah(row.saldo)}
-                            </td>
-                          </tr>
-                        ))}
+                        {chunk.rows.map((row, idx) => {
+                          if (row.isSubtotal) {
+                            const subNet = (row.debet || 0) - (row.kredit || 0);
+                            return (
+                              <tr key={`subtotal-${idx}`} className="bg-amber-50/60 font-bold border-y border-amber-200">
+                                <td className="p-2.5 border border-slate-200 text-center text-slate-400">-</td>
+                                <td className="p-2.5 border border-slate-200 text-center text-amber-700">{row.tanggal}</td>
+                                <td colSpan={2} className="p-2.5 border border-slate-200 text-right font-extrabold text-amber-800 tracking-wider text-[10px]">
+                                  {row.deskripsi} &nbsp; {subNet >= 0 ? '(SURPLUS)' : '(DEFISIT)'}
+                                </td>
+                                <td className="p-2.5 border border-slate-200 text-right font-bold text-emerald-700 tabular-nums">
+                                  {row.debet > 0 ? formatRupiah(row.debet) : '-'}
+                                </td>
+                                <td className="p-2.5 border border-slate-200 text-right font-bold text-rose-700 tabular-nums">
+                                  {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
+                                </td>
+                                <td className="p-2.5 border border-slate-200 text-right font-black tabular-nums text-slate-400 italic">
+                                  -
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white hover:bg-emerald-50/20' : 'bg-[#F8FAFC] hover:bg-emerald-50/20'}>
+                              <td className="p-2.5 border border-slate-200 text-center text-slate-500 font-medium tabular-nums">{row.no}</td>
+                              <td className="p-2.5 border border-slate-200 text-center font-medium whitespace-nowrap text-slate-700 tabular-nums">{row.tanggal}</td>
+                              <td className="p-2.5 border border-slate-200 text-left font-bold text-slate-900 break-words">{row.deskripsi}</td>
+                              <td className="p-2.5 border border-slate-200 text-left text-slate-600 font-medium">{row.kategori}</td>
+                              <td className="p-2.5 border border-slate-200 text-right font-semibold text-emerald-700 tabular-nums">
+                                {row.debet > 0 ? formatRupiah(row.debet) : '-'}
+                              </td>
+                              <td className="p-2.5 border border-slate-200 text-right font-semibold text-rose-700 tabular-nums">
+                                {row.kredit > 0 ? formatRupiah(row.kredit) : '-'}
+                              </td>
+                              <td className={`p-2.5 border border-slate-200 text-right font-black tabular-nums ${row.saldo >= 0 ? 'text-slate-900' : 'text-rose-700'}`}>
+                                {formatSaldoRupiah(row.saldo)}
+                              </td>
+                            </tr>
+                          );
+                        })}
 
                         {/* 3. Baris JUMLAH DIPINDAHKAN jika BUKAN halaman terakhir (Paling Bawah Halaman Ini) */}
                         {!chunk.isLastPage && (
