@@ -899,6 +899,23 @@ ${summary.sisaDanaProyek >= 0 ? 'Penggunaan anggaran proyek berjalan sangat efis
           <Button
             variant="secondary"
             size="sm"
+            icon={<Sparkles size={15} className="text-emerald-600" />}
+            onClick={() => {
+              if (!project) return;
+              const items = project.procurementItems || [];
+              const totalItems = items.length;
+              const purchasedItems = items.filter(i => i.isPurchased).length;
+              const text = `📋 RINGKASAN EXECUTIVE PROYEK: ${project.nama.toUpperCase()}\n👤 Klien: ${project.klien}\n------------------------------------------\n💰 Modal Cair/Drop: ${formatRupiah(financials.modalDisuntikkan)}\n💸 Realisasi Belanja: ${formatRupiah(financials.totalPengeluaran)}\n💵 Sisa Cash di Tangan: ${formatRupiah(financials.sisaDanaProyek)}\n📋 Status Belanja: ${purchasedItems} / ${totalItems} Item (${totalItems > 0 ? Math.round((purchasedItems/totalItems)*100) : 0}%)\n------------------------------------------\nDiproses oleh ARKA Finance. Audit Verified.`;
+              navigator.clipboard.writeText(text);
+              addToast('success', '📋 Rangkuman WA Direksi berhasil disalin! Tinggal Paste di WA Pak Habsi / Pak Fatwa.');
+            }}
+            className="bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+          >
+            📋 Copy WA Direksi
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             icon={<Download size={15} />}
             onClick={() => exportProjectRealisasiExcel(project, transactions)}
           >
